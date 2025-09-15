@@ -2,21 +2,21 @@
 
 ## Phase 1: Project Setup and Core Infrastructure
 
-- [ ] 1. Set up project structure and basic models
+- [x] 1. Set up project structure and basic models
   - Create directory structure: Models/, ViewModels/, Views/, Services/, Utilities/
   - Create Role enum with display names and MembershipStatus enum
   - Create basic data models (Family, UserProfile, Membership) as simple structs for prototyping
   - Add mock data generators for testing UI components
   - _Requirements: 2.2, 4.2_
 
-- [ ] 2. Configure project entitlements and dependencies
+- [x] 2. Configure project entitlements and dependencies
   - Update TribeBoard.entitlements for CloudKit and Sign in with Apple capabilities
   - Add required frameworks: SwiftData, CloudKit, AuthenticationServices
   - Update Info.plist with usage descriptions for camera (QR scanning)
   - Configure app identifier and CloudKit container in project settings
   - _Requirements: 7.4, 7.5_
 
-- [ ] 3. Create app navigation structure and state management
+- [x] 3. Create app navigation structure and state management
   - Replace ContentView with main navigation using NavigationStack
   - Create AppState ObservableObject for global state management
   - Implement authentication state tracking and routing logic
@@ -25,14 +25,14 @@
 
 ## Phase 2: Authentication and Onboarding
 
-- [ ] 4. Implement OnboardingView with mock authentication
+- [x] 4. Implement OnboardingView with mock authentication
   - Create OnboardingView with TribeBoard branding and Sign in with Apple button
   - Implement OnboardingViewModel with mock authentication flow
   - Add loading states and error handling UI
   - Navigate to family selection (create/join) after successful authentication
   - _Requirements: 1.1, 1.2, 1.4_
 
-- [ ] 5. Create family selection flow
+- [x] 5. Create family selection flow
   - Implement FamilySelectionView with options to create or join family
   - Add navigation to CreateFamilyView or JoinFamilyView based on user choice
   - Include back navigation and proper flow coordination
@@ -40,7 +40,7 @@
 
 ## Phase 3: Family Creation and Joining
 
-- [ ] 6. Implement CreateFamilyView with mock data
+- [x] 6. Implement CreateFamilyView with mock data
   - Create CreateFamilyView with family name input and validation
   - Generate mock family code (6-8 characters) and display
   - Create mock QR code placeholder image for family code
@@ -48,7 +48,7 @@
   - Navigate to family dashboard with mock family data
   - _Requirements: 2.1, 2.2, 2.4_
 
-- [ ] 7. Create JoinFamilyView with mock family search
+- [x] 7. Create JoinFamilyView with mock family search
   - Implement JoinFamilyView with family code input and QR scan button (mock)
   - Create mock family search that returns sample family data
   - Add family confirmation dialog showing mock family name and member count
@@ -58,7 +58,7 @@
 
 ## Phase 4: Role Management
 
-- [ ] 8. Implement RoleSelectionView with role constraints
+- [x] 8. Implement RoleSelectionView with role constraints
   - Create RoleSelectionView with role selection cards (icons, titles, descriptions)
   - Implement role selection logic with Parent Admin constraint checking
   - Create RoleSelectionViewModel with mock role validation
@@ -68,7 +68,7 @@
 
 ## Phase 5: Family Dashboard
 
-- [ ] 9. Create FamilyDashboardView with member management
+- [x] 9. Create FamilyDashboardView with member management
   - Implement FamilyDashboardView displaying mock family members with avatars and role badges
   - Show different UI states for Parent Admin vs regular members
   - Add member management controls (role change, remove) for Parent Admin only

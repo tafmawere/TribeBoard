@@ -11,7 +11,7 @@ import SwiftUI
 struct TribeBoardApp: App {
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            MainNavigationView()
         }
     }
 }
