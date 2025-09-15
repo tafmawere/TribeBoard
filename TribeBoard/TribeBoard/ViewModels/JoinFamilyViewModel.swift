@@ -66,6 +66,9 @@ class JoinFamilyViewModel: ObservableObject {
             foundFamily = family
             memberCount = mockMemberCounts[family.id] ?? 0
             showConfirmation = true
+            
+            // Success haptic feedback
+            HapticManager.shared.success()
         } else {
             // Mock some specific error scenarios
             switch trimmedCode {
@@ -76,6 +79,9 @@ class JoinFamilyViewModel: ObservableObject {
             default:
                 errorMessage = "Family not found. Please check the code and try again."
             }
+            
+            // Error haptic feedback
+            HapticManager.shared.error()
         }
         
         isSearching = false
@@ -116,6 +122,14 @@ class JoinFamilyViewModel: ObservableObject {
         // Mock join logic - always succeeds for demo
         // In real implementation, this would create a Membership record
         
+        // Success haptic feedback
+        HapticManager.shared.success()
+        
+        // Show success toast
+        if let family = foundFamily {
+            ToastManager.shared.success("Joined \(family.name) successfully!")
+        }
+        
         isJoining = false
         showConfirmation = false
         
@@ -148,10 +162,14 @@ class JoinFamilyViewModel: ObservableObject {
     
     // MARK: - Validation
     
+    /// Validation state for family code using the new validation system
+    var familyCodeValidation: ValidationState {
+        return ValidationRules.familyCode.validate(familyCode)
+    }
+    
     /// Check if family code format is valid
     var isValidCodeFormat: Bool {
-        let trimmed = familyCode.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.count >= 4 && trimmed.count <= 8 && trimmed.allSatisfy { $0.isLetter || $0.isNumber }
+        return familyCodeValidation.isValid
     }
     
     /// Check if search can be performed

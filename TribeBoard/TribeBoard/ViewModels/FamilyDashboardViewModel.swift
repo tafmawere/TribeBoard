@@ -82,17 +82,20 @@ class FamilyDashboardViewModel: ObservableObject {
     func changeRole(for member: Membership, to newRole: Role) async {
         guard currentUserRole == .parentAdmin else {
             errorMessage = "Only Parent Admin can change member roles"
+            HapticManager.shared.error()
             return
         }
         
         guard member.userId != currentUserId else {
             errorMessage = "You cannot change your own role"
+            HapticManager.shared.error()
             return
         }
         
         // Check if trying to assign Parent Admin when one already exists
         if newRole == .parentAdmin && members.contains(where: { $0.role == .parentAdmin }) {
             errorMessage = "Only one Parent Admin is allowed per family"
+            HapticManager.shared.warning()
             return
         }
         
@@ -111,6 +114,12 @@ class FamilyDashboardViewModel: ObservableObject {
                     self.isLoading = false
                     self.showRoleChangeSheet = false
                     self.selectedMember = nil
+                    
+                    // Success haptic feedback
+                    HapticManager.shared.success()
+                    
+                    // Show success toast
+                    ToastManager.shared.success("Role updated to \(newRole.displayName)")
                 }
             }
             
@@ -126,16 +135,19 @@ class FamilyDashboardViewModel: ObservableObject {
     func removeMember(_ member: Membership) async {
         guard currentUserRole == .parentAdmin else {
             errorMessage = "Only Parent Admin can remove members"
+            HapticManager.shared.error()
             return
         }
         
         guard member.userId != currentUserId else {
             errorMessage = "You cannot remove yourself from the family"
+            HapticManager.shared.error()
             return
         }
         
         guard member.role != .parentAdmin else {
             errorMessage = "Cannot remove Parent Admin"
+            HapticManager.shared.warning()
             return
         }
         
@@ -156,6 +168,12 @@ class FamilyDashboardViewModel: ObservableObject {
                     self.isLoading = false
                     self.showRemovalConfirmation = false
                     self.memberToRemove = nil
+                    
+                    // Success haptic feedback
+                    HapticManager.shared.success()
+                    
+                    // Show success toast
+                    ToastManager.shared.success("Member removed from family")
                 }
             }
             

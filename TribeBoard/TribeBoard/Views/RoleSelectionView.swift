@@ -32,9 +32,13 @@ struct RoleSelectionView: View {
         .background(Color(.systemGroupedBackground))
         .overlay {
             if viewModel.isUpdating {
-                LoadingOverlay()
+                LoadingStateView(
+                    message: "Updating your role...",
+                    style: .overlay
+                )
             }
         }
+        .withToast()
         .alert("Role Selection Error", isPresented: .constant(viewModel.errorMessage != nil)) {
             Button("OK") {
                 viewModel.errorMessage = nil
@@ -101,24 +105,18 @@ struct RoleSelectionView: View {
     
     private var continueButton: some View {
         VStack(spacing: 12) {
-            Button(action: {
-                Task {
-                    await viewModel.updateRole(viewModel.selectedRole)
-                }
-            }) {
-                HStack {
-                    if viewModel.isUpdating {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                            .scaleEffect(0.8)
-                    } else {
-                        Text("Continue")
-                            .fontWeight(.semibold)
+            LoadingButton(
+                title: "Continue",
+                isLoading: viewModel.isUpdating,
+                action: {
+                    Task {
+                        await viewModel.updateRole(viewModel.selectedRole)
                     }
-                }
-            }
-            .buttonStyle(PrimaryButtonStyle())
-            .disabled(viewModel.isUpdating)
+                },
+                style: .primary
+            )
+            .accessibilityLabel("Continue with selected role")
+            .accessibilityHint("Confirms your role selection and continues to the family dashboard")
             
             Text("You can change your role later in family settings")
                 .font(.caption)

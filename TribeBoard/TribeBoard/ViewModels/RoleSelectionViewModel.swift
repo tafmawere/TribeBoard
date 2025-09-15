@@ -56,6 +56,7 @@ class RoleSelectionViewModel: ObservableObject {
         if role == .parentAdmin && !canSelectParentAdmin {
             showError("A Parent Admin already exists for this family. Selecting Adult role instead.")
             selectedRole = .adult
+            HapticManager.shared.warning()
             return
         }
         
@@ -78,6 +79,12 @@ class RoleSelectionViewModel: ObservableObject {
                 role: role
             )
             
+            // Success haptic feedback
+            HapticManager.shared.success()
+            
+            // Show success toast
+            ToastManager.shared.success("Role set to \(role.displayName)")
+            
             // Update app state with new membership
             appState?.setFamily(currentFamily, membership: membership)
             
@@ -85,6 +92,7 @@ class RoleSelectionViewModel: ObservableObject {
             
         } catch {
             showError("Failed to update role. Please try again.")
+            HapticManager.shared.error()
         }
         
         isUpdating = false

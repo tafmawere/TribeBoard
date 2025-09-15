@@ -28,21 +28,9 @@ class CreateFamilyViewModel: ObservableObject {
     
     // MARK: - Computed Properties
     
-    /// Validation message for family name
-    var familyNameValidationMessage: String? {
-        if familyName.isEmpty {
-            return nil
-        }
-        
-        if familyName.count < 2 {
-            return "Family name must be at least 2 characters"
-        }
-        
-        if familyName.count > 50 {
-            return "Family name must be less than 50 characters"
-        }
-        
-        return nil
+    /// Validation state for family name using the new validation system
+    var familyNameValidation: ValidationState {
+        return ValidationRules.familyName.validate(familyName)
     }
     
     /// Whether the create button should be enabled
@@ -99,11 +87,18 @@ class CreateFamilyViewModel: ObservableObject {
             createdFamily = family
             qrCodeImage = qrImage
             
+            // Success haptic feedback
+            HapticManager.shared.success()
+            
+            // Show success toast
+            ToastManager.shared.success("Family '\(trimmedName)' created successfully!")
+            
             // Update app state and navigate to dashboard
             appState.setFamily(family, membership: membership)
             
         } catch {
             errorMessage = error.localizedDescription
+            HapticManager.shared.error()
         }
         
         isCreating = false

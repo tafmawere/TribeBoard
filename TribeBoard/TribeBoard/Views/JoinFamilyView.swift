@@ -78,9 +78,9 @@ struct JoinFamilyView: View {
                         }
                         .padding(.horizontal, 20)
                         
-                        // Error message
+                        // Error message with enhanced styling
                         if let errorMessage = viewModel.errorMessage {
-                            ErrorMessageView(message: errorMessage) {
+                            InlineErrorView(message: errorMessage) {
                                 viewModel.clearError()
                             }
                             .padding(.horizontal, 20)
@@ -127,6 +127,7 @@ struct JoinFamilyView: View {
                 }
             )
         }
+        .withToast()
         .onAppear {
             viewModel.reset()
         }
@@ -153,7 +154,11 @@ struct FamilyCodeInputSection: View {
                 
                 HStack {
                     TextField("Enter family code", text: $familyCode)
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                        .textFieldStyle(ValidatedTextFieldStyle(
+                            isValid: isValidFormat || familyCode.isEmpty,
+                            isFocused: isCodeFieldFocused,
+                            hasError: !isValidFormat && !familyCode.isEmpty
+                        ))
                         .textInputAutocapitalization(.characters)
                         .autocorrectionDisabled()
                         .focused($isCodeFieldFocused)
@@ -185,10 +190,17 @@ struct FamilyCodeInputSection: View {
                     )
                 }
                 
-                // Format hint
-                Text("Family codes are 4-8 characters (letters and numbers)")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                // Validation feedback
+                if !familyCode.isEmpty {
+                    ValidationFeedbackView(
+                        state: ValidationRules.familyCode.validate(familyCode),
+                        showSuccess: false
+                    )
+                } else {
+                    Text("Family codes are 4-8 characters (letters and numbers)")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
             }
         }
     }

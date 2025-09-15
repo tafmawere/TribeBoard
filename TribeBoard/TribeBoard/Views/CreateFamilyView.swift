@@ -41,6 +41,15 @@ struct CreateFamilyView: View {
         .navigationTitle("Create Family")
         .navigationBarTitleDisplayMode(.inline)
 
+        .overlay {
+            if viewModel.isCreating {
+                LoadingStateView(
+                    message: "Creating your family...",
+                    style: .overlay
+                )
+            }
+        }
+        .withToast()
         .alert("Error", isPresented: .constant(viewModel.errorMessage != nil)) {
             Button("OK") {
                 viewModel.clearError()
@@ -48,11 +57,6 @@ struct CreateFamilyView: View {
         } message: {
             if let errorMessage = viewModel.errorMessage {
                 Text(errorMessage)
-            }
-        }
-        .overlay {
-            if viewModel.isCreating {
-                LoadingOverlay()
             }
         }
     }
@@ -84,32 +88,21 @@ struct CreateFamilyView: View {
     
     private var familyNameInputSection: some View {
         VStack(spacing: 16) {
-            // Input field
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Family Name")
-                    .font(.headline)
-                    .foregroundColor(.primary)
-                
-                TextField("Enter your family name", text: $viewModel.familyName)
-                    .textFieldStyle(CustomTextFieldStyle())
-                    .focused($isTextFieldFocused)
-                    .submitLabel(.done)
-                    .onSubmit {
-                        if viewModel.canCreateFamily {
-                            Task {
-                                await viewModel.createFamily(with: appState)
-                            }
+            // Enhanced input field with validation
+            ValidatedTextField(
+                title: "Family Name",
+                placeholder: "Enter your family name",
+                text: $viewModel.familyName,
+                validation: ValidationRules.familyName,
+                submitLabel: .done,
+                onSubmit: {
+                    if viewModel.canCreateFamily {
+                        Task {
+                            await viewModel.createFamily(with: appState)
                         }
                     }
-                
-                // Validation message
-                if let validationMessage = viewModel.familyNameValidationMessage {
-                    Text(validationMessage)
-                        .font(.caption)
-                        .foregroundColor(.red)
-                        .transition(.opacity)
                 }
-            }
+            )
             
             // Input guidelines
             VStack(alignment: .leading, spacing: 4) {
@@ -133,43 +126,22 @@ struct CreateFamilyView: View {
     }
     
     private var createFamilyButton: some View {
-        Button(action: {
-            isTextFieldFocused = false
-            Task {
-                await viewModel.createFamily(with: appState)
-            }
-        }) {
-            HStack(spacing: 12) {
-                if viewModel.isCreating {
-                    ProgressView()
-                        .scaleEffect(0.8)
-                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                } else {
-                    Image(systemName: "plus.circle.fill")
-                        .font(.title3)
+        LoadingButton(
+            title: "Create Family",
+            isLoading: viewModel.isCreating,
+            action: {
+                isTextFieldFocused = false
+                Task {
+                    await viewModel.createFamily(with: appState)
                 }
-                
-                Text(viewModel.isCreating ? "Creating Family..." : "Create Family")
-                    .font(.headline)
-                    .fontWeight(.semibold)
-            }
-            .foregroundColor(.white)
-            .frame(maxWidth: .infinity)
-            .frame(height: 56)
-            .background(
-                LinearGradient.brandGradient
-                    .opacity(viewModel.canCreateFamily ? 1.0 : 0.6)
-            )
-            .cornerRadius(BrandStyle.cornerRadius)
-            .shadow(
-                color: viewModel.canCreateFamily ? BrandStyle.standardShadow : .clear,
-                radius: BrandStyle.shadowRadius,
-                x: BrandStyle.shadowOffset.width,
-                y: BrandStyle.shadowOffset.height
-            )
-        }
+            },
+            style: .primary
+        )
         .disabled(!viewModel.canCreateFamily)
+        .opacity(viewModel.canCreateFamily ? 1.0 : 0.6)
         .animation(.easeInOut(duration: 0.2), value: viewModel.canCreateFamily)
+        .accessibilityLabel("Create Family")
+        .accessibilityHint("Creates a new family with the entered name")
     }
     
     private func familyCodeSection(family: Family) -> some View {
@@ -215,19 +187,12 @@ struct CreateFamilyView: View {
                                 )
                         )
                     
-                    // Copy button
-                    Button(action: {
-                        UIPasteboard.general.string = family.code
-                        // TODO: Add haptic feedback and toast notification
-                    }) {
-                        HStack(spacing: 8) {
-                            Image(systemName: "doc.on.doc")
-                            Text("Copy Code")
-                        }
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                        .foregroundColor(.brandPrimary)
-                    }
+                    // Copy button with enhanced feedback
+                    CopyableText(
+                        text: family.code,
+                        displayText: "Copy Code",
+                        successMessage: "Family code copied to clipboard!"
+                    )
                 }
             }
             

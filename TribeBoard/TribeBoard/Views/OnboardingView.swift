@@ -18,42 +18,48 @@ struct OnboardingView: View {
                     .ignoresSafeArea()
                 
                 ScrollView {
-                    VStack(spacing: 40) {
-                        Spacer(minLength: geometry.size.height * 0.1)
+                    VStack(spacing: 32) {
+                        Spacer(minLength: geometry.size.height * 0.08)
                         
                         // Logo and branding section
-                        VStack(spacing: 24) {
-                            TribeBoardLogoWithText(size: .extraLarge)
+                        VStack(spacing: 32) {
+                            TribeBoardLogoWithText(size: .large)
                             
-                            VStack(spacing: 12) {
+                            VStack(spacing: 16) {
                                 Text("Welcome to TribeBoard")
-                                    .font(.largeTitle)
+                                    .font(.title)
                                     .fontWeight(.bold)
                                     .foregroundColor(.brandPrimary)
                                     .multilineTextAlignment(.center)
                                 
                                 Text("Connect your family, organize your life")
-                                    .font(.title3)
+                                    .font(.subheadline)
                                     .foregroundColor(.secondary)
                                     .multilineTextAlignment(.center)
-                                    .padding(.horizontal)
+                                    .padding(.horizontal, 20)
                             }
                         }
                         
-                        Spacer(minLength: 40)
+                        Spacer(minLength: 32)
                         
                         // Authentication section
-                        VStack(spacing: 20) {
+                        VStack(spacing: 24) {
                             Text("Sign in to get started")
-                                .font(.headline)
+                                .font(.title3)
+                                .fontWeight(.medium)
                                 .foregroundColor(.primary)
                             
-                            // Sign in with Apple button
-                            Button(action: {
-                                Task {
-                                    await viewModel.signInWithApple()
-                                }
-                            }) {
+                            // Enhanced Sign in with Apple button
+                            AccessibleButton(
+                                action: {
+                                    Task {
+                                        await viewModel.signInWithApple()
+                                    }
+                                },
+                                label: "Sign in with Apple",
+                                hint: "Authenticates you with your Apple ID to access TribeBoard",
+                                hapticStyle: .medium
+                            ) {
                                 HStack(spacing: 12) {
                                     if viewModel.isLoading {
                                         ProgressView()
@@ -70,7 +76,7 @@ struct OnboardingView: View {
                                 }
                                 .foregroundColor(.white)
                                 .frame(maxWidth: .infinity)
-                                .frame(height: 56)
+                                .frame(height: 52)
                                 .background(
                                     RoundedRectangle(cornerRadius: BrandStyle.cornerRadius)
                                         .fill(Color.black)
@@ -78,33 +84,21 @@ struct OnboardingView: View {
                                 )
                             }
                             .disabled(viewModel.isLoading)
-                            .padding(.horizontal, 32)
+                            .padding(.horizontal, 40)
                             
-                            // Error message
+                            // Enhanced error message
                             if let errorMessage = viewModel.errorMessage {
-                                HStack(spacing: 8) {
-                                    Image(systemName: "exclamationmark.triangle.fill")
-                                        .foregroundColor(.red)
-                                    
-                                    Text(errorMessage)
-                                        .font(.subheadline)
-                                        .foregroundColor(.red)
-                                        .multilineTextAlignment(.leading)
+                                InlineErrorView(message: errorMessage) {
+                                    viewModel.clearError()
                                 }
-                                .padding(.horizontal, 32)
-                                .padding(.vertical, 12)
-                                .background(
-                                    RoundedRectangle(cornerRadius: BrandStyle.cornerRadiusSmall)
-                                        .fill(Color.red.opacity(0.1))
-                                )
-                                .padding(.horizontal, 32)
+                                .padding(.horizontal, 40)
                             }
                         }
                         
-                        Spacer(minLength: geometry.size.height * 0.1)
+                        Spacer(minLength: geometry.size.height * 0.08)
                         
                         // Footer
-                        VStack(spacing: 8) {
+                        VStack(spacing: 12) {
                             Text("By signing in, you agree to our")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
@@ -134,21 +128,10 @@ struct OnboardingView: View {
             }
         }
         .navigationBarHidden(true)
+        .withToast()
         .onAppear {
             // Inject the actual appState when view appears
             viewModel.setAppState(appState)
-        }
-        .alert("Authentication Error", isPresented: .constant(viewModel.errorMessage != nil)) {
-            Button("Try Again") {
-                viewModel.clearError()
-            }
-            Button("Cancel", role: .cancel) {
-                viewModel.clearError()
-            }
-        } message: {
-            if let errorMessage = viewModel.errorMessage {
-                Text(errorMessage)
-            }
         }
     }
 }

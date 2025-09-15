@@ -25,8 +25,22 @@ struct FamilyDashboardView: View {
                     .ignoresSafeArea()
                 
                 if viewModel.isLoading && viewModel.members.isEmpty {
-                    // Initial loading state
-                    LoadingOverlay()
+                    // Initial loading state with skeleton
+                    VStack(spacing: 20) {
+                        LoadingStateView(
+                            message: "Loading family members...",
+                            style: .card
+                        )
+                        
+                        SkeletonLoadingView(rows: 3, showAvatar: true)
+                    }
+                    .padding()
+                } else if viewModel.members.isEmpty && !viewModel.isLoading {
+                    // Empty state
+                    EmptyStateView.noMembers {
+                        // TODO: Implement invite functionality in later tasks
+                        ToastManager.shared.info("Invite functionality coming soon")
+                    }
                 } else {
                     ScrollView {
                         LazyVStack(spacing: 16) {
@@ -77,6 +91,7 @@ struct FamilyDashboardView: View {
         .task {
             await viewModel.loadMembers()
         }
+        .withToast()
         .alert("Error", isPresented: .constant(viewModel.errorMessage != nil)) {
             Button("OK") {
                 viewModel.clearErrorMessage()
@@ -84,15 +99,6 @@ struct FamilyDashboardView: View {
         } message: {
             if let errorMessage = viewModel.errorMessage {
                 Text(errorMessage)
-            }
-        }
-        .alert("Success", isPresented: .constant(viewModel.successMessage != nil)) {
-            Button("OK") {
-                viewModel.clearSuccessMessage()
-            }
-        } message: {
-            if let successMessage = viewModel.successMessage {
-                Text(successMessage)
             }
         }
         .sheet(isPresented: $viewModel.showRoleChangeSheet) {
