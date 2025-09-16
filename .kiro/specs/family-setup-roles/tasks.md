@@ -87,14 +87,14 @@
 
 ## Phase 6: Core Services Implementation
 
-- [ ] 11. Implement KeychainService for secure storage
+- [x] 11. Implement KeychainService for secure storage
   - Create KeychainService class with store, retrieve, and delete methods
   - Implement secure storage for Apple ID hash and family ID
   - Add comprehensive error handling for Keychain operations
   - Write unit tests for KeychainService functionality
   - _Requirements: 7.3, 1.3_
 
-- [ ] 12. Create utility services
+- [x] 12. Create utility services
   - Implement CodeGenerator utility for unique family code creation with collision detection
   - Create Validation utility for input validation and format checking
   - Implement QRCodeService for QR code generation using CoreImage
@@ -102,7 +102,7 @@
   - Write unit tests for all utility services
   - _Requirements: 8.1, 8.2, 8.3, 2.4, 3.3_
 
-- [ ] 13. Implement core data models with SwiftData
+- [x] 13. Implement core data models with SwiftData
   - Convert mock structs to SwiftData models with CloudKit sync properties
   - Add proper relationships between Family, UserProfile, and Membership
   - Create data persistence layer with SwiftData ModelContainer
