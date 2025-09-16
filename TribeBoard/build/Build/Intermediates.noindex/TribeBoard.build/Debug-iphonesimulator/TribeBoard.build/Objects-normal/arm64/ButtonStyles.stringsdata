@@ -1,0 +1,24 @@
+{
+  "source": "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/TribeBoard/Views/Components/ButtonStyles.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Primary Button",
+        "location": {
+          "startingColumn": 1,
+          "startingLine": 41
+        }
+      },
+      {
+        "comment": "",
+        "key": "Secondary Button",
+        "location": {
+          "startingColumn": 1,
+          "startingLine": 41
+        }
+      }
+    ]
+  },
+  "version": 1
+}

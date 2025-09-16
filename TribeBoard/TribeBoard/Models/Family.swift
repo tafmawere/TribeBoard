@@ -1,12 +1,24 @@
 import Foundation
+import SwiftData
+import CloudKit
 
-/// Basic Family model for prototyping
-struct Family: Identifiable, Codable {
-    let id: UUID
+/// SwiftData model for Family with CloudKit sync capabilities
+@Model
+class Family {
+    @Attribute(.unique) var id: UUID
     var name: String
-    var code: String
-    let createdByUserId: UUID
-    let createdAt: Date
+    @Attribute(.unique) var code: String
+    var createdByUserId: UUID
+    var createdAt: Date
+    
+    // CloudKit sync properties
+    var ckRecordID: String?
+    var lastSyncDate: Date?
+    var needsSync: Bool = false
+    
+    // Relationships
+    @Relationship(deleteRule: .cascade, inverse: \Membership.family)
+    var memberships: [Membership] = []
     
     init(name: String, code: String, createdByUserId: UUID) {
         self.id = UUID()
@@ -14,28 +26,96 @@ struct Family: Identifiable, Codable {
         self.code = code
         self.createdByUserId = createdByUserId
         self.createdAt = Date()
+        self.needsSync = true
+    }
+    
+    // MARK: - Validation
+    
+    /// Validates the family name
+    var isNameValid: Bool {
+        !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        name.count >= 2 &&
+        name.count <= 50
+    }
+    
+    /// Validates the family code format (6-8 character alphanumeric)
+    var isCodeValid: Bool {
+        code.count >= 6 &&
+        code.count <= 8 &&
+        code.allSatisfy { $0.isLetter || $0.isNumber } &&
+        !code.isEmpty
+    }
+    
+    /// Validates all family properties
+    var isFullyValid: Bool {
+        isNameValid && isCodeValid && !createdByUserId.uuidString.isEmpty
+    }
+    
+    /// Returns active memberships only
+    var activeMembers: [Membership] {
+        memberships.filter { $0.status == .active }
+    }
+    
+    /// Returns the parent admin membership if exists
+    var parentAdmin: Membership? {
+        memberships.first { $0.role == .parentAdmin && $0.status == .active }
+    }
+    
+    /// Checks if a parent admin exists
+    var hasParentAdmin: Bool {
+        parentAdmin != nil
     }
 }
 
-// MARK: - Mock Data Extension
-extension Family {
-    /// Creates a mock family for testing and prototyping
-    static func mock(
-        name: String = "The Smith Family",
-        code: String = "ABC123",
-        createdByUserId: UUID = UUID()
-    ) -> Family {
-        Family(
-            name: name,
-            code: code,
-            createdByUserId: createdByUserId
-        )
+// MARK: - CloudKit Synchronization
+extension Family: CloudKitSyncable {
+    static var recordType: String { CKRecordType.family }
+    
+    func toCKRecord() throws -> CKRecord {
+        let recordID = CKRecord.ID(recordName: id.uuidString)
+        let record = CKRecord(recordType: Self.recordType, recordID: recordID)
+        
+        record[CKFieldName.familyName] = name
+        record[CKFieldName.familyCode] = code
+        record[CKFieldName.familyCreatedByUserId] = createdByUserId.uuidString
+        record[CKFieldName.familyCreatedAt] = createdAt
+        
+        return record
     }
     
-    /// Sample families for UI testing
-    static let sampleFamilies: [Family] = [
-        Family.mock(name: "The Johnson Family", code: "JOH456"),
-        Family.mock(name: "The Garcia Family", code: "GAR789"),
-        Family.mock(name: "The Chen Family", code: "CHE012")
-    ]
+    func updateFromCKRecord(_ record: CKRecord) throws {
+        guard let name = record[CKFieldName.familyName] as? String,
+              let code = record[CKFieldName.familyCode] as? String,
+              let createdByUserIdString = record[CKFieldName.familyCreatedByUserId] as? String,
+              let createdByUserId = UUID(uuidString: createdByUserIdString),
+              let createdAt = record[CKFieldName.familyCreatedAt] as? Date else {
+            throw CloudKitSyncError.invalidRecord
+        }
+        
+        self.name = name
+        self.code = code
+        self.createdByUserId = createdByUserId
+        self.createdAt = createdAt
+        self.ckRecordID = record.recordID.recordName
+        self.lastSyncDate = Date()
+        self.needsSync = false
+    }
+}
+
+/// CloudKit synchronization errors
+enum CloudKitSyncError: LocalizedError {
+    case invalidRecord
+    case missingRequiredField(String)
+    case conversionFailed
+    
+    var errorDescription: String? {
+        switch self {
+        case .invalidRecord:
+            return "Invalid CloudKit record format"
+        case .missingRequiredField(let field):
+            return "Missing required field: \(field)"
+        case .conversionFailed:
+            return "Failed to convert data types"
+        }
+    }
 }

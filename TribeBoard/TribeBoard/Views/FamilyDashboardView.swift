@@ -531,11 +531,11 @@ struct RoleSelectionRow: View {
 // MARK: - Preview
 
 #Preview {
-    let mockFamily = Family.mock()
-    let mockUserId = UUID()
+    let mockData = MockDataGenerator.mockFamilyWithMembers()
+    let mockUserId = mockData.users[0].id
     
     FamilyDashboardView(
-        family: mockFamily,
+        family: mockData.family,
         currentUserId: mockUserId,
         currentUserRole: .parentAdmin
     )

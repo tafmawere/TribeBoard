@@ -1,40 +1,98 @@
 import Foundation
+import SwiftData
+import CloudKit
 
-/// Basic UserProfile model for prototyping
-struct UserProfile: Identifiable, Codable {
-    let id: UUID
+/// SwiftData model for UserProfile with CloudKit sync capabilities
+@Model
+class UserProfile {
+    @Attribute(.unique) var id: UUID
     var displayName: String
-    let appleUserIdHash: String
+    @Attribute(.unique) var appleUserIdHash: String
     var avatarUrl: URL?
+    var createdAt: Date
+    
+    // CloudKit sync properties
+    var ckRecordID: String?
+    var lastSyncDate: Date?
+    var needsSync: Bool = false
+    
+    // Relationships
+    @Relationship(deleteRule: .cascade, inverse: \Membership.user)
+    var memberships: [Membership] = []
     
     init(displayName: String, appleUserIdHash: String, avatarUrl: URL? = nil) {
         self.id = UUID()
         self.displayName = displayName
         self.appleUserIdHash = appleUserIdHash
         self.avatarUrl = avatarUrl
+        self.createdAt = Date()
+        self.needsSync = true
+    }
+    
+    // MARK: - Validation
+    
+    /// Validates the display name
+    var isDisplayNameValid: Bool {
+        !displayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        displayName.count >= 1 &&
+        displayName.count <= 50
+    }
+    
+    /// Validates the Apple user ID hash format
+    var isAppleUserIdHashValid: Bool {
+        !appleUserIdHash.isEmpty &&
+        appleUserIdHash.count >= 10 // Minimum expected hash length
+    }
+    
+    /// Validates all user profile properties
+    var isFullyValid: Bool {
+        isDisplayNameValid && isAppleUserIdHashValid
+    }
+    
+    /// Returns active memberships only
+    var activeMemberships: [Membership] {
+        memberships.filter { $0.status == .active }
+    }
+    
+    /// Returns the current family membership if exists
+    var currentFamilyMembership: Membership? {
+        activeMemberships.first
     }
 }
 
-// MARK: - Mock Data Extension
-extension UserProfile {
-    /// Creates a mock user profile for testing and prototyping
-    static func mock(
-        displayName: String = "John Doe",
-        appleUserIdHash: String = "mock_hash_123",
-        avatarUrl: URL? = nil
-    ) -> UserProfile {
-        UserProfile(
-            displayName: displayName,
-            appleUserIdHash: appleUserIdHash,
-            avatarUrl: avatarUrl
-        )
+// MARK: - CloudKit Synchronization
+extension UserProfile: CloudKitSyncable {
+    static var recordType: String { CKRecordType.userProfile }
+    
+    func toCKRecord() throws -> CKRecord {
+        let recordID = CKRecord.ID(recordName: id.uuidString)
+        let record = CKRecord(recordType: Self.recordType, recordID: recordID)
+        
+        record[CKFieldName.userDisplayName] = displayName
+        record[CKFieldName.userAppleUserIdHash] = appleUserIdHash
+        record[CKFieldName.userAvatarUrl] = avatarUrl?.absoluteString
+        record[CKFieldName.userCreatedAt] = createdAt
+        
+        return record
     }
     
-    /// Sample user profiles for UI testing
-    static let sampleUsers: [UserProfile] = [
-        UserProfile.mock(displayName: "Sarah Johnson", appleUserIdHash: "hash_sarah"),
-        UserProfile.mock(displayName: "Mike Garcia", appleUserIdHash: "hash_mike"),
-        UserProfile.mock(displayName: "Emma Chen", appleUserIdHash: "hash_emma"),
-        UserProfile.mock(displayName: "Alex Smith", appleUserIdHash: "hash_alex")
-    ]
+    func updateFromCKRecord(_ record: CKRecord) throws {
+        guard let displayName = record[CKFieldName.userDisplayName] as? String,
+              let appleUserIdHash = record[CKFieldName.userAppleUserIdHash] as? String,
+              let createdAt = record[CKFieldName.userCreatedAt] as? Date else {
+            throw CloudKitSyncError.invalidRecord
+        }
+        
+        self.displayName = displayName
+        self.appleUserIdHash = appleUserIdHash
+        self.createdAt = createdAt
+        
+        if let avatarUrlString = record[CKFieldName.userAvatarUrl] as? String {
+            self.avatarUrl = URL(string: avatarUrlString)
+        }
+        
+        self.ckRecordID = record.recordID.recordName
+        self.lastSyncDate = Date()
+        self.needsSync = false
+    }
 }

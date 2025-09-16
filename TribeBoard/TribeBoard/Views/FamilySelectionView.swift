@@ -157,7 +157,7 @@ struct FamilyOptionCard: View {
         FamilySelectionView()
             .environmentObject({
                 let appState = AppState()
-                appState.currentUser = UserProfile.mock(displayName: "John Doe")
+                appState.currentUser = MockDataGenerator.mockAuthenticatedUser()
                 return appState
             }())
     }

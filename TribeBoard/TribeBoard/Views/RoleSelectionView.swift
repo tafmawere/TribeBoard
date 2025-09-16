@@ -250,8 +250,8 @@ struct RoleCard: View {
 #Preview("Role Selection") {
     NavigationStack {
         RoleSelectionView(
-            family: Family.mock(name: "The Johnson Family"),
-            user: UserProfile.mock(displayName: "John Doe")
+            family: MockDataGenerator.mockFamilyWithMembers().family,
+            user: MockDataGenerator.mockAuthenticatedUser()
         )
     }
     .environmentObject(AppState())

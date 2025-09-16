@@ -1,0 +1,80 @@
+{
+  "source": "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/TribeBoard/Views/OnboardingView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Welcome to TribeBoard",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 29
+        }
+      },
+      {
+        "comment": "",
+        "key": "Connect your family, organize your life",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 35
+        }
+      },
+      {
+        "comment": "",
+        "key": "Sign in to get started",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 47
+        }
+      },
+      {
+        "comment": "",
+        "key": "Signing in...",
+        "location": {
+          "startingColumn": 64,
+          "startingLine": 73
+        }
+      },
+      {
+        "comment": "",
+        "key": "Sign in with Apple",
+        "location": {
+          "startingColumn": 82,
+          "startingLine": 73
+        }
+      },
+      {
+        "comment": "",
+        "key": "By signing in, you agree to our",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 102
+        }
+      },
+      {
+        "comment": "",
+        "key": "•",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 113
+        }
+      },
+      {
+        "comment": "",
+        "key": "Terms of Service",
+        "location": {
+          "startingColumn": 40,
+          "startingLine": 107
+        }
+      },
+      {
+        "comment": "",
+        "key": "Privacy Policy",
+        "location": {
+          "startingColumn": 40,
+          "startingLine": 117
+        }
+      }
+    ]
+  },
+  "version": 1
+}

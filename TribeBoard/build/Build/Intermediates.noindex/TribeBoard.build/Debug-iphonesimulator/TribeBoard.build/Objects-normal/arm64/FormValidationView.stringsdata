@@ -1,0 +1,48 @@
+{
+  "source": "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/TribeBoard/Views/Components/FormValidationView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "%@ input field",
+        "location": {
+          "startingColumn": 37,
+          "startingLine": 68
+        }
+      },
+      {
+        "comment": "",
+        "key": "Valid: %@",
+        "location": {
+          "startingColumn": 49,
+          "startingLine": 159
+        }
+      },
+      {
+        "comment": "",
+        "key": "Error: %@",
+        "location": {
+          "startingColumn": 71,
+          "startingLine": 159
+        }
+      },
+      {
+        "comment": "",
+        "key": "Input is valid",
+        "location": {
+          "startingColumn": 33,
+          "startingLine": 171
+        }
+      },
+      {
+        "comment": "",
+        "key": "Looks good!",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 166
+        }
+      }
+    ]
+  },
+  "version": 1
+}

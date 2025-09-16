@@ -105,7 +105,7 @@ class OnboardingViewModel: ObservableObject {
         let randomName = mockNames.randomElement() ?? "Test User"
         let mockHash = "mock_hash_\(UUID().uuidString.prefix(8))"
         
-        return UserProfile.mock(
+        return UserProfile(
             displayName: randomName,
             appleUserIdHash: mockHash
         )

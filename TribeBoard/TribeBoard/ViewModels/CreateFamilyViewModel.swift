@@ -78,8 +78,8 @@ class CreateFamilyViewModel: ObservableObject {
             
             // Create membership for the creator as Parent Admin
             let membership = Membership(
-                familyId: family.id,
-                userId: currentUser.id,
+                family: family,
+                user: currentUser,
                 role: .parentAdmin
             )
             

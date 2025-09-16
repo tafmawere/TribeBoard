@@ -57,7 +57,7 @@ class AppState: ObservableObject {
         // Check if user has a family
         if let membership = getMockMembership(for: user.id) {
             currentMembership = membership
-            currentFamily = getMockFamily(for: membership.familyId)
+            currentFamily = getMockFamily(for: membership.familyId!)
             currentFlow = .familyDashboard
         } else {
             currentFlow = .familySelection
@@ -123,7 +123,7 @@ class AppState: ObservableObject {
     
     private func getMockFamily(for familyId: UUID) -> Family? {
         // Mock: Return sample family
-        return Family.sampleFamilies.first
+        return MockDataGenerator.mockFamilyWithMembers().family
     }
 }
 

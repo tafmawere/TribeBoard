@@ -84,12 +84,9 @@ struct RoleSelectionPlaceholderView: View {
             
             Button("Mock Select Role") {
                 // Mock role selection
-                let mockFamily = Family.mock()
-                let mockMembership = Membership.mock(
-                    familyId: mockFamily.id,
-                    userId: appState.currentUser?.id ?? UUID(),
-                    role: .adult
-                )
+                let mockData = MockDataGenerator.mockFamilyWithMembers()
+                let mockFamily = mockData.family
+                let mockMembership = mockData.memberships[1] // Use the adult membership
                 appState.setFamily(mockFamily, membership: mockMembership)
             }
             .buttonStyle(PrimaryButtonStyle())

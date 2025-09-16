@@ -293,7 +293,7 @@ struct CustomTextFieldStyle: TextFieldStyle {
         CreateFamilyView()
             .environmentObject({
                 let appState = AppState()
-                appState.currentUser = UserProfile.mock(displayName: "John Doe")
+                appState.currentUser = MockDataGenerator.mockAuthenticatedUser()
                 return appState
             }())
     }
@@ -304,7 +304,7 @@ struct CustomTextFieldStyle: TextFieldStyle {
         CreateFamilyView()
             .environmentObject({
                 let appState = AppState()
-                appState.currentUser = UserProfile.mock(displayName: "John Doe")
+                appState.currentUser = MockDataGenerator.mockAuthenticatedUser()
                 return appState
             }())
             .onAppear {

@@ -1,0 +1,112 @@
+{
+  "source": "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/TribeBoard/Views/JoinFamilyView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Join Family",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 95
+        }
+      },
+      {
+        "comment": "",
+        "key": "Join Family",
+        "location": {
+          "startingColumn": 13,
+          "startingLine": 99
+        }
+      },
+      {
+        "comment": "",
+        "key": "Join Family",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 22
+        }
+      },
+      {
+        "comment": "",
+        "key": "Enter your family code or scan the QR code to join an existing family",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 27
+        }
+      },
+      {
+        "comment": "",
+        "key": "OR",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 56
+        }
+      },
+      {
+        "comment": "",
+        "key": "Family Code",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 151
+        }
+      },
+      {
+        "comment": "",
+        "key": "Family codes are 4-8 characters (letters and numbers)",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 200
+        }
+      },
+      {
+        "comment": "",
+        "key": "Enter family code",
+        "location": {
+          "startingColumn": 31,
+          "startingLine": 156
+        }
+      },
+      {
+        "comment": "",
+        "key": "Scanning...",
+        "location": {
+          "startingColumn": 35,
+          "startingLine": 227
+        }
+      },
+      {
+        "comment": "",
+        "key": "Scan QR Code",
+        "location": {
+          "startingColumn": 51,
+          "startingLine": 227
+        }
+      },
+      {
+        "comment": "",
+        "key": "Join %@",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 258
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cancel",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 263
+        }
+      },
+      {
+        "comment": "",
+        "key": "Dismiss",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 290
+        }
+      }
+    ]
+  },
+  "version": 1
+}

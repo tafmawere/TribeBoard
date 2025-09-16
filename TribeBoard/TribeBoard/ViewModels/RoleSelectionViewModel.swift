@@ -74,8 +74,8 @@ class RoleSelectionViewModel: ObservableObject {
             
             // Mock role update logic
             let membership = Membership(
-                familyId: currentFamily.id,
-                userId: currentUser.id,
+                family: currentFamily,
+                user: currentUser,
                 role: role
             )
             
