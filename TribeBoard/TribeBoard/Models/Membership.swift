@@ -4,19 +4,22 @@ import CloudKit
 
 /// SwiftData model for Membership with CloudKit sync capabilities
 @Model
-class Membership {
-    @Attribute(.unique) var id: UUID
-    var role: Role
-    var joinedAt: Date
-    var status: MembershipStatus
+final class Membership {
+    // Primary identifier - no unique constraint for CloudKit compatibility
+    var id: UUID = UUID()
+    
+    // Core properties - with default values for CloudKit compatibility
+    var role: Role = Role.kid
+    var joinedAt: Date = Date()
+    var status: MembershipStatus = MembershipStatus.active
     var lastRoleChangeAt: Date?
     
     // CloudKit sync properties
     var ckRecordID: String?
     var lastSyncDate: Date?
-    var needsSync: Bool = false
+    var needsSync: Bool = true
     
-    // Relationships
+    // Relationships - already optional, which is good for CloudKit
     @Relationship var family: Family?
     @Relationship var user: UserProfile?
     
@@ -26,6 +29,7 @@ class Membership {
         self.joinedAt = Date()
         self.status = .active
         self.needsSync = true
+        self.lastRoleChangeAt = nil
         
         // Set relationships
         self.family = family

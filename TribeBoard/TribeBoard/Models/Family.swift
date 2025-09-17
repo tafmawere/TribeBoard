@@ -4,21 +4,24 @@ import CloudKit
 
 /// SwiftData model for Family with CloudKit sync capabilities
 @Model
-class Family {
-    @Attribute(.unique) var id: UUID
-    var name: String
-    @Attribute(.unique) var code: String
-    var createdByUserId: UUID
-    var createdAt: Date
+final class Family {
+    // Primary identifier - no unique constraint for CloudKit compatibility
+    var id: UUID = UUID()
+    
+    // Core properties - with default values for CloudKit compatibility
+    var name: String = ""
+    var code: String = ""
+    var createdByUserId: UUID = UUID()
+    var createdAt: Date = Date()
     
     // CloudKit sync properties
     var ckRecordID: String?
     var lastSyncDate: Date?
-    var needsSync: Bool = false
+    var needsSync: Bool = true
     
-    // Relationships
+    // Relationships - optional for CloudKit compatibility
     @Relationship(deleteRule: .cascade, inverse: \Membership.family)
-    var memberships: [Membership] = []
+    var memberships: [Membership]?
     
     init(name: String, code: String, createdByUserId: UUID) {
         self.id = UUID()
@@ -27,6 +30,7 @@ class Family {
         self.createdByUserId = createdByUserId
         self.createdAt = Date()
         self.needsSync = true
+        self.memberships = []
     }
     
     // MARK: - Validation
@@ -53,12 +57,12 @@ class Family {
     
     /// Returns active memberships only
     var activeMembers: [Membership] {
-        memberships.filter { $0.status == .active }
+        memberships?.filter { $0.status == .active } ?? []
     }
     
     /// Returns the parent admin membership if exists
     var parentAdmin: Membership? {
-        memberships.first { $0.role == .parentAdmin && $0.status == .active }
+        memberships?.first { $0.role == .parentAdmin && $0.status == .active }
     }
     
     /// Checks if a parent admin exists

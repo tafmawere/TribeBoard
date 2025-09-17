@@ -4,21 +4,24 @@ import CloudKit
 
 /// SwiftData model for UserProfile with CloudKit sync capabilities
 @Model
-class UserProfile {
-    @Attribute(.unique) var id: UUID
-    var displayName: String
-    @Attribute(.unique) var appleUserIdHash: String
+final class UserProfile {
+    // Primary identifier - no unique constraint for CloudKit compatibility
+    var id: UUID = UUID()
+    
+    // Core properties - with default values for CloudKit compatibility
+    var displayName: String = ""
+    var appleUserIdHash: String = ""
     var avatarUrl: URL?
-    var createdAt: Date
+    var createdAt: Date = Date()
     
     // CloudKit sync properties
     var ckRecordID: String?
     var lastSyncDate: Date?
-    var needsSync: Bool = false
+    var needsSync: Bool = true
     
-    // Relationships
+    // Relationships - optional for CloudKit compatibility
     @Relationship(deleteRule: .cascade, inverse: \Membership.user)
-    var memberships: [Membership] = []
+    var memberships: [Membership]?
     
     init(displayName: String, appleUserIdHash: String, avatarUrl: URL? = nil) {
         self.id = UUID()
@@ -27,6 +30,7 @@ class UserProfile {
         self.avatarUrl = avatarUrl
         self.createdAt = Date()
         self.needsSync = true
+        self.memberships = []
     }
     
     // MARK: - Validation
@@ -51,7 +55,7 @@ class UserProfile {
     
     /// Returns active memberships only
     var activeMemberships: [Membership] {
-        memberships.filter { $0.status == .active }
+        memberships?.filter { $0.status == .active } ?? []
     }
     
     /// Returns the current family membership if exists
