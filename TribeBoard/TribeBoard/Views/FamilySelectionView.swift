@@ -81,7 +81,9 @@ struct FamilySelectionView: View {
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button("Sign Out") {
-                    appState.signOut()
+                    Task {
+                        await appState.signOut()
+                    }
                 }
                 .foregroundColor(.brandPrimary)
             }

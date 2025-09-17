@@ -39,39 +39,99 @@ class AppState: ObservableObject {
         checkAuthenticationState()
     }
     
-    // MARK: - Authentication Methods
+    // MARK: - Dependencies
     
-    /// Check if user is already authenticated (mock implementation)
-    private func checkAuthenticationState() {
-        // TODO: Replace with real authentication check in later tasks
-        // For now, assume user is not authenticated
-        isAuthenticated = false
-        currentFlow = .onboarding
+    private var serviceCoordinator: ServiceCoordinator?
+    
+    /// Set the service coordinator (called during app initialization)
+    func setServiceCoordinator(_ serviceCoordinator: ServiceCoordinator) {
+        self.serviceCoordinator = serviceCoordinator
+        
+        // Check authentication state after services are set up
+        checkAuthenticationState()
     }
     
-    /// Sign in user (mock implementation)
+    /// Get the service coordinator
+    var services: ServiceCoordinator? {
+        return serviceCoordinator
+    }
+    
+    // MARK: - Authentication Methods
+    
+    /// Check if user is already authenticated
+    private func checkAuthenticationState() {
+        guard let serviceCoordinator = serviceCoordinator else {
+            isAuthenticated = false
+            currentFlow = .onboarding
+            return
+        }
+        
+        // Check authentication status
+        isAuthenticated = serviceCoordinator.authService.checkAuthenticationStatus()
+        currentUser = serviceCoordinator.authService.getCurrentUser()
+        
+        if isAuthenticated, let user = currentUser {
+            // Check if user has a family
+            checkUserFamilyStatus(user)
+        } else {
+            currentFlow = .onboarding
+        }
+    }
+    
+    /// Sign in user
     func signIn(user: UserProfile) {
         currentUser = user
         isAuthenticated = true
         
         // Check if user has a family
-        if let membership = getMockMembership(for: user.id) {
-            currentMembership = membership
-            currentFamily = getMockFamily(for: membership.familyId!)
-            currentFlow = .familyDashboard
-        } else {
-            currentFlow = .familySelection
-        }
+        checkUserFamilyStatus(user)
     }
     
     /// Sign out user
-    func signOut() {
+    func signOut() async {
+        guard let serviceCoordinator = serviceCoordinator else { return }
+        
+        do {
+            try await serviceCoordinator.authService.signOut()
+        } catch {
+            // Handle sign out error
+            showError("Failed to sign out: \(error.localizedDescription)")
+        }
+        
         currentUser = nil
         currentMembership = nil
         currentFamily = nil
         isAuthenticated = false
         currentFlow = .onboarding
         navigationPath = NavigationPath()
+    }
+    
+    /// Check user's family status and set appropriate flow
+    private func checkUserFamilyStatus(_ user: UserProfile) {
+        guard let serviceCoordinator = serviceCoordinator else {
+            currentFlow = .familySelection
+            return
+        }
+        
+        do {
+            // Get user's active memberships
+            let memberships = try serviceCoordinator.dataService.fetchMemberships(forUser: user)
+            let activeMembership = memberships.first { $0.status == .active }
+            
+            if let membership = activeMembership,
+               let familyId = membership.family?.id,
+               let family = try serviceCoordinator.dataService.fetchFamily(byId: familyId) {
+                
+                currentMembership = membership
+                currentFamily = family
+                currentFlow = .familyDashboard
+            } else {
+                currentFlow = .familySelection
+            }
+        } catch {
+            // If there's an error checking family status, go to family selection
+            currentFlow = .familySelection
+        }
     }
     
     // MARK: - Family Management

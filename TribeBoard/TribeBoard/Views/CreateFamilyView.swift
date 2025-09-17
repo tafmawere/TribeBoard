@@ -3,8 +3,26 @@ import SwiftUI
 /// View for creating a new family with name input and QR code generation
 struct CreateFamilyView: View {
     @EnvironmentObject private var appState: AppState
-    @StateObject private var viewModel = CreateFamilyViewModel()
+    @Environment(\.modelContext) private var modelContext
+    @StateObject private var viewModel: CreateFamilyViewModel
     @FocusState private var isTextFieldFocused: Bool
+    
+    init() {
+        // Create temporary services for initialization
+        // In a real app, these would be injected properly
+        let tempContainer = try! ModelContainerConfiguration.createInMemory()
+        let dataService = DataService(modelContext: tempContainer.mainContext)
+        let cloudKitService = CloudKitService()
+        let qrCodeService = QRCodeService()
+        let codeGenerator = CodeGenerator()
+        
+        self._viewModel = StateObject(wrappedValue: CreateFamilyViewModel(
+            dataService: dataService,
+            cloudKitService: cloudKitService,
+            qrCodeService: qrCodeService,
+            codeGenerator: codeGenerator
+        ))
+    }
     
     var body: some View {
         GeometryReader { geometry in
@@ -40,6 +58,22 @@ struct CreateFamilyView: View {
         }
         .navigationTitle("Create Family")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button(action: {
+                    appState.navigateTo(.familySelection)
+                }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 16, weight: .medium))
+                        Text("Back")
+                            .font(.body)
+                    }
+                    .foregroundColor(.brandPrimary)
+                }
+                .accessibilityLabel("Go back to family selection")
+            }
+        }
 
         .overlay {
             if viewModel.isCreating {
@@ -203,7 +237,7 @@ struct CreateFamilyView: View {
                         .font(.headline)
                         .foregroundColor(.primary)
                     
-                    Image(uiImage: qrImage)
+                    qrImage
                         .interpolation(.none)
                         .resizable()
                         .aspectRatio(contentMode: .fit)

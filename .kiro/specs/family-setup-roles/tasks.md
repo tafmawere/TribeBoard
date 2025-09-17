@@ -111,7 +111,7 @@
 
 ## Phase 7: Authentication Integration
 
-- [ ] 14. Create AuthService for Apple authentication
+- [x] 14. Create AuthService for Apple authentication
   - Implement AuthService class with Sign in with Apple integration
   - Add ASAuthorizationAppleIDProvider setup and delegate handling
   - Create user profile creation and retrieval logic
@@ -121,7 +121,7 @@
 
 ## Phase 8: CloudKit Integration
 
-- [ ] 15. Implement CloudKitService for data synchronization
+- [x] 15. Implement CloudKitService for data synchronization
   - Create CloudKitService class with CKContainer and private database setup
   - Implement CRUD operations for Family, UserProfile, and Membership records
   - Add CloudKit record conversion methods for SwiftData models
@@ -129,7 +129,7 @@
   - Create conflict resolution using last-write-wins strategy
   - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6_
 
-- [ ] 16. Set up CloudKit schema and subscriptions
+- [x] 16. Set up CloudKit schema and subscriptions
   - Create CloudKit record types (CKFamily, CKUserProfile, CKMembership) in CloudKit Console
   - Set up required indexes for family code lookup and user queries
   - Implement CloudKit custom zone creation for better organization
@@ -138,7 +138,7 @@
 
 ## Phase 9: Backend Integration
 
-- [ ] 17. Replace mock data with real backend integration
+- [x] 17. Replace mock data with real backend integration
   - Update CreateFamilyViewModel to use real family creation with CloudKit
   - Replace mock family search in JoinFamilyViewModel with CloudKit queries
   - Integrate real role validation and constraints in RoleSelectionViewModel
@@ -148,7 +148,7 @@
 
 ## Phase 10: Testing and Polish
 
-- [ ] 18. Add comprehensive testing
+- [x] 18. Add comprehensive testing
   - Write unit tests for all ViewModels with mocked services
   - Create unit tests for all services (Auth, CloudKit, QR, Keychain)
   - Add integration tests for complete user flows
@@ -156,7 +156,7 @@
   - Add UI tests for critical user paths
   - _Requirements: All requirements validation through testing_
 
-- [ ] 19. Final integration and polish
+- [x] 19. Final integration and polish
   - Add proper app lifecycle handling and background sync
   - Implement app state restoration and deep linking
   - Perform final testing and bug fixes

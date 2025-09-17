@@ -1,7 +1,7 @@
 import Foundation
 
 /// Represents the different roles a family member can have
-enum Role: String, CaseIterable, Codable {
+enum Role: String, CaseIterable, Codable, Sendable {
     case parentAdmin = "parent_admin"
     case adult = "adult"
     case kid = "kid"
@@ -37,7 +37,7 @@ enum Role: String, CaseIterable, Codable {
 }
 
 /// Represents the status of a family membership
-enum MembershipStatus: String, Codable {
+enum MembershipStatus: String, Codable, Sendable {
     case active = "active"
     case invited = "invited"
     case removed = "removed"

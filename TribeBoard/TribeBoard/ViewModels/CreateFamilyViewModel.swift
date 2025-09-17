@@ -1,7 +1,7 @@
 import SwiftUI
 import Foundation
 
-/// ViewModel for family creation with mock data implementation
+/// ViewModel for family creation with real CloudKit backend integration
 @MainActor
 class CreateFamilyViewModel: ObservableObject {
     // MARK: - Published Properties
@@ -16,7 +16,7 @@ class CreateFamilyViewModel: ObservableObject {
     @Published var createdFamily: Family?
     
     /// Generated QR code image for the family code
-    @Published var qrCodeImage: UIImage?
+    @Published var qrCodeImage: Image?
     
     /// Error message for display
     @Published var errorMessage: String?
@@ -24,7 +24,12 @@ class CreateFamilyViewModel: ObservableObject {
     /// Validation state for family name
     @Published var isValidFamilyName: Bool = false
     
-
+    // MARK: - Dependencies
+    
+    private let dataService: DataService
+    private let cloudKitService: CloudKitService
+    private let qrCodeService: QRCodeService
+    private let codeGenerator: CodeGenerator
     
     // MARK: - Computed Properties
     
@@ -40,14 +45,19 @@ class CreateFamilyViewModel: ObservableObject {
     
     // MARK: - Initialization
     
-    init() {
+    init(dataService: DataService, cloudKitService: CloudKitService, qrCodeService: QRCodeService = QRCodeService(), codeGenerator: CodeGenerator = CodeGenerator()) {
+        self.dataService = dataService
+        self.cloudKitService = cloudKitService
+        self.qrCodeService = qrCodeService
+        self.codeGenerator = codeGenerator
+        
         // Set up validation
         setupValidation()
     }
     
     // MARK: - Public Methods
     
-    /// Create a new family with mock implementation
+    /// Create a new family with real CloudKit backend integration
     func createFamily(with appState: AppState) async {
         guard canCreateFamily else { return }
         
@@ -55,33 +65,34 @@ class CreateFamilyViewModel: ObservableObject {
         errorMessage = nil
         
         do {
-            // Simulate network delay
-            try await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 seconds
-            
-            // Mock family creation logic
-            let familyCode = generateFamilyCode()
-            let trimmedName = familyName.trimmingCharacters(in: .whitespacesAndNewlines)
-            
             guard let currentUser = appState.currentUser else {
                 throw CreateFamilyError.userNotAuthenticated
             }
             
-            // Create mock family
-            let family = Family(
+            let trimmedName = familyName.trimmingCharacters(in: .whitespacesAndNewlines)
+            
+            // Generate unique family code with collision detection
+            let familyCode = try await generateUniqueFamilyCode()
+            
+            // Create family in local storage first
+            let family = try dataService.createFamily(
                 name: trimmedName,
                 code: familyCode,
                 createdByUserId: currentUser.id
             )
             
-            // Generate mock QR code
-            let qrImage = generateMockQRCode(for: familyCode)
-            
             // Create membership for the creator as Parent Admin
-            let membership = Membership(
+            let membership = try dataService.createMembership(
                 family: family,
                 user: currentUser,
                 role: .parentAdmin
             )
+            
+            // Generate QR code
+            let qrImage = qrCodeService.generateQRCode(from: familyCode)
+            
+            // Sync to CloudKit
+            try await syncToCloudKit(family: family, membership: membership)
             
             // Update state
             createdFamily = family
@@ -97,7 +108,17 @@ class CreateFamilyViewModel: ObservableObject {
             appState.setFamily(family, membership: membership)
             
         } catch {
-            errorMessage = error.localizedDescription
+            // Handle specific errors
+            if let createError = error as? CreateFamilyError {
+                errorMessage = createError.localizedDescription
+            } else if let dataError = error as? DataServiceError {
+                errorMessage = dataError.localizedDescription
+            } else if let cloudKitError = error as? CloudKitError {
+                errorMessage = "Sync failed: \(cloudKitError.localizedDescription). Changes saved locally."
+            } else {
+                errorMessage = "Failed to create family: \(error.localizedDescription)"
+            }
+            
             HapticManager.shared.error()
         }
         
@@ -133,83 +154,38 @@ class CreateFamilyViewModel: ObservableObject {
             .assign(to: &$isValidFamilyName)
     }
     
-    /// Generate a unique family code (mock implementation)
-    private func generateFamilyCode() -> String {
-        // Mock implementation - generate 6-8 character alphanumeric code
-        let characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-        let codeLength = Int.random(in: 6...8)
-        
-        var code = ""
-        for _ in 0..<codeLength {
-            if let randomChar = characters.randomElement() {
-                code.append(randomChar)
+    /// Generate a unique family code with collision detection
+    private func generateUniqueFamilyCode() async throws -> String {
+        return try await codeGenerator.generateUniqueCode { [weak self] code in
+            guard let self = self else { return false }
+            
+            // Check local storage first
+            let localExists = try self.dataService.familyCodeExists(code)
+            if localExists {
+                return false // Code exists locally
             }
+            
+            // Check CloudKit for collision
+            let cloudKitRecord = try await self.cloudKitService.fetchFamily(byCode: code)
+            return cloudKitRecord == nil // Return true if code is unique (not found)
         }
-        
-        // Ensure uniqueness in mock implementation
-        // In real implementation, this would check against CloudKit
-        return code
     }
     
-    /// Generate a mock QR code image
-    private func generateMockQRCode(for code: String) -> UIImage? {
-        // Mock QR code generation - create a simple placeholder image
-        let size = CGSize(width: 200, height: 200)
-        let renderer = UIGraphicsImageRenderer(size: size)
+    /// Sync family and membership to CloudKit
+    private func syncToCloudKit(family: Family, membership: Membership) async throws {
+        // Save family to CloudKit
+        try await cloudKitService.save(family)
         
-        return renderer.image { context in
-            // Draw a simple placeholder QR code pattern
-            let cgContext = context.cgContext
-            
-            // Background
-            cgContext.setFillColor(UIColor.white.cgColor)
-            cgContext.fill(CGRect(origin: .zero, size: size))
-            
-            // Border
-            cgContext.setStrokeColor(UIColor.black.cgColor)
-            cgContext.setLineWidth(2)
-            cgContext.stroke(CGRect(x: 10, y: 10, width: size.width - 20, height: size.height - 20))
-            
-            // Mock QR pattern (simple grid)
-            cgContext.setFillColor(UIColor.black.cgColor)
-            let cellSize: CGFloat = 8
-            let startX: CGFloat = 20
-            let startY: CGFloat = 20
-            let gridSize = Int((size.width - 40) / cellSize)
-            
-            // Create a simple pattern based on the code
-            for row in 0..<gridSize {
-                for col in 0..<gridSize {
-                    let shouldFill = (row + col + code.count) % 3 == 0
-                    if shouldFill {
-                        let rect = CGRect(
-                            x: startX + CGFloat(col) * cellSize,
-                            y: startY + CGFloat(row) * cellSize,
-                            width: cellSize - 1,
-                            height: cellSize - 1
-                        )
-                        cgContext.fill(rect)
-                    }
-                }
-            }
-            
-            // Add text at bottom
-            let textAttributes: [NSAttributedString.Key: Any] = [
-                .font: UIFont.systemFont(ofSize: 12, weight: .medium),
-                .foregroundColor: UIColor.black
-            ]
-            
-            let text = "Code: \(code)"
-            let textSize = text.size(withAttributes: textAttributes)
-            let textRect = CGRect(
-                x: (size.width - textSize.width) / 2,
-                y: size.height - 25,
-                width: textSize.width,
-                height: textSize.height
-            )
-            
-            text.draw(in: textRect, withAttributes: textAttributes)
-        }
+        // Save membership to CloudKit
+        try await cloudKitService.save(membership)
+        
+        // Mark as synced in local storage
+        family.needsSync = false
+        family.lastSyncDate = Date()
+        membership.needsSync = false
+        membership.lastSyncDate = Date()
+        
+        try dataService.save()
     }
 }
 

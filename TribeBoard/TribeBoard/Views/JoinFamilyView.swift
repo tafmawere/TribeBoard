@@ -2,9 +2,23 @@ import SwiftUI
 
 /// View for joining an existing family using family code or QR scan
 struct JoinFamilyView: View {
-    @StateObject private var viewModel = JoinFamilyViewModel()
+    @StateObject private var viewModel: JoinFamilyViewModel
     @EnvironmentObject private var appState: AppState
     @FocusState private var isCodeFieldFocused: Bool
+    
+    init() {
+        // Create temporary services for initialization
+        let tempContainer = try! ModelContainerConfiguration.createInMemory()
+        let dataService = DataService(modelContext: tempContainer.mainContext)
+        let cloudKitService = CloudKitService()
+        let qrCodeService = QRCodeService()
+        
+        self._viewModel = StateObject(wrappedValue: JoinFamilyViewModel(
+            dataService: dataService,
+            cloudKitService: cloudKitService,
+            qrCodeService: qrCodeService
+        ))
+    }
     
     var body: some View {
         GeometryReader { geometry in
@@ -106,14 +120,14 @@ struct JoinFamilyView: View {
                 isJoining: viewModel.isJoining,
                 onJoin: {
                     Task {
-                        await viewModel.joinFamily()
+                        await viewModel.joinFamily(with: appState)
                         // Set the found family in app state and navigate to role selection
                         if let family = viewModel.foundFamily,
                            let user = appState.currentUser {
                             // Create a temporary membership for role selection
                             let tempMembership = Membership(
-                                familyId: family.id,
-                                userId: user.id,
+                                family: family,
+                                user: user,
                                 role: .adult // Default role, will be updated in role selection
                             )
                             appState.currentFamily = family

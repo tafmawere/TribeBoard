@@ -7,7 +7,7 @@
         "key": "Error",
         "location": {
           "startingColumn": 16,
-          "startingLine": 95
+          "startingLine": 104
         }
       },
       {
@@ -15,7 +15,7 @@
         "key": "Remove Member",
         "location": {
           "startingColumn": 13,
-          "startingLine": 118
+          "startingLine": 127
         }
       },
       {
@@ -23,7 +23,7 @@
         "key": "Family Dashboard",
         "location": {
           "startingColumn": 30,
-          "startingLine": 65
+          "startingLine": 72
         }
       },
       {
@@ -31,7 +31,7 @@
         "key": "Refresh",
         "location": {
           "startingColumn": 32,
-          "startingLine": 70
+          "startingLine": 77
         }
       },
       {
@@ -39,7 +39,7 @@
         "key": "Leave Family",
         "location": {
           "startingColumn": 32,
-          "startingLine": 78
+          "startingLine": 85
         }
       },
       {
@@ -47,7 +47,7 @@
         "key": "Sign Out",
         "location": {
           "startingColumn": 32,
-          "startingLine": 82
+          "startingLine": 89
         }
       },
       {
@@ -55,7 +55,7 @@
         "key": "OK",
         "location": {
           "startingColumn": 20,
-          "startingLine": 96
+          "startingLine": 105
         }
       },
       {
@@ -63,7 +63,7 @@
         "key": "Remove %@",
         "location": {
           "startingColumn": 24,
-          "startingLine": 124
+          "startingLine": 133
         }
       },
       {
@@ -71,7 +71,7 @@
         "key": "Cancel",
         "location": {
           "startingColumn": 24,
-          "startingLine": 129
+          "startingLine": 138
         }
       },
       {
@@ -79,7 +79,7 @@
         "key": "Are you sure you want to remove %@ from the family? This action cannot be undone.",
         "location": {
           "startingColumn": 22,
-          "startingLine": 136
+          "startingLine": 145
         }
       },
       {
@@ -87,7 +87,7 @@
         "key": "%lld %@",
         "location": {
           "startingColumn": 18,
-          "startingLine": 163
+          "startingLine": 172
         }
       },
       {
@@ -95,7 +95,7 @@
         "key": "Your Role:",
         "location": {
           "startingColumn": 22,
-          "startingLine": 155
+          "startingLine": 164
         }
       },
       {
@@ -103,7 +103,7 @@
         "key": "Family Members",
         "location": {
           "startingColumn": 18,
-          "startingLine": 175
+          "startingLine": 184
         }
       },
       {
@@ -111,7 +111,7 @@
         "key": "Admin Controls",
         "location": {
           "startingColumn": 18,
-          "startingLine": 200
+          "startingLine": 209
         }
       },
       {
@@ -119,7 +119,7 @@
         "key": "Change Role",
         "location": {
           "startingColumn": 30,
-          "startingLine": 460
+          "startingLine": 469
         }
       },
       {
@@ -127,7 +127,7 @@
         "key": "Current Role: %@",
         "location": {
           "startingColumn": 26,
-          "startingLine": 434
+          "startingLine": 443
         }
       },
       {
@@ -135,7 +135,7 @@
         "key": "Select New Role",
         "location": {
           "startingColumn": 26,
-          "startingLine": 442
+          "startingLine": 451
         }
       },
       {
@@ -143,7 +143,7 @@
         "key": "Cancel",
         "location": {
           "startingColumn": 28,
-          "startingLine": 464
+          "startingLine": 473
         }
       },
       {
@@ -151,7 +151,7 @@
         "key": "Save",
         "location": {
           "startingColumn": 28,
-          "startingLine": 470
+          "startingLine": 479
         }
       },
       {
@@ -159,7 +159,7 @@
         "key": "Unavailable",
         "location": {
           "startingColumn": 26,
-          "startingLine": 512
+          "startingLine": 521
         }
       }
     ]

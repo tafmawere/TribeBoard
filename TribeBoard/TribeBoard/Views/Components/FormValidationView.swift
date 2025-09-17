@@ -70,7 +70,7 @@ struct ValidatedTextField: View {
                 .accessibilityValue(text.isEmpty ? "Empty" : text)
             
             // Validation feedback
-            if let validation = validation, hasBeenEdited || !isFocused {
+            if validation != nil, hasBeenEdited || !isFocused {
                 ValidationFeedbackView(
                     state: validationState,
                     showSuccess: !isFocused && validationState.isValid && !text.isEmpty

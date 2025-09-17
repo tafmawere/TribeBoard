@@ -158,7 +158,7 @@ struct AccessibleRoleCard: View {
         
         if !isEnabled {
             // Note: .notEnabled is not available in iOS, using button trait instead
-            traits.insert(.isButton)
+            _ = traits.insert(.isButton)
         }
         
         return traits

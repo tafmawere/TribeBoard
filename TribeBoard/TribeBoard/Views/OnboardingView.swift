@@ -1,13 +1,14 @@
 import SwiftUI
+import SwiftData
 
 /// Onboarding view with TribeBoard branding and Sign in with Apple
 struct OnboardingView: View {
     @StateObject private var viewModel: OnboardingViewModel
     @EnvironmentObject private var appState: AppState
     
-    init() {
-        // Initialize viewModel without appState - will be injected when view appears
-        self._viewModel = StateObject(wrappedValue: OnboardingViewModel())
+    init(authService: AuthService) {
+        // Initialize viewModel with AuthService
+        self._viewModel = StateObject(wrappedValue: OnboardingViewModel(authService: authService))
     }
     
     var body: some View {
@@ -139,6 +140,13 @@ struct OnboardingView: View {
 // MARK: - Preview
 
 #Preview {
-    OnboardingView()
+    // Create a mock model context for preview
+    let container = try! ModelContainerConfiguration.create()
+    let context = SwiftData.ModelContext(container)
+    let dataService = DataService(modelContext: context)
+    let authService = AuthService()
+    authService.setDataService(dataService)
+    
+    return OnboardingView(authService: authService)
         .environmentObject(AppState())
 }

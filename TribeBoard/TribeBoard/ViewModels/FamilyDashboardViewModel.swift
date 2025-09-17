@@ -1,7 +1,8 @@
 import SwiftUI
 import Foundation
+import CloudKit
 
-/// ViewModel for managing family dashboard state and member operations
+/// ViewModel for managing family dashboard state and member operations with real backend integration
 @MainActor
 class FamilyDashboardViewModel: ObservableObject {
     // MARK: - Published Properties
@@ -36,66 +37,79 @@ class FamilyDashboardViewModel: ObservableObject {
     /// Member to be removed
     @Published var memberToRemove: Membership?
     
-    // MARK: - Private Properties
+    // MARK: - Dependencies
     
+    private let dataService: DataService
+    private let cloudKitService: CloudKitService
     private let currentFamily: Family
     private let currentUserId: UUID
     
     // MARK: - Initialization
     
-    init(family: Family, currentUserId: UUID, currentUserRole: Role) {
+    init(family: Family, currentUserId: UUID, currentUserRole: Role, dataService: DataService, cloudKitService: CloudKitService) {
         self.currentFamily = family
         self.currentUserId = currentUserId
         self.currentUserRole = currentUserRole
+        self.dataService = dataService
+        self.cloudKitService = cloudKitService
+        
+        // Set up real-time sync notifications
+        setupSyncNotifications()
     }
     
     // MARK: - Public Methods
     
-    /// Load family members and their profiles
+    /// Load family members and their profiles with real backend integration
     func loadMembers() async {
         isLoading = true
         errorMessage = nil
         
         do {
-            // Simulate network delay
-            try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+            // Load from local storage first for immediate display
+            let localMemberships = try dataService.fetchActiveMemberships(forFamily: currentFamily)
+            var allProfiles: [UUID: UserProfile] = [:]
             
-            // Mock data: Generate sample memberships for the family
-            let mockMemberships = generateMockMemberships()
-            let mockProfiles = generateMockUserProfiles(for: mockMemberships)
-            
-            await MainActor.run {
-                self.members = mockMemberships
-                self.userProfiles = mockProfiles
-                self.isLoading = false
+            // Get user profiles for local memberships
+            for membership in localMemberships {
+                if let userId = membership.userId,
+                   let userProfile = try dataService.fetchUserProfile(byId: userId) {
+                    allProfiles[userId] = userProfile
+                }
             }
+            
+            // Update UI with local data
+            await MainActor.run {
+                self.members = localMemberships
+                self.userProfiles = allProfiles
+            }
+            
+            // Sync with CloudKit for latest data
+            try await syncMembersFromCloudKit()
             
         } catch {
             await MainActor.run {
                 self.errorMessage = "Failed to load family members: \(error.localizedDescription)"
-                self.isLoading = false
             }
         }
+        
+        isLoading = false
     }
     
-    /// Change a member's role (Parent Admin only)
+    /// Change a member's role (Parent Admin only) with real backend integration
     func changeRole(for member: Membership, to newRole: Role) async {
         guard currentUserRole == .parentAdmin else {
             errorMessage = "Only Parent Admin can change member roles"
-            HapticManager.shared.error()
             return
         }
         
         guard member.userId != currentUserId else {
             errorMessage = "You cannot change your own role"
-            HapticManager.shared.error()
             return
         }
         
         // Check if trying to assign Parent Admin when one already exists
-        if newRole == .parentAdmin && members.contains(where: { $0.role == .parentAdmin }) {
+        if newRole == .parentAdmin && members.contains(where: { $0.role == .parentAdmin && $0.id != member.id }) {
             errorMessage = "Only one Parent Admin is allowed per family"
-            HapticManager.shared.warning()
             return
         }
         
@@ -103,51 +117,54 @@ class FamilyDashboardViewModel: ObservableObject {
         errorMessage = nil
         
         do {
-            // Simulate network delay
-            try await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
+            // Update role in local storage
+            try dataService.updateMembershipRole(member, to: newRole)
             
-            // Mock: Update the member's role
+            // Sync to CloudKit
+            try await cloudKitService.save(member)
+            
+            // Mark as synced
+            member.needsSync = false
+            member.lastSyncDate = Date()
+            try dataService.save()
+            
+            // Update local UI
             if let index = members.firstIndex(where: { $0.id == member.id }) {
                 await MainActor.run {
-                    self.members[index].role = newRole
+                    self.members[index] = member
                     self.successMessage = "Role updated to \(newRole.displayName)"
-                    self.isLoading = false
                     self.showRoleChangeSheet = false
                     self.selectedMember = nil
-                    
-                    // Success haptic feedback
-                    HapticManager.shared.success()
-                    
-                    // Show success toast
-                    ToastManager.shared.success("Role updated to \(newRole.displayName)")
                 }
             }
             
         } catch {
-            await MainActor.run {
-                self.errorMessage = "Failed to update role: \(error.localizedDescription)"
-                self.isLoading = false
+            if let dataError = error as? DataServiceError {
+                errorMessage = dataError.localizedDescription
+            } else if let cloudKitError = error as? CloudKitError {
+                errorMessage = "Role updated locally. Sync failed: \(cloudKitError.localizedDescription)"
+            } else {
+                errorMessage = "Failed to update role: \(error.localizedDescription)"
             }
         }
+        
+        isLoading = false
     }
     
-    /// Remove a member from the family (Parent Admin only)
+    /// Remove a member from the family (Parent Admin only) with real backend integration
     func removeMember(_ member: Membership) async {
         guard currentUserRole == .parentAdmin else {
             errorMessage = "Only Parent Admin can remove members"
-            HapticManager.shared.error()
             return
         }
         
         guard member.userId != currentUserId else {
             errorMessage = "You cannot remove yourself from the family"
-            HapticManager.shared.error()
             return
         }
         
         guard member.role != .parentAdmin else {
             errorMessage = "Cannot remove Parent Admin"
-            HapticManager.shared.warning()
             return
         }
         
@@ -155,34 +172,39 @@ class FamilyDashboardViewModel: ObservableObject {
         errorMessage = nil
         
         do {
-            // Simulate network delay
-            try await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
+            // Remove member (soft delete) in local storage
+            try dataService.removeMembership(member)
             
-            // Mock: Remove the member (soft delete by changing status)
-            if let index = members.firstIndex(where: { $0.id == member.id }) {
-                await MainActor.run {
-                    self.members[index].status = .removed
-                    // Remove from display list
-                    self.members.removeAll { $0.id == member.id }
-                    self.successMessage = "Member removed from family"
-                    self.isLoading = false
-                    self.showRemovalConfirmation = false
-                    self.memberToRemove = nil
-                    
-                    // Success haptic feedback
-                    HapticManager.shared.success()
-                    
-                    // Show success toast
-                    ToastManager.shared.success("Member removed from family")
+            // Sync to CloudKit
+            try await cloudKitService.save(member)
+            
+            // Mark as synced
+            member.needsSync = false
+            member.lastSyncDate = Date()
+            try dataService.save()
+            
+            // Update local UI
+            await MainActor.run {
+                self.members.removeAll { $0.id == member.id }
+                if let userId = member.userId {
+                    self.userProfiles.removeValue(forKey: userId)
                 }
+                self.successMessage = "Member removed from family"
+                self.showRemovalConfirmation = false
+                self.memberToRemove = nil
             }
             
         } catch {
-            await MainActor.run {
-                self.errorMessage = "Failed to remove member: \(error.localizedDescription)"
-                self.isLoading = false
+            if let dataError = error as? DataServiceError {
+                errorMessage = dataError.localizedDescription
+            } else if let cloudKitError = error as? CloudKitError {
+                errorMessage = "Member removed locally. Sync failed: \(cloudKitError.localizedDescription)"
+            } else {
+                errorMessage = "Failed to remove member: \(error.localizedDescription)"
             }
         }
+        
+        isLoading = false
     }
     
     /// Show role change sheet for a member
@@ -214,81 +236,158 @@ class FamilyDashboardViewModel: ObservableObject {
     
     /// Get user profile for a member
     func userProfile(for membership: Membership) -> UserProfile? {
-        return userProfiles[membership.userId]
+        guard let userId = membership.userId else { return nil }
+        return userProfiles[userId]
     }
     
     // MARK: - Private Methods
     
-    /// Generate mock memberships for testing
-    private func generateMockMemberships() -> [Membership] {
-        let familyId = currentFamily.id
-        
-        // Create memberships with different roles
-        var memberships: [Membership] = []
-        
-        // Current user membership
-        let currentUserMembership = Membership(
-            familyId: familyId,
-            userId: currentUserId,
-            role: currentUserRole
-        )
-        memberships.append(currentUserMembership)
-        
-        // Additional mock members
-        let additionalMembers = [
-            (Role.adult, "Active"),
-            (Role.kid, "Active"),
-            (Role.visitor, "Active"),
-            (Role.adult, "Invited")
-        ]
-        
-        for (role, statusString) in additionalMembers {
-            let status: MembershipStatus = statusString == "Active" ? .active : .invited
-            var membership = Membership(
-                familyId: familyId,
-                userId: UUID(),
-                role: role
-            )
-            membership.status = status
-            memberships.append(membership)
+    /// Set up real-time sync notifications
+    private func setupSyncNotifications() {
+        NotificationCenter.default.addObserver(
+            forName: .membershipRecordChanged,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            Task {
+                await self?.handleMembershipChange(notification)
+            }
         }
         
-        // Ensure only one Parent Admin exists
-        if currentUserRole != .parentAdmin {
-            // Add a Parent Admin if current user is not one
-            let adminMembership = Membership(
-                familyId: familyId,
-                userId: UUID(),
-                role: .parentAdmin
-            )
-            memberships.insert(adminMembership, at: 0)
+        NotificationCenter.default.addObserver(
+            forName: .membershipRecordDeleted,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            Task {
+                await self?.handleMembershipDeletion(notification)
+            }
         }
         
-        return memberships.filter { $0.status != .removed }
+        NotificationCenter.default.addObserver(
+            forName: .userProfileRecordChanged,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            Task {
+                await self?.handleUserProfileChange(notification)
+            }
+        }
     }
     
-    /// Generate mock user profiles for memberships
-    private func generateMockUserProfiles(for memberships: [Membership]) -> [UUID: UserProfile] {
-        var profiles: [UUID: UserProfile] = [:]
+    /// Sync members from CloudKit
+    private func syncMembersFromCloudKit() async throws {
+        // Fetch latest memberships from CloudKit
+        let membershipRecords = try await cloudKitService.fetchActiveMemberships(forFamilyId: currentFamily.id.uuidString)
         
-        let mockNames = [
-            "Sarah Johnson",
-            "Mike Garcia", 
-            "Emma Chen",
-            "Alex Smith",
-            "Jordan Taylor",
-            "Casey Morgan"
-        ]
+        var updatedMemberships: [Membership] = []
+        var updatedProfiles: [UUID: UserProfile] = userProfiles
         
-        for (index, membership) in memberships.enumerated() {
-            let name = index < mockNames.count ? mockNames[index] : "Family Member \(index + 1)"
-            let profile = UserProfile.mock(
-                displayName: name,
-                appleUserIdHash: "hash_\(membership.userId.uuidString.prefix(8))"
-            )
-            profiles[membership.userId] = profile
+        for record in membershipRecords {
+            // Convert CloudKit record to local membership
+            if let membership = try await convertMembershipRecord(record) {
+                updatedMemberships.append(membership)
+                
+                // Get user profile for this membership
+                if let userId = membership.userId,
+                   let userProfile = try dataService.fetchUserProfile(byId: userId) {
+                    updatedProfiles[userId] = userProfile
+                } else if let userReference = record[CKFieldName.membershipUserReference] as? CKRecord.Reference {
+                    // Fetch user profile from CloudKit if not found locally
+                    if let userRecord = try await cloudKitService.fetchRecord(withID: userReference.recordID.recordName, recordType: CKRecordType.userProfile) {
+                        let userProfile = try await convertUserProfileRecord(userRecord)
+                        if let userId = membership.userId {
+                            updatedProfiles[userId] = userProfile
+                        }
+                    }
+                }
+            }
         }
         
-        return profiles
+        // Update UI on main thread
+        await MainActor.run {
+            self.members = updatedMemberships
+            self.userProfiles = updatedProfiles
+        }
+    }
+    
+    /// Convert CloudKit membership record to local Membership
+    private func convertMembershipRecord(_ record: CKRecord) async throws -> Membership? {
+        guard let roleString = record[CKFieldName.membershipRole] as? String,
+              let role = Role(rawValue: roleString),
+              let statusString = record[CKFieldName.membershipStatus] as? String,
+              let status = MembershipStatus(rawValue: statusString),
+              status == .active else {
+            return nil // Skip non-active memberships
+        }
+        
+        // Check if membership exists locally
+        let membershipId = UUID(uuidString: record.recordID.recordName)!
+        
+        // For now, create a temporary membership - in a real implementation,
+        // this would properly sync with local storage
+        let membership = Membership(family: currentFamily, user: UserProfile(displayName: "Loading...", appleUserIdHash: "temp"), role: role)
+        try membership.updateFromCKRecord(record)
+        
+        return membership
+    }
+    
+    /// Convert CloudKit user profile record to local UserProfile
+    private func convertUserProfileRecord(_ record: CKRecord) async throws -> UserProfile {
+        guard let displayName = record[CKFieldName.userDisplayName] as? String,
+              let appleUserIdHash = record[CKFieldName.userAppleUserIdHash] as? String else {
+            throw CloudKitSyncError.invalidRecord
+        }
+        
+        let userProfile = UserProfile(displayName: displayName, appleUserIdHash: appleUserIdHash)
+        try userProfile.updateFromCKRecord(record)
+        
+        return userProfile
+    }
+    
+    /// Handle membership change notifications
+    private func handleMembershipChange(_ notification: Notification) async {
+        guard let record = notification.userInfo?["record"] as? CKRecord else { return }
+        
+        // Check if this membership belongs to our family
+        if let familyReference = record[CKFieldName.membershipFamilyReference] as? CKRecord.Reference,
+           familyReference.recordID.recordName == currentFamily.id.uuidString {
+            
+            // Reload members to get latest data
+            await loadMembers()
+        }
+    }
+    
+    /// Handle membership deletion notifications
+    private func handleMembershipDeletion(_ notification: Notification) async {
+        guard let recordID = notification.userInfo?["recordID"] as? String else { return }
+        
+        // Remove member from local list
+        await MainActor.run {
+            self.members.removeAll { $0.ckRecordID == recordID }
+        }
+    }
+    
+    /// Handle user profile change notifications
+    private func handleUserProfileChange(_ notification: Notification) async {
+        guard let record = notification.userInfo?["record"] as? CKRecord else { return }
+        
+        // Update user profile if it's for one of our members
+        if let userId = UUID(uuidString: record.recordID.recordName),
+           userProfiles[userId] != nil {
+            
+            do {
+                let updatedProfile = try await convertUserProfileRecord(record)
+                await MainActor.run {
+                    self.userProfiles[userId] = updatedProfile
+                }
+            } catch {
+                // Handle error silently for now
+            }
+        }
+    }
+    
+    deinit {
+        NotificationCenter.default.removeObserver(self)
     }
 }

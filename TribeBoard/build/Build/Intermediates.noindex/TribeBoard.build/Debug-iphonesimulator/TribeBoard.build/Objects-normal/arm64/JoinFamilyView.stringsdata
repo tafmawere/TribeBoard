@@ -7,7 +7,7 @@
         "key": "Join Family",
         "location": {
           "startingColumn": 26,
-          "startingLine": 95
+          "startingLine": 109
         }
       },
       {
@@ -15,7 +15,7 @@
         "key": "Join Family",
         "location": {
           "startingColumn": 13,
-          "startingLine": 99
+          "startingLine": 113
         }
       },
       {
@@ -23,7 +23,7 @@
         "key": "Join Family",
         "location": {
           "startingColumn": 34,
-          "startingLine": 22
+          "startingLine": 36
         }
       },
       {
@@ -31,7 +31,7 @@
         "key": "Enter your family code or scan the QR code to join an existing family",
         "location": {
           "startingColumn": 34,
-          "startingLine": 27
+          "startingLine": 41
         }
       },
       {
@@ -39,7 +39,7 @@
         "key": "OR",
         "location": {
           "startingColumn": 38,
-          "startingLine": 56
+          "startingLine": 70
         }
       },
       {
@@ -47,7 +47,7 @@
         "key": "Family Code",
         "location": {
           "startingColumn": 22,
-          "startingLine": 151
+          "startingLine": 165
         }
       },
       {
@@ -55,7 +55,7 @@
         "key": "Family codes are 4-8 characters (letters and numbers)",
         "location": {
           "startingColumn": 26,
-          "startingLine": 200
+          "startingLine": 214
         }
       },
       {
@@ -63,7 +63,7 @@
         "key": "Enter family code",
         "location": {
           "startingColumn": 31,
-          "startingLine": 156
+          "startingLine": 170
         }
       },
       {
@@ -71,7 +71,7 @@
         "key": "Scanning...",
         "location": {
           "startingColumn": 35,
-          "startingLine": 227
+          "startingLine": 241
         }
       },
       {
@@ -79,7 +79,7 @@
         "key": "Scan QR Code",
         "location": {
           "startingColumn": 51,
-          "startingLine": 227
+          "startingLine": 241
         }
       },
       {
@@ -87,7 +87,7 @@
         "key": "Join %@",
         "location": {
           "startingColumn": 24,
-          "startingLine": 258
+          "startingLine": 272
         }
       },
       {
@@ -95,7 +95,7 @@
         "key": "Cancel",
         "location": {
           "startingColumn": 24,
-          "startingLine": 263
+          "startingLine": 277
         }
       },
       {
@@ -103,7 +103,7 @@
         "key": "Dismiss",
         "location": {
           "startingColumn": 20,
-          "startingLine": 290
+          "startingLine": 304
         }
       }
     ]

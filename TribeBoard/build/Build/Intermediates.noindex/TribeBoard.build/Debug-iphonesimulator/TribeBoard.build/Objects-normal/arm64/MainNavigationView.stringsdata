@@ -7,7 +7,7 @@
         "key": "Error",
         "location": {
           "startingColumn": 16,
-          "startingLine": 48
+          "startingLine": 66
         }
       },
       {
@@ -15,7 +15,7 @@
         "key": "OK",
         "location": {
           "startingColumn": 20,
-          "startingLine": 49
+          "startingLine": 67
         }
       },
       {
@@ -23,7 +23,7 @@
         "key": "Select Role",
         "location": {
           "startingColumn": 26,
-          "startingLine": 100
+          "startingLine": 134
         }
       },
       {
@@ -31,7 +31,7 @@
         "key": "Select Role",
         "location": {
           "startingColumn": 18,
-          "startingLine": 76
+          "startingLine": 113
         }
       },
       {
@@ -39,7 +39,7 @@
         "key": "This will be the role selection view",
         "location": {
           "startingColumn": 18,
-          "startingLine": 81
+          "startingLine": 118
         }
       },
       {
@@ -47,7 +47,7 @@
         "key": "Mock Select Role",
         "location": {
           "startingColumn": 20,
-          "startingLine": 85
+          "startingLine": 122
         }
       },
       {
@@ -55,7 +55,7 @@
         "key": "Family Dashboard",
         "location": {
           "startingColumn": 26,
-          "startingLine": 137
+          "startingLine": 171
         }
       },
       {
@@ -63,7 +63,7 @@
         "key": "Your role: %@",
         "location": {
           "startingColumn": 22,
-          "startingLine": 120
+          "startingLine": 154
         }
       },
       {
@@ -71,7 +71,7 @@
         "key": "This will be the family dashboard view",
         "location": {
           "startingColumn": 18,
-          "startingLine": 125
+          "startingLine": 159
         }
       },
       {
@@ -79,7 +79,7 @@
         "key": "Leave Family",
         "location": {
           "startingColumn": 20,
-          "startingLine": 129
+          "startingLine": 163
         }
       },
       {
@@ -87,7 +87,7 @@
         "key": "Sign Out",
         "location": {
           "startingColumn": 24,
-          "startingLine": 141
+          "startingLine": 175
         }
       }
     ]

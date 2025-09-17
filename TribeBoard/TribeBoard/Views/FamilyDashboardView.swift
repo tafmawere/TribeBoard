@@ -8,10 +8,17 @@ struct FamilyDashboardView: View {
     // MARK: - Initialization
     
     init(family: Family, currentUserId: UUID, currentUserRole: Role) {
+        // Create temporary services for initialization
+        let tempContainer = try! ModelContainerConfiguration.createInMemory()
+        let dataService = DataService(modelContext: tempContainer.mainContext)
+        let cloudKitService = CloudKitService()
+        
         self._viewModel = StateObject(wrappedValue: FamilyDashboardViewModel(
             family: family,
             currentUserId: currentUserId,
-            currentUserRole: currentUserRole
+            currentUserRole: currentUserRole,
+            dataService: dataService,
+            cloudKitService: cloudKitService
         ))
     }
     
@@ -80,7 +87,9 @@ struct FamilyDashboardView: View {
                         }
                         
                         Button("Sign Out", role: .destructive) {
-                            appState.signOut()
+                            Task {
+                                await appState.signOut()
+                            }
                         }
                     } label: {
                         Image(systemName: "ellipsis.circle")

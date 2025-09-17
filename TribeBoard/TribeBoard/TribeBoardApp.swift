@@ -7,16 +7,34 @@
 
 import SwiftUI
 import SwiftData
+import UserNotifications
 
 @main
 struct TribeBoardApp: App {
     let modelContainer: ModelContainer
+    @StateObject private var cloudKitService = CloudKitService()
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     
     init() {
         do {
-            modelContainer = try ModelContainerConfiguration.create()
+            // Validate SwiftData schema before creating container
+            print("🔍 Validating SwiftData schema...")
+            try ModelContainerConfiguration.validateSchema()
+            
+            // Use the fallback method that gracefully handles CloudKit failures
+            modelContainer = ModelContainerConfiguration.createWithFallback()
+            print("✅ TribeBoardApp initialized with ModelContainer")
         } catch {
-            fatalError("Failed to create ModelContainer: \(error)")
+            print("💥 CRITICAL: Failed to initialize ModelContainer: \(error)")
+            print("   This indicates a fundamental issue with SwiftData model definitions")
+            
+            // Last resort: try to create a minimal in-memory container
+            do {
+                modelContainer = try ModelContainerConfiguration.createInMemory()
+                print("⚠️ Using emergency in-memory container - data will not persist")
+            } catch {
+                fatalError("Unable to create any ModelContainer. Check SwiftData model definitions: \(error)")
+            }
         }
     }
     
@@ -24,6 +42,70 @@ struct TribeBoardApp: App {
         WindowGroup {
             MainNavigationView()
                 .modelContainer(modelContainer)
+                .environmentObject(cloudKitService)
+                .onAppear {
+                    Task {
+                        await setupCloudKit()
+                        await requestNotificationPermissions()
+                    }
+                }
+                .onReceive(NotificationCenter.default.publisher(for: UIApplication.didFinishLaunchingNotification)) { _ in
+                    UIApplication.shared.registerForRemoteNotifications()
+                }
+                .onReceive(NotificationCenter.default.publisher(for: .didReceiveRemoteNotificationNotification)) { notification in
+                    if let userInfo = notification.userInfo {
+                        Task {
+                            await cloudKitService.handleRemoteNotification(userInfo)
+                        }
+                    }
+                }
         }
+    }
+    
+    // MARK: - CloudKit Setup
+    
+    @MainActor
+    private func setupCloudKit() async {
+        do {
+            try await cloudKitService.performInitialSetup()
+            print("CloudKit setup completed successfully")
+        } catch {
+            print("CloudKit setup failed: \(error)")
+            // Continue without CloudKit - app should work offline
+        }
+    }
+    
+    // MARK: - Notification Permissions
+    
+    private func requestNotificationPermissions() async {
+        let center = UNUserNotificationCenter.current()
+        do {
+            let granted = try await center.requestAuthorization(options: [.alert, .sound, .badge])
+            if granted {
+                print("Notification permissions granted")
+            } else {
+                print("Notification permissions denied")
+            }
+        } catch {
+            print("Failed to request notification permissions: \(error)")
+        }
+    }
+}
+
+// MARK: - Custom Notification Names
+
+extension Notification.Name {
+    static let didReceiveRemoteNotificationNotification = Notification.Name("didReceiveRemoteNotification")
+}
+
+// MARK: - UIApplication Extension for Remote Notifications
+
+extension UIApplication {
+    static func handleRemoteNotification(_ userInfo: [AnyHashable: Any]) {
+        NotificationCenter.default.post(
+            name: .didReceiveRemoteNotificationNotification,
+            object: nil,
+            userInfo: userInfo
+        )
     }
 }

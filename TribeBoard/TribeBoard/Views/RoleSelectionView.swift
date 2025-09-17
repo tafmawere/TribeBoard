@@ -8,9 +8,16 @@ struct RoleSelectionView: View {
     // MARK: - Initialization
     
     init(family: Family, user: UserProfile) {
+        // Create temporary services for initialization
+        let tempContainer = try! ModelContainerConfiguration.createInMemory()
+        let dataService = DataService(modelContext: tempContainer.mainContext)
+        let cloudKitService = CloudKitService()
+        
         self._viewModel = StateObject(wrappedValue: RoleSelectionViewModel(
             family: family,
-            user: user
+            user: user,
+            dataService: dataService,
+            cloudKitService: cloudKitService
         ))
     }
     

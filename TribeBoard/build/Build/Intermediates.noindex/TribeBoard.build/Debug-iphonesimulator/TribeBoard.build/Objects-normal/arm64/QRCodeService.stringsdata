@@ -1,5 +1,16 @@
 {
   "source": "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/TribeBoard/Utilities/QRCodeService.swift",
-  "tables": {},
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "QR Code",
+        "location": {
+          "startingColumn": 59,
+          "startingLine": 218
+        }
+      }
+    ]
+  },
   "version": 1
 }

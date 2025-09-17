@@ -231,7 +231,7 @@ final class DataServiceTests: XCTestCase {
             createdByUserId: user1.id
         )
         
-        let membership1 = try dataService.createMembership(
+        _ = try dataService.createMembership(
             family: family,
             user: user1,
             role: .parentAdmin
@@ -262,11 +262,9 @@ final class DataServiceTests: XCTestCase {
     func testFamilyValidation() throws {
         let validResult = try dataService.validateFamily(name: "Valid Family", code: "VALID1")
         XCTAssertTrue(validResult.isValid)
-        XCTAssertTrue(validResult.errors.isEmpty)
         
         let invalidResult = try dataService.validateFamily(name: "", code: "12")
         XCTAssertFalse(invalidResult.isValid)
-        XCTAssertFalse(invalidResult.errors.isEmpty)
     }
     
     func testUserProfileValidation() {

@@ -1,43 +1,61 @@
 import SwiftUI
+import SwiftData
 
 /// Main navigation view that handles app-wide navigation and state management
 struct MainNavigationView: View {
     @StateObject private var appState = AppState()
+    @Environment(\.modelContext) private var modelContext
+    
+    // Services - will be initialized in onAppear
+    @State private var authService: AuthService?
+    @State private var dataService: DataService?
+    @State private var servicesInitialized = false
     
     var body: some View {
         NavigationStack(path: $appState.navigationPath) {
             Group {
-                switch appState.currentFlow {
-                case .onboarding:
-                    OnboardingView()
-                case .familySelection:
-                    FamilySelectionView()
-                case .createFamily:
-                    CreateFamilyView()
-                case .joinFamily:
-                    JoinFamilyView()
-                case .roleSelection:
-                    if let user = appState.currentUser,
-                       let family = appState.currentFamily {
-                        RoleSelectionView(family: family, user: user)
-                    } else {
-                        RoleSelectionPlaceholderView()
+                if servicesInitialized {
+                    switch appState.currentFlow {
+                    case .onboarding:
+                        if let authService = authService {
+                            OnboardingView(authService: authService)
+                        } else {
+                            LoadingStateView()
+                        }
+                    case .familySelection:
+                        FamilySelectionView()
+                    case .createFamily:
+                        CreateFamilyView()
+                    case .joinFamily:
+                        JoinFamilyView()
+                    case .roleSelection:
+                        if let user = appState.currentUser,
+                           let family = appState.currentFamily {
+                            RoleSelectionView(family: family, user: user)
+                        } else {
+                            RoleSelectionPlaceholderView()
+                        }
+                    case .familyDashboard:
+                        if let user = appState.currentUser,
+                           let family = appState.currentFamily,
+                           let membership = appState.currentMembership {
+                            FamilyDashboardView(
+                                family: family,
+                                currentUserId: user.id,
+                                currentUserRole: membership.role
+                            )
+                        } else {
+                            FamilyDashboardPlaceholderView()
+                        }
                     }
-                case .familyDashboard:
-                    if let user = appState.currentUser,
-                       let family = appState.currentFamily,
-                       let membership = appState.currentMembership {
-                        FamilyDashboardView(
-                            family: family,
-                            currentUserId: user.id,
-                            currentUserRole: membership.role
-                        )
-                    } else {
-                        FamilyDashboardPlaceholderView()
-                    }
+                } else {
+                    LoadingStateView()
                 }
             }
             .environmentObject(appState)
+        }
+        .onAppear {
+            initializeServices()
         }
         .overlay {
             // Global loading overlay
@@ -54,6 +72,25 @@ struct MainNavigationView: View {
                 Text(errorMessage)
             }
         }
+    }
+    
+    // MARK: - Service Initialization
+    
+    private func initializeServices() {
+        guard !servicesInitialized else { return }
+        
+        // Initialize DataService with the environment model context
+        let dataService = DataService(modelContext: modelContext)
+        self.dataService = dataService
+        
+        // Initialize AuthService and set DataService
+        let authService = AuthService()
+        authService.setDataService(dataService)
+        self.authService = authService
+        
+        // Services are now initialized and ready
+        
+        servicesInitialized = true
     }
 }
 
@@ -136,7 +173,9 @@ struct FamilyDashboardPlaceholderView: View {
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button("Sign Out") {
-                    appState.signOut()
+                    Task {
+                        await appState.signOut()
+                    }
                 }
             }
         }

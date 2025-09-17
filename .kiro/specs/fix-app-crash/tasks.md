@@ -55,3 +55,11 @@
   - Update model initializers to handle optional properties
   - Ensure models work with both CloudKit and local storage
   - _Requirements: 4.1, 4.2, 4.3, 4.4_
+
+- [x] 10. Fix SwiftData fetch operations causing EXC_BREAKPOINT crashes
+  - Investigate and fix the EXC_BREAKPOINT error occurring at line 61 in DataService.swift
+  - Add error handling around fetch operations to prevent crashes
+  - Implement safer fetch descriptor patterns that work with CloudKit-compatible models
+  - Add validation to ensure ModelContext is in a valid state before fetch operations
+  - Test fetch operations with both CloudKit and local storage configurations
+  - _Requirements: 1.1, 3.1, 4.2_

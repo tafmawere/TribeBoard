@@ -1,252 +1,291 @@
-import UIKit
+import SwiftUI
 import CoreImage
-import AVFoundation
-import Vision
 
-/// Service for QR code generation and scanning functionality
-class QRCodeService: NSObject {
+/// Service for QR code generation using SwiftUI and CoreImage
+class QRCodeService {
     
     // MARK: - Properties
     
     private let context = CIContext()
-    private var captureSession: AVCaptureSession?
-    private var previewLayer: AVCaptureVideoPreviewLayer?
-    private var scanCompletion: ((Result<String, QRCodeError>) -> Void)?
     
     // MARK: - QR Code Generation
     
-    /// Generates a QR code image from a string
+    /// Generates a QR code SwiftUI Image from a string
+    /// - Parameter string: String to encode in QR code
+    /// - Returns: SwiftUI Image containing the QR code, or fallback image if generation fails
+    func generateQRCode(from string: String) -> Image {
+        return generateQRCodeImage(from: string, size: CGSize(width: 200, height: 200))
+    }
+    
+    /// Generates a QR code SwiftUI Image from a string with specified size
     /// - Parameters:
     ///   - string: String to encode in QR code
-    ///   - size: Size of the generated QR code image
-    /// - Returns: UIImage containing the QR code, or nil if generation fails
-    func generateQRCode(from string: String, size: CGSize = CGSize(width: 200, height: 200)) -> UIImage? {
+    ///   - size: Desired size for the QR code image
+    /// - Returns: SwiftUI Image containing the QR code, or fallback image if generation fails
+    func generateQRCode(from string: String, size: CGSize) -> Image {
+        return generateQRCodeImage(from: string, size: size)
+    }
+    
+    // MARK: - Private Methods
+    
+    /// Core implementation of QR code generation using CoreImage pipeline
+    /// - Parameters:
+    ///   - string: String to encode in QR code
+    ///   - size: Desired size for the QR code image
+    /// - Returns: SwiftUI Image containing the QR code, or fallback image if generation fails
+    private func generateQRCodeImage(from string: String, size: CGSize) -> Image {
+        // Step 1: Comprehensive input validation and string-to-data conversion
+        guard validateInput(string) else {
+            return createFallbackImage(reason: "Invalid input string")
+        }
+        
+        guard let inputData = convertStringToData(string) else {
+            return createFallbackImage(reason: "String to data conversion failed")
+        }
+        
+        // Step 2: Create CIFilter with comprehensive error handling
+        guard let qrCodeFilter = createQRCodeFilter() else {
+            return createFallbackImage(reason: "CIFilter creation failed")
+        }
+        
+        // Step 3: Configure filter with error handling for parameter setting
+        guard configureQRCodeFilter(qrCodeFilter, with: inputData) else {
+            return createFallbackImage(reason: "Filter configuration failed")
+        }
+        
+        // Step 4: Generate QR code image with output validation
+        guard let qrCodeImage = generateQRCodeFromFilter(qrCodeFilter) else {
+            return createFallbackImage(reason: "QR code generation failed")
+        }
+        
+        // Step 5: Scale the QR code with error handling for transformation
+        guard let scaledImage = scaleQRCodeImageSafely(qrCodeImage, to: size) else {
+            return createFallbackImage(reason: "Image scaling failed")
+        }
+        
+        // Step 6: Convert to SwiftUI Image with comprehensive error handling
+        return convertToSwiftUIImageSafely(scaledImage)
+    }
+    
+    // MARK: - Input Validation and Data Conversion
+    
+    /// Validates input string for QR code generation
+    /// - Parameter string: Input string to validate
+    /// - Returns: True if string is valid for QR code generation
+    private func validateInput(_ string: String) -> Bool {
+        // Check for empty or whitespace-only strings
+        guard !string.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return false
+        }
+        
+        // Check for reasonable string length (QR codes have practical limits)
+        guard string.count <= 4296 else { // QR code maximum capacity for alphanumeric
+            return false
+        }
+        
+        return true
+    }
+    
+    /// Safely converts string to UTF-8 data with error handling
+    /// - Parameter string: Input string to convert
+    /// - Returns: UTF-8 data or nil if conversion fails
+    private func convertStringToData(_ string: String) -> Data? {
+        // Attempt UTF-8 conversion with fallback handling
         guard let data = string.data(using: .utf8) else {
+            // Try alternative encodings if UTF-8 fails
+            return string.data(using: .ascii) ?? string.data(using: .isoLatin1)
+        }
+        
+        // Validate data is not empty
+        guard !data.isEmpty else {
             return nil
         }
         
-        guard let qrFilter = CIFilter(name: "CIQRCodeGenerator") else {
-            return nil
-        }
-        
-        qrFilter.setValue(data, forKey: "inputMessage")
-        qrFilter.setValue("M", forKey: "inputCorrectionLevel") // Medium error correction
-        
-        guard let qrImage = qrFilter.outputImage else {
-            return nil
-        }
-        
-        // Scale the QR code to desired size
-        let scaleX = size.width / qrImage.extent.width
-        let scaleY = size.height / qrImage.extent.height
-        let scaledImage = qrImage.transformed(by: CGAffineTransform(scaleX: scaleX, y: scaleY))
-        
-        guard let cgImage = context.createCGImage(scaledImage, from: scaledImage.extent) else {
-            return nil
-        }
-        
-        return UIImage(cgImage: cgImage)
+        return data
     }
     
-    /// Generates a styled QR code with TribeBoard branding
+    // MARK: - Filter Creation and Configuration
+    
+    /// Creates QR code filter with comprehensive error handling
+    /// - Returns: Configured CIFilter or nil if creation fails
+    private func createQRCodeFilter() -> CIFilter? {
+        // Primary attempt with CIQRCodeGenerator
+        return CIFilter(name: "CIQRCodeGenerator")
+    }
+    
+    /// Configures QR code filter with input data and error correction
     /// - Parameters:
-    ///   - familyCode: Family code to encode
-    ///   - size: Size of the generated QR code
-    /// - Returns: Styled QR code image
-    func generateStyledFamilyQRCode(familyCode: String, size: CGSize = CGSize(width: 300, height: 300)) -> UIImage? {
-        // Create the base QR code
-        guard let qrImage = generateQRCode(from: familyCode, size: size) else {
-            return nil
+    ///   - filter: CIFilter to configure
+    ///   - data: Input data for QR code
+    /// - Returns: True if configuration succeeds
+    private func configureQRCodeFilter(_ filter: CIFilter, with data: Data) -> Bool {
+        // Set input message with error handling
+        filter.setValue(data, forKey: "inputMessage")
+        
+        // Verify the input was set correctly
+        guard filter.value(forKey: "inputMessage") != nil else {
+            return false
         }
         
-        // Create a styled version with border and label
-        let renderer = UIGraphicsImageRenderer(size: CGSize(width: size.width + 40, height: size.height + 80))
-        
-        return renderer.image { context in
-            let rect = CGRect(origin: .zero, size: renderer.format.bounds.size)
-            
-            // Background
-            UIColor.systemBackground.setFill()
-            context.fill(rect)
-            
-            // QR Code
-            let qrRect = CGRect(x: 20, y: 20, width: size.width, height: size.height)
-            qrImage.draw(in: qrRect)
-            
-            // Family code label
-            let labelRect = CGRect(x: 20, y: size.height + 30, width: size.width, height: 30)
-            let paragraphStyle = NSMutableParagraphStyle()
-            paragraphStyle.alignment = .center
-            
-            let attributes: [NSAttributedString.Key: Any] = [
-                .font: UIFont.systemFont(ofSize: 16, weight: .medium),
-                .foregroundColor: UIColor.label,
-                .paragraphStyle: paragraphStyle
-            ]
-            
-            familyCode.draw(in: labelRect, withAttributes: attributes)
-        }
-    }
-    
-    // MARK: - QR Code Scanning
-    
-    /// Scans QR code from an image
-    /// - Parameter image: UIImage to scan for QR codes
-    /// - Returns: String content of the first QR code found, or nil if none found
-    func scanQRCode(from image: UIImage) -> String? {
-        guard let cgImage = image.cgImage else { return nil }
-        
-        let request = VNDetectBarcodesRequest()
-        request.symbologies = [.qr]
-        
-        let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
-        
-        do {
-            try handler.perform([request])
-            
-            guard let results = request.results,
-                  let firstResult = results.first,
-                  let payload = firstResult.payloadStringValue else {
-                return nil
-            }
-            
-            return payload
-        } catch {
-            return nil
-        }
-    }
-    
-    /// Sets up camera session for live QR code scanning
-    /// - Parameters:
-    ///   - previewView: UIView to display camera preview
-    ///   - completion: Completion handler called when QR code is detected
-    /// - Throws: QRCodeError if camera setup fails
-    func setupCameraSession(previewView: UIView, completion: @escaping (Result<String, QRCodeError>) -> Void) throws {
-        guard AVCaptureDevice.authorizationStatus(for: .video) == .authorized else {
-            throw QRCodeError.cameraPermissionDenied
-        }
-        
-        captureSession = AVCaptureSession()
-        guard let captureSession = captureSession else {
-            throw QRCodeError.cameraSetupFailed
-        }
-        
-        guard let videoCaptureDevice = AVCaptureDevice.default(for: .video) else {
-            throw QRCodeError.cameraNotAvailable
-        }
-        
-        let videoInput: AVCaptureDeviceInput
-        do {
-            videoInput = try AVCaptureDeviceInput(device: videoCaptureDevice)
-        } catch {
-            throw QRCodeError.cameraSetupFailed
-        }
-        
-        if captureSession.canAddInput(videoInput) {
-            captureSession.addInput(videoInput)
-        } else {
-            throw QRCodeError.cameraSetupFailed
-        }
-        
-        let metadataOutput = AVCaptureMetadataOutput()
-        
-        if captureSession.canAddOutput(metadataOutput) {
-            captureSession.addOutput(metadataOutput)
-            
-            metadataOutput.setMetadataObjectsDelegate(self, queue: DispatchQueue.main)
-            metadataOutput.metadataObjectTypes = [.qr]
-        } else {
-            throw QRCodeError.cameraSetupFailed
-        }
-        
-        previewLayer = AVCaptureVideoPreviewLayer(session: captureSession)
-        previewLayer?.frame = previewView.layer.bounds
-        previewLayer?.videoGravity = .resizeAspectFill
-        
-        if let previewLayer = previewLayer {
-            previewView.layer.addSublayer(previewLayer)
-        }
-        
-        self.scanCompletion = completion
-    }
-    
-    /// Starts the camera session for QR code scanning
-    func startScanning() {
-        DispatchQueue.global(qos: .background).async { [weak self] in
-            self?.captureSession?.startRunning()
-        }
-    }
-    
-    /// Stops the camera session
-    func stopScanning() {
-        captureSession?.stopRunning()
-    }
-    
-    /// Requests camera permission
-    /// - Parameter completion: Completion handler with permission result
-    static func requestCameraPermission(completion: @escaping (Bool) -> Void) {
-        AVCaptureDevice.requestAccess(for: .video) { granted in
-            DispatchQueue.main.async {
-                completion(granted)
+        // Set error correction level with fallback options
+        let correctionLevels = ["M", "L", "Q", "H"] // Medium, Low, Quartile, High
+        for level in correctionLevels {
+            filter.setValue(level, forKey: "inputCorrectionLevel")
+            if filter.value(forKey: "inputCorrectionLevel") != nil {
+                break
             }
         }
-    }
-    
-    // MARK: - Cleanup
-    
-    deinit {
-        stopScanning()
-    }
-}
-
-// MARK: - AVCaptureMetadataOutputObjectsDelegate
-
-extension QRCodeService: AVCaptureMetadataOutputObjectsDelegate {
-    func metadataOutput(_ output: AVCaptureMetadataOutput, didOutput metadataObjects: [AVMetadataObject], from connection: AVCaptureConnection) {
         
-        guard let metadataObject = metadataObjects.first,
-              let readableObject = metadataObject as? AVMetadataMachineReadableCodeObject,
-              let stringValue = readableObject.stringValue else {
-            return
+        return true
+    }
+    
+    // MARK: - Image Generation and Processing
+    
+    /// Generates QR code image from configured filter
+    /// - Parameter filter: Configured CIFilter
+    /// - Returns: Generated CIImage or nil if generation fails
+    private func generateQRCodeFromFilter(_ filter: CIFilter) -> CIImage? {
+        guard let outputImage = filter.outputImage else {
+            return nil
         }
         
-        // Stop scanning after first successful read
-        stopScanning()
+        // Validate the output image has reasonable dimensions
+        let extent = outputImage.extent
+        guard extent.width > 0 && extent.height > 0 && 
+              !extent.width.isInfinite && !extent.height.isInfinite &&
+              !extent.width.isNaN && !extent.height.isNaN else {
+            return nil
+        }
         
-        // Validate that this looks like a family code
-        let validation = Validation.validateFamilyCode(stringValue)
-        if validation.isValid {
-            scanCompletion?(.success(stringValue))
-        } else {
-            scanCompletion?(.failure(.invalidQRCode))
+        return outputImage
+    }
+    
+    /// Safely scales QR code image with comprehensive error handling
+    /// - Parameters:
+    ///   - ciImage: Source CIImage from QR code generation
+    ///   - size: Target size for the QR code
+    /// - Returns: Scaled CIImage or nil if scaling fails
+    private func scaleQRCodeImageSafely(_ ciImage: CIImage, to size: CGSize) -> CIImage? {
+        // Validate input parameters
+        guard size.width > 0 && size.height > 0 else {
+            return nil
+        }
+        
+        let imageSize = ciImage.extent.size
+        guard imageSize.width > 0 && imageSize.height > 0 else {
+            return nil
+        }
+        
+        // Calculate scale factors with bounds checking
+        let scaleX = size.width / imageSize.width
+        let scaleY = size.height / imageSize.height
+        let scale = min(scaleX, scaleY) // Maintain aspect ratio
+        
+        // Ensure scale is reasonable (not too small or too large)
+        guard scale > 0.1 && scale < 100.0 else {
+            return nil
+        }
+        
+        // Apply transformation with error handling
+        let transform = CGAffineTransform(scaleX: scale, y: scale)
+        let scaledImage = ciImage.transformed(by: transform)
+        
+        // Validate the transformed image
+        let scaledExtent = scaledImage.extent
+        guard !scaledExtent.width.isInfinite && !scaledExtent.height.isInfinite &&
+              !scaledExtent.width.isNaN && !scaledExtent.height.isNaN else {
+            return nil
+        }
+        
+        return scaledImage
+    }
+    
+    /// Safely converts CIImage to SwiftUI Image with comprehensive error handling
+    /// - Parameter ciImage: Source CIImage to convert
+    /// - Returns: SwiftUI Image or fallback image if conversion fails
+    private func convertToSwiftUIImageSafely(_ ciImage: CIImage) -> Image {
+        // Validate input image
+        let extent = ciImage.extent
+        guard !extent.width.isInfinite && !extent.height.isInfinite &&
+              !extent.width.isNaN && !extent.height.isNaN &&
+              !extent.isEmpty else {
+            return createFallbackImage(reason: "Invalid CIImage extent")
+        }
+        
+        // Attempt CGImage conversion with multiple strategies
+        if let cgImage = createCGImageSafely(from: ciImage) {
+            // Convert CGImage to SwiftUI Image with proper labeling for accessibility
+            return Image(cgImage, scale: 1.0, label: Text("QR Code"))
+        }
+        
+        return createFallbackImage(reason: "CGImage conversion failed")
+    }
+    
+    /// Creates CGImage from CIImage with multiple fallback strategies
+    /// - Parameter ciImage: Source CIImage
+    /// - Returns: CGImage or nil if all conversion attempts fail
+    private func createCGImageSafely(from ciImage: CIImage) -> CGImage? {
+        let extent = ciImage.extent
+        
+        // Primary conversion attempt with current context
+        if let cgImage = context.createCGImage(ciImage, from: extent) {
+            return cgImage
+        }
+        
+        // Fallback: Try with a new context
+        let fallbackContext = CIContext(options: [.useSoftwareRenderer: true])
+        if let cgImage = fallbackContext.createCGImage(ciImage, from: extent) {
+            return cgImage
+        }
+        
+        // Final fallback: Try with minimal options
+        let minimalContext = CIContext()
+        return minimalContext.createCGImage(ciImage, from: extent)
+    }
+    
+    // MARK: - Fallback Mechanisms
+    
+    /// Creates a fallback image for error states with optional reason logging
+    /// - Parameter reason: Optional reason for fallback (for debugging)
+    /// - Returns: SwiftUI system image indicating QR generation failure
+    private func createFallbackImage(reason: String? = nil) -> Image {
+        // Log the reason for debugging purposes (in debug builds only)
+        #if DEBUG
+        if let reason = reason {
+            print("QRCodeService fallback triggered: \(reason)")
+        }
+        #endif
+        
+        // Return appropriate fallback image
+        return Image(systemName: "xmark.circle")
+    }
+    
+    /// Alternative fallback images for different error scenarios
+    /// - Parameter errorType: Type of error that occurred
+    /// - Returns: Contextually appropriate fallback image
+    private func createContextualFallbackImage(for errorType: QRGenerationError) -> Image {
+        switch errorType {
+        case .invalidInput:
+            return Image(systemName: "exclamationmark.triangle")
+        case .filterCreationFailed:
+            return Image(systemName: "gear.badge.xmark")
+        case .imageProcessingFailed:
+            return Image(systemName: "photo.badge.exclamationmark")
+        case .conversionFailed:
+            return Image(systemName: "arrow.triangle.2.circlepath")
+        case .unknown:
+            return Image(systemName: "xmark.circle")
         }
     }
 }
 
 // MARK: - Error Types
 
-enum QRCodeError: LocalizedError {
-    case generationFailed
-    case cameraPermissionDenied
-    case cameraNotAvailable
-    case cameraSetupFailed
-    case scanningFailed
-    case invalidQRCode
-    
-    var errorDescription: String? {
-        switch self {
-        case .generationFailed:
-            return "Failed to generate QR code"
-        case .cameraPermissionDenied:
-            return "Camera permission is required to scan QR codes"
-        case .cameraNotAvailable:
-            return "Camera is not available on this device"
-        case .cameraSetupFailed:
-            return "Failed to set up camera for scanning"
-        case .scanningFailed:
-            return "Failed to scan QR code"
-        case .invalidQRCode:
-            return "QR code does not contain a valid family code"
-        }
-    }
+/// Enumeration of possible QR code generation errors for better error handling
+private enum QRGenerationError {
+    case invalidInput
+    case filterCreationFailed
+    case imageProcessingFailed
+    case conversionFailed
+    case unknown
 }

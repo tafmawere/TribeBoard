@@ -1,7 +1,7 @@
 import SwiftUI
 import Foundation
 
-/// ViewModel for role selection with mock validation and Parent Admin constraint checking
+/// ViewModel for role selection with real validation and Parent Admin constraint checking
 @MainActor
 class RoleSelectionViewModel: ObservableObject {
     
@@ -22,17 +22,21 @@ class RoleSelectionViewModel: ObservableObject {
     /// Success state after role selection
     @Published var roleSelectionComplete: Bool = false
     
-    // MARK: - Private Properties
+    // MARK: - Dependencies
     
-    private var appState: AppState?
+    private let dataService: DataService
+    private let cloudKitService: CloudKitService
     private let currentFamily: Family
     private let currentUser: UserProfile
+    private var appState: AppState?
     
     // MARK: - Initialization
     
-    init(family: Family, user: UserProfile) {
+    init(family: Family, user: UserProfile, dataService: DataService, cloudKitService: CloudKitService) {
         self.currentFamily = family
         self.currentUser = user
+        self.dataService = dataService
+        self.cloudKitService = cloudKitService
         
         // Check Parent Admin availability on initialization
         Task {
@@ -63,21 +67,27 @@ class RoleSelectionViewModel: ObservableObject {
         await updateRole(selectedRole)
     }
     
-    /// Update the user's role in the family
+    /// Update the user's role in the family with real backend integration
     func updateRole(_ role: Role) async {
         isUpdating = true
         clearError()
         
         do {
-            // Simulate API delay
-            try await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 seconds
+            // Get or create the user's membership
+            let membership = try await getOrCreateMembership(role: role)
             
-            // Mock role update logic
-            let membership = Membership(
-                family: currentFamily,
-                user: currentUser,
-                role: role
-            )
+            // If membership already exists, update the role
+            if membership.role != role {
+                try dataService.updateMembershipRole(membership, to: role)
+                
+                // Sync to CloudKit
+                try await cloudKitService.save(membership)
+                
+                // Mark as synced
+                membership.needsSync = false
+                membership.lastSyncDate = Date()
+                try dataService.save()
+            }
             
             // Success haptic feedback
             HapticManager.shared.success()
@@ -85,35 +95,59 @@ class RoleSelectionViewModel: ObservableObject {
             // Show success toast
             ToastManager.shared.success("Role set to \(role.displayName)")
             
-            // Update app state with new membership
+            // Update app state with membership
             appState?.setFamily(currentFamily, membership: membership)
             
             roleSelectionComplete = true
             
         } catch {
-            showError("Failed to update role. Please try again.")
+            if let dataError = error as? DataServiceError {
+                showError(dataError.localizedDescription)
+            } else if let cloudKitError = error as? CloudKitError {
+                showError("Role updated locally. Sync failed: \(cloudKitError.localizedDescription)")
+            } else {
+                showError("Failed to update role: \(error.localizedDescription)")
+            }
             HapticManager.shared.error()
         }
         
         isUpdating = false
     }
     
-    /// Check if Parent Admin role is available in the current family
+    /// Check if Parent Admin role is available in the current family with real backend integration
     func checkParentAdminAvailability() async {
-        // Mock check for existing Parent Admin
-        // In a real implementation, this would query the backend
-        
-        // Simulate API delay
-        try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
-        
-        // Mock scenario: 30% chance that Parent Admin is already taken
-        let isParentAdminTaken = Bool.random() && Double.random(in: 0...1) < 0.3
-        
-        canSelectParentAdmin = !isParentAdminTaken
-        
-        // If Parent Admin is taken and currently selected, default to Adult
-        if !canSelectParentAdmin && selectedRole == .parentAdmin {
-            selectedRole = .adult
+        do {
+            // Check local storage first
+            let hasLocalParentAdmin = try dataService.familyHasParentAdmin(currentFamily)
+            
+            if hasLocalParentAdmin {
+                canSelectParentAdmin = false
+            } else {
+                // Check CloudKit for the most up-to-date information
+                let membershipRecords = try await cloudKitService.fetchActiveMemberships(forFamilyId: currentFamily.id.uuidString)
+                
+                let hasCloudKitParentAdmin = membershipRecords.contains { record in
+                    guard let roleString = record[CKFieldName.membershipRole] as? String,
+                          let role = Role(rawValue: roleString) else {
+                        return false
+                    }
+                    return role == .parentAdmin
+                }
+                
+                canSelectParentAdmin = !hasCloudKitParentAdmin
+            }
+            
+            // If Parent Admin is taken and currently selected, default to Adult
+            if !canSelectParentAdmin && selectedRole == .parentAdmin {
+                selectedRole = .adult
+            }
+            
+        } catch {
+            // If check fails, default to not allowing Parent Admin selection for safety
+            canSelectParentAdmin = false
+            if selectedRole == .parentAdmin {
+                selectedRole = .adult
+            }
         }
     }
     
@@ -139,6 +173,23 @@ class RoleSelectionViewModel: ObservableObject {
     
     private func clearError() {
         errorMessage = nil
+    }
+    
+    /// Get or create membership for the current user
+    private func getOrCreateMembership(role: Role) async throws -> Membership {
+        // Check if user already has a membership in this family
+        let existingMemberships = try dataService.fetchMemberships(forUser: currentUser)
+        
+        if let existingMembership = existingMemberships.first(where: { $0.family?.id == currentFamily.id && $0.status == .active }) {
+            return existingMembership
+        } else {
+            // Create new membership
+            return try dataService.createMembership(
+                family: currentFamily,
+                user: currentUser,
+                role: role
+            )
+        }
     }
     
     private func getIconName(for role: Role) -> String {

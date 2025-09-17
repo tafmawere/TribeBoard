@@ -1,7 +1,8 @@
 import SwiftUI
 import Foundation
+import CloudKit
 
-/// ViewModel for joining an existing family with mock data and search functionality
+/// ViewModel for joining an existing family with real CloudKit backend integration
 @MainActor
 class JoinFamilyViewModel: ObservableObject {
     // MARK: - Published Properties
@@ -24,28 +25,26 @@ class JoinFamilyViewModel: ObservableObject {
     /// Error message for display
     @Published var errorMessage: String?
     
-    /// Mock member count for found family
+    /// Real member count for found family
     @Published var memberCount: Int = 0
     
-    // MARK: - Private Properties
+    // MARK: - Dependencies
     
-    private let mockFamilies: [Family]
-    private let mockMemberCounts: [UUID: Int]
+    private let dataService: DataService
+    private let cloudKitService: CloudKitService
+    private let qrCodeService: QRCodeService
     
     // MARK: - Initialization
     
-    init() {
-        // Initialize mock data
-        let mockData = MockDataGenerator.mockMultipleFamilies()
-        self.mockFamilies = mockData.map { $0.family }
-        self.mockMemberCounts = Dictionary(
-            uniqueKeysWithValues: mockData.map { ($0.family.id, $0.memberCount) }
-        )
+    init(dataService: DataService, cloudKitService: CloudKitService, qrCodeService: QRCodeService = QRCodeService()) {
+        self.dataService = dataService
+        self.cloudKitService = cloudKitService
+        self.qrCodeService = qrCodeService
     }
     
     // MARK: - Public Methods
     
-    /// Search for family by code with mock implementation
+    /// Search for family by code with real CloudKit backend integration
     func searchFamily(by code: String) async {
         guard !code.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             errorMessage = "Please enter a family code"
@@ -55,85 +54,140 @@ class JoinFamilyViewModel: ObservableObject {
         isSearching = true
         errorMessage = nil
         foundFamily = nil
+        memberCount = 0
         
-        // Simulate network delay
-        try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
-        
-        // Mock family search logic
-        let trimmedCode = code.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
-        
-        if let family = mockFamilies.first(where: { $0.code.uppercased() == trimmedCode }) {
-            foundFamily = family
-            memberCount = mockMemberCounts[family.id] ?? 0
-            showConfirmation = true
+        do {
+            let trimmedCode = code.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
             
-            // Success haptic feedback
-            HapticManager.shared.success()
-        } else {
-            // Mock some specific error scenarios
-            switch trimmedCode {
-            case "ERROR":
-                errorMessage = "Network error occurred. Please try again."
-            case "FULL":
-                errorMessage = "This family is currently full and not accepting new members."
-            default:
-                errorMessage = "Family not found. Please check the code and try again."
+            // First check local storage
+            if let localFamily = try dataService.fetchFamily(byCode: trimmedCode) {
+                await handleFoundFamily(localFamily)
+                return
             }
             
-            // Error haptic feedback
+            // Search in CloudKit
+            if let familyRecord = try await cloudKitService.fetchFamily(byCode: trimmedCode) {
+                // Convert CloudKit record to local Family object
+                let family = try await createFamilyFromCloudKitRecord(familyRecord)
+                await handleFoundFamily(family)
+            } else {
+                errorMessage = "Family not found. Please check the code and try again."
+                HapticManager.shared.error()
+            }
+            
+        } catch {
+            if let cloudKitError = error as? CloudKitError {
+                switch cloudKitError {
+                case .networkUnavailable:
+                    errorMessage = "Network unavailable. Please check your connection."
+                default:
+                    errorMessage = "Search failed: \(cloudKitError.localizedDescription)"
+                }
+            } else {
+                errorMessage = "Failed to search for family: \(error.localizedDescription)"
+            }
             HapticManager.shared.error()
         }
         
         isSearching = false
     }
     
-    /// Mock QR code scanning functionality
+    /// Real QR code scanning functionality
     func scanQRCode() async {
         isSearching = true
         errorMessage = nil
         
-        // Simulate QR scanning delay
-        try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
+        do {
+            // TODO: Camera scanning functionality will be implemented in a separate QRScannerService
+            // For now, we'll simulate the scanning process
+            errorMessage = "QR code scanning will be implemented in a future update"
+            isSearching = false
+            return
+            
+            // Note: In a real implementation, this would integrate with the camera view
+            // For now, we'll simulate a successful scan with a test code
+            // The actual camera integration would be handled by the SwiftUI view
+            
+            // This is a placeholder - the actual scanning would be triggered from the view
+            errorMessage = "Please use the camera view to scan QR codes"
+            
+        } catch {
+            errorMessage = "Failed to set up QR code scanning: \(error.localizedDescription)"
+            HapticManager.shared.error()
+        }
         
-        // Mock QR scan result - randomly select a family code
-        let mockScannedCodes = ["SMI123", "GAR456", "CHE789", "DEMO01"]
-        let scannedCode = mockScannedCodes.randomElement() ?? "SMI123"
-        
-        familyCode = scannedCode
         isSearching = false
-        
-        // Automatically search for the scanned code
-        await searchFamily(by: scannedCode)
     }
     
-    /// Join the found family with mock implementation
-    func joinFamily() async {
-        guard foundFamily != nil else {
+    /// Handle scanned QR code from camera view
+    func handleScannedCode(_ code: String) async {
+        familyCode = code
+        await searchFamily(by: code)
+    }
+    
+    /// Join the found family with real backend integration
+    func joinFamily(with appState: AppState) async {
+        guard let family = foundFamily else {
             errorMessage = "No family selected to join"
+            return
+        }
+        
+        guard let currentUser = appState.currentUser else {
+            errorMessage = "User not authenticated"
             return
         }
         
         isJoining = true
         errorMessage = nil
         
-        // Simulate join operation delay
-        try? await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 seconds
-        
-        // Mock join logic - always succeeds for demo
-        // In real implementation, this would create a Membership record
-        
-        // Success haptic feedback
-        HapticManager.shared.success()
-        
-        // Show success toast
-        if let family = foundFamily {
+        do {
+            // Check if user can join this family
+            let canJoin = try dataService.canUserJoinFamily(user: currentUser, family: family)
+            guard canJoin else {
+                throw JoinFamilyError.alreadyMember
+            }
+            
+            // Create membership with default Adult role
+            let membership = try dataService.createMembership(
+                family: family,
+                user: currentUser,
+                role: .adult
+            )
+            
+            // Sync to CloudKit
+            try await cloudKitService.save(membership)
+            
+            // Mark as synced
+            membership.needsSync = false
+            membership.lastSyncDate = Date()
+            try dataService.save()
+            
+            // Success haptic feedback
+            HapticManager.shared.success()
+            
+            // Show success toast
             ToastManager.shared.success("Joined \(family.name) successfully!")
+            
+            // Update app state
+            appState.setFamily(family, membership: membership)
+            
+            isJoining = false
+            showConfirmation = false
+            
+        } catch {
+            if let joinError = error as? JoinFamilyError {
+                errorMessage = joinError.localizedDescription
+            } else if let dataError = error as? DataServiceError {
+                errorMessage = dataError.localizedDescription
+            } else if let cloudKitError = error as? CloudKitError {
+                errorMessage = "Join failed: \(cloudKitError.localizedDescription)"
+            } else {
+                errorMessage = "Failed to join family: \(error.localizedDescription)"
+            }
+            
+            HapticManager.shared.error()
+            isJoining = false
         }
-        
-        isJoining = false
-        showConfirmation = false
-        
-        // Success - the view will handle navigation to role selection
     }
     
     /// Cancel the join operation
@@ -176,14 +230,82 @@ class JoinFamilyViewModel: ObservableObject {
     var canSearch: Bool {
         return !familyCode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isSearching
     }
+    
+    // MARK: - Private Methods
+    
+    /// Handle found family and get member count
+    private func handleFoundFamily(_ family: Family) async {
+        foundFamily = family
+        
+        do {
+            // Get active member count from CloudKit
+            let membershipRecords = try await cloudKitService.fetchActiveMemberships(forFamilyId: family.id.uuidString)
+            memberCount = membershipRecords.count
+            
+            showConfirmation = true
+            HapticManager.shared.success()
+            
+        } catch {
+            // Fallback to local count if CloudKit fails
+            do {
+                let count = try dataService.getActiveMemberCount(for: family)
+                memberCount = count
+                showConfirmation = true
+                HapticManager.shared.success()
+            } catch {
+                memberCount = 0
+                showConfirmation = true
+            }
+        }
+    }
+    
+    /// Create a Family object from CloudKit record
+    private func createFamilyFromCloudKitRecord(_ record: CKRecord) async throws -> Family {
+        guard let name = record[CKFieldName.familyName] as? String,
+              let code = record[CKFieldName.familyCode] as? String,
+              let createdByUserIdString = record[CKFieldName.familyCreatedByUserId] as? String,
+              let createdByUserId = UUID(uuidString: createdByUserIdString) else {
+            throw CloudKitSyncError.invalidRecord
+        }
+        
+        // Check if family already exists locally
+        if let existingFamily = try dataService.fetchFamily(byCode: code) {
+            // Update existing family with CloudKit data
+            try existingFamily.updateFromCKRecord(record)
+            try dataService.save()
+            return existingFamily
+        } else {
+            // Create new family from CloudKit data
+            let family = try dataService.createFamily(
+                name: name,
+                code: code,
+                createdByUserId: createdByUserId
+            )
+            
+            // Update with CloudKit metadata
+            try family.updateFromCKRecord(record)
+            try dataService.save()
+            
+            return family
+        }
+    }
 }
 
-// MARK: - Mock Error Scenarios
+// MARK: - Error Types
 
-extension JoinFamilyViewModel {
-    /// Test different error scenarios for development
-    func testErrorScenario(_ scenario: String) async {
-        familyCode = scenario
-        await searchFamily(by: scenario)
+enum JoinFamilyError: LocalizedError {
+    case alreadyMember
+    case familyNotFound
+    case networkUnavailable
+    
+    var errorDescription: String? {
+        switch self {
+        case .alreadyMember:
+            return "You are already a member of this family"
+        case .familyNotFound:
+            return "Family not found. Please check the code and try again."
+        case .networkUnavailable:
+            return "Network unavailable. Please check your connection."
+        }
     }
 }

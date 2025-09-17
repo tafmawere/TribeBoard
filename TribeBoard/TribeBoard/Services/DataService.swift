@@ -29,42 +29,165 @@ class DataService: ObservableObject {
     
     init(modelContext: ModelContext) {
         self.modelContext = modelContext
+        print("🔧 DataService: Initialized with ModelContext")
+        
+        // Validate ModelContext on initialization
+        validateModelContext()
+    }
+    
+    /// Validates that the ModelContext is in a usable state
+    private func validateModelContext() {
+        print("🔍 DataService: Validating ModelContext state...")
+        
+        do {
+            // Try a simple operation to test if the context is working
+            let testDescriptor = FetchDescriptor<Family>()
+            _ = try modelContext.fetch(testDescriptor)
+            print("✅ DataService: ModelContext validation successful")
+        } catch {
+            print("❌ DataService: ModelContext validation failed")
+            print("   Error: \(error.localizedDescription)")
+            print("   ⚠️ This may cause issues with data operations")
+        }
     }
     
     // MARK: - Family Operations
     
     /// Creates a new family with validation
     func createFamily(name: String, code: String, createdByUserId: UUID) throws -> Family {
+        print("🏠 DataService: Creating new family - Name: '\(name)', Code: '\(code)'")
+        
         // Validate before creation
         let validationResult = try validateFamily(name: name, code: code)
         if !validationResult.isValid {
-            throw DataServiceError.validationFailed(validationResult.errors)
+            print("❌ DataService: Family validation failed: \(validationResult.message)")
+            throw DataServiceError.validationFailed([validationResult.message])
         }
         
-        let family = Family(name: name, code: code, createdByUserId: createdByUserId)
+        print("✅ DataService: Family validation passed")
         
-        // Ensure the family is valid
-        guard family.isFullyValid else {
-            throw DataServiceError.invalidData("Family data is invalid")
+        do {
+            let family = Family(name: name, code: code, createdByUserId: createdByUserId)
+            
+            // Ensure the family is valid
+            guard family.isFullyValid else {
+                print("❌ DataService: Created family is not fully valid")
+                throw DataServiceError.invalidData("Family data is invalid")
+            }
+            
+            print("📝 DataService: Inserting family into ModelContext...")
+            modelContext.insert(family)
+            
+            print("💾 DataService: Saving family to persistent store...")
+            try save()
+            
+            print("✅ DataService: Family created successfully - ID: \(family.id)")
+            return family
+            
+        } catch {
+            print("❌ DataService: Failed to create family")
+            print("   Error: \(error.localizedDescription)")
+            
+            // Re-throw with more context
+            if error is DataServiceError {
+                throw error
+            } else {
+                throw DataServiceError.invalidData("Failed to create family '\(name)': \(error.localizedDescription)")
+            }
         }
-        
-        modelContext.insert(family)
-        try modelContext.save()
-        return family
     }
     
     /// Fetches a family by code
     func fetchFamily(byCode code: String) throws -> Family? {
-        let descriptor = FetchDescriptor<Family>(
-            predicate: #Predicate { $0.code == code }
-        )
-        return try modelContext.fetch(descriptor).first
+        print("🔍 DataService: Fetching family by code: '\(code)'")
+        
+        // Validate input
+        guard !code.isEmpty else {
+            print("❌ DataService: Empty code provided")
+            throw DataServiceError.invalidData("Family code cannot be empty")
+        }
+        
+        do {
+            // Create descriptor with safer predicate handling
+            let descriptor = FetchDescriptor<Family>()
+            let allFamilies = try modelContext.fetch(descriptor)
+            
+            print("📊 DataService: Found \(allFamilies.count) total families")
+            
+            // Filter manually to avoid predicate issues
+            let matchingFamily = allFamilies.first { family in
+                family.code == code
+            }
+            
+            if let family = matchingFamily {
+                print("✅ DataService: Found matching family: '\(family.name)' (ID: \(family.id))")
+            } else {
+                print("❌ DataService: No family found with code: '\(code)'")
+            }
+            
+            return matchingFamily
+            
+        } catch {
+            print("❌ DataService: Fetch operation failed")
+            print("   Error: \(error.localizedDescription)")
+            
+            // Re-throw with more context
+            throw DataServiceError.invalidData("Failed to fetch family by code '\(code)': \(error.localizedDescription)")
+        }
+    }
+    
+    /// Fetches a family by ID
+    func fetchFamily(byId id: UUID) throws -> Family? {
+        print("🔍 DataService: Fetching family by ID: \(id)")
+        
+        do {
+            // Create descriptor with safer predicate handling
+            let descriptor = FetchDescriptor<Family>()
+            let allFamilies = try modelContext.fetch(descriptor)
+            
+            print("📊 DataService: Found \(allFamilies.count) total families")
+            
+            // Filter manually to avoid predicate issues
+            let matchingFamily = allFamilies.first { family in
+                family.id == id
+            }
+            
+            if let family = matchingFamily {
+                print("✅ DataService: Found matching family: '\(family.name)' (Code: \(family.code))")
+            } else {
+                print("❌ DataService: No family found with ID: \(id)")
+            }
+            
+            return matchingFamily
+            
+        } catch {
+            print("❌ DataService: Fetch operation failed")
+            print("   Error: \(error.localizedDescription)")
+            
+            // Re-throw with more context
+            throw DataServiceError.invalidData("Failed to fetch family by ID '\(id)': \(error.localizedDescription)")
+        }
     }
     
     /// Fetches all families
     func fetchAllFamilies() throws -> [Family] {
-        let descriptor = FetchDescriptor<Family>()
-        return try modelContext.fetch(descriptor)
+        print("🔍 DataService: Fetching all families")
+        
+        do {
+            let descriptor = FetchDescriptor<Family>()
+            let families = try modelContext.fetch(descriptor)
+            
+            print("📊 DataService: Successfully fetched \(families.count) families")
+            
+            return families
+            
+        } catch {
+            print("❌ DataService: Failed to fetch all families")
+            print("   Error: \(error.localizedDescription)")
+            
+            // Re-throw with more context
+            throw DataServiceError.invalidData("Failed to fetch all families: \(error.localizedDescription)")
+        }
     }
     
     /// Checks if a family code exists
@@ -79,7 +202,7 @@ class DataService: ObservableObject {
         // Validate before creation
         let validationResult = validateUserProfile(displayName: displayName, appleUserIdHash: appleUserIdHash)
         if !validationResult.isValid {
-            throw DataServiceError.validationFailed(validationResult.errors)
+            throw DataServiceError.validationFailed([validationResult.message])
         }
         
         let userProfile = UserProfile(displayName: displayName, appleUserIdHash: appleUserIdHash, avatarUrl: avatarUrl)
@@ -96,18 +219,74 @@ class DataService: ObservableObject {
     
     /// Fetches a user profile by Apple ID hash
     func fetchUserProfile(byAppleUserIdHash hash: String) throws -> UserProfile? {
-        let descriptor = FetchDescriptor<UserProfile>(
-            predicate: #Predicate { $0.appleUserIdHash == hash }
-        )
-        return try modelContext.fetch(descriptor).first
+        print("🔍 DataService: Fetching user profile by Apple ID hash")
+        
+        // Validate input
+        guard !hash.isEmpty else {
+            print("❌ DataService: Empty Apple ID hash provided")
+            throw DataServiceError.invalidData("Apple ID hash cannot be empty")
+        }
+        
+        do {
+            // Create descriptor with safer predicate handling
+            let descriptor = FetchDescriptor<UserProfile>()
+            let allProfiles = try modelContext.fetch(descriptor)
+            
+            print("📊 DataService: Found \(allProfiles.count) total user profiles")
+            
+            // Filter manually to avoid predicate issues
+            let matchingProfile = allProfiles.first { profile in
+                profile.appleUserIdHash == hash
+            }
+            
+            if let profile = matchingProfile {
+                print("✅ DataService: Found matching user profile: '\(profile.displayName)' (ID: \(profile.id))")
+            } else {
+                print("❌ DataService: No user profile found with Apple ID hash")
+            }
+            
+            return matchingProfile
+            
+        } catch {
+            print("❌ DataService: Fetch operation failed")
+            print("   Error: \(error.localizedDescription)")
+            
+            // Re-throw with more context
+            throw DataServiceError.invalidData("Failed to fetch user profile by Apple ID hash: \(error.localizedDescription)")
+        }
     }
     
     /// Fetches a user profile by ID
     func fetchUserProfile(byId id: UUID) throws -> UserProfile? {
-        let descriptor = FetchDescriptor<UserProfile>(
-            predicate: #Predicate { $0.id == id }
-        )
-        return try modelContext.fetch(descriptor).first
+        print("🔍 DataService: Fetching user profile by ID: \(id)")
+        
+        do {
+            // Create descriptor with safer predicate handling
+            let descriptor = FetchDescriptor<UserProfile>()
+            let allProfiles = try modelContext.fetch(descriptor)
+            
+            print("📊 DataService: Found \(allProfiles.count) total user profiles")
+            
+            // Filter manually to avoid predicate issues
+            let matchingProfile = allProfiles.first { profile in
+                profile.id == id
+            }
+            
+            if let profile = matchingProfile {
+                print("✅ DataService: Found matching user profile: '\(profile.displayName)'")
+            } else {
+                print("❌ DataService: No user profile found with ID: \(id)")
+            }
+            
+            return matchingProfile
+            
+        } catch {
+            print("❌ DataService: Fetch operation failed")
+            print("   Error: \(error.localizedDescription)")
+            
+            // Re-throw with more context
+            throw DataServiceError.invalidData("Failed to fetch user profile by ID '\(id)': \(error.localizedDescription)")
+        }
     }
     
     // MARK: - Membership Operations
@@ -123,8 +302,11 @@ class DataService: ObservableObject {
         }
         
         // Check parent admin constraint
-        if role == .parentAdmin && try familyHasParentAdmin(family) {
-            throw DataServiceError.constraintViolation("A Parent Admin already exists for this family")
+        if role == .parentAdmin {
+            let hasParentAdmin = try familyHasParentAdmin(family)
+            if hasParentAdmin {
+                throw DataServiceError.constraintViolation("A Parent Admin already exists for this family")
+            }
         }
         
         let membership = Membership(family: family, user: user, role: role)
@@ -141,40 +323,68 @@ class DataService: ObservableObject {
     
     /// Fetches memberships for a family
     func fetchMemberships(forFamily family: Family) throws -> [Membership] {
-        let descriptor = FetchDescriptor<Membership>(
-            predicate: #Predicate { $0.family?.id == family.id }
-        )
-        return try modelContext.fetch(descriptor)
+        print("🔍 DataService: Fetching memberships for family: '\(family.name)' (ID: \(family.id))")
+        
+        do {
+            let descriptor = FetchDescriptor<Membership>()
+            let allMemberships = try modelContext.fetch(descriptor)
+            
+            print("📊 DataService: Found \(allMemberships.count) total memberships")
+            
+            let familyMemberships = allMemberships.filter { membership in
+                membership.family?.id == family.id
+            }
+            
+            print("✅ DataService: Found \(familyMemberships.count) memberships for family '\(family.name)'")
+            
+            return familyMemberships
+            
+        } catch {
+            print("❌ DataService: Failed to fetch memberships for family")
+            print("   Error: \(error.localizedDescription)")
+            
+            // Re-throw with more context
+            throw DataServiceError.invalidData("Failed to fetch memberships for family '\(family.name)': \(error.localizedDescription)")
+        }
     }
     
     /// Fetches memberships for a user
     func fetchMemberships(forUser user: UserProfile) throws -> [Membership] {
-        let descriptor = FetchDescriptor<Membership>(
-            predicate: #Predicate { $0.user?.id == user.id }
-        )
-        return try modelContext.fetch(descriptor)
+        print("🔍 DataService: Fetching memberships for user: '\(user.displayName)' (ID: \(user.id))")
+        
+        do {
+            let descriptor = FetchDescriptor<Membership>()
+            let allMemberships = try modelContext.fetch(descriptor)
+            
+            print("📊 DataService: Found \(allMemberships.count) total memberships")
+            
+            let userMemberships = allMemberships.filter { membership in
+                membership.user?.id == user.id
+            }
+            
+            print("✅ DataService: Found \(userMemberships.count) memberships for user '\(user.displayName)'")
+            
+            return userMemberships
+            
+        } catch {
+            print("❌ DataService: Failed to fetch memberships for user")
+            print("   Error: \(error.localizedDescription)")
+            
+            // Re-throw with more context
+            throw DataServiceError.invalidData("Failed to fetch memberships for user '\(user.displayName)': \(error.localizedDescription)")
+        }
     }
     
     /// Fetches active memberships for a family
     func fetchActiveMemberships(forFamily family: Family) throws -> [Membership] {
-        let descriptor = FetchDescriptor<Membership>(
-            predicate: #Predicate { 
-                $0.family?.id == family.id && $0.status == MembershipStatus.active 
-            }
-        )
-        return try modelContext.fetch(descriptor)
+        let allMemberships = try fetchMemberships(forFamily: family)
+        return allMemberships.filter { $0.status == .active }
     }
     
     /// Checks if a family has a parent admin
     func familyHasParentAdmin(_ family: Family) throws -> Bool {
-        let descriptor = FetchDescriptor<Membership>(
-            predicate: #Predicate { 
-                $0.family?.id == family.id && 
-                $0.role == Role.parentAdmin && 
-                $0.status == MembershipStatus.active 
-            }
-        )
-        return !(try modelContext.fetch(descriptor).isEmpty)
+        let activeMemberships = try fetchActiveMemberships(forFamily: family)
+        return activeMemberships.contains { $0.role == .parentAdmin }
     }
     
     /// Updates a membership role with validation
@@ -182,7 +392,7 @@ class DataService: ObservableObject {
         // Validate the role change
         let validationResult = try validateRoleChange(membership: membership, newRole: role)
         if !validationResult.isValid {
-            throw DataServiceError.validationFailed(validationResult.errors)
+            throw DataServiceError.validationFailed([validationResult.message])
         }
         
         membership.updateRole(to: role)
@@ -199,7 +409,24 @@ class DataService: ObservableObject {
     
     /// Saves the current context
     func save() throws {
-        try modelContext.save()
+        print("💾 DataService: Attempting to save ModelContext...")
+        
+        do {
+            // Check if there are changes to save
+            if modelContext.hasChanges {
+                print("📝 DataService: ModelContext has changes, saving...")
+                try modelContext.save()
+                print("✅ DataService: ModelContext saved successfully")
+            } else {
+                print("ℹ️ DataService: No changes to save")
+            }
+        } catch {
+            print("❌ DataService: Failed to save ModelContext")
+            print("   Error: \(error.localizedDescription)")
+            
+            // Re-throw with more context
+            throw DataServiceError.invalidData("Failed to save context: \(error.localizedDescription)")
+        }
     }
     
     /// Deletes an object
@@ -210,84 +437,91 @@ class DataService: ObservableObject {
     
     /// Fetches records that need CloudKit sync
     func fetchRecordsNeedingSync<T: PersistentModel & CloudKitSyncable>(_ type: T.Type) throws -> [T] {
-        let descriptor = FetchDescriptor<T>(
-            predicate: #Predicate { $0.needsSync == true }
-        )
-        return try modelContext.fetch(descriptor)
+        print("🔍 DataService: Fetching records needing sync for type: \(T.self)")
+        
+        do {
+            // Use safer approach without predicates for now
+            let descriptor = FetchDescriptor<T>()
+            let allRecords = try modelContext.fetch(descriptor)
+            
+            print("📊 DataService: Found \(allRecords.count) total records of type \(T.self)")
+            
+            // Filter manually to avoid predicate issues
+            let recordsNeedingSync = allRecords.filter { record in
+                record.needsSync == true
+            }
+            
+            print("✅ DataService: Found \(recordsNeedingSync.count) records needing sync")
+            
+            return recordsNeedingSync
+            
+        } catch {
+            print("❌ DataService: Failed to fetch records needing sync")
+            print("   Error: \(error.localizedDescription)")
+            
+            // Re-throw with more context
+            throw DataServiceError.invalidData("Failed to fetch records needing sync for type \(T.self): \(error.localizedDescription)")
+        }
     }
     
     // MARK: - Validation Operations
     
     /// Validates a family before creation
     func validateFamily(name: String, code: String) throws -> ValidationResult {
-        var errors: [String] = []
-        
         // Validate name
-        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmedName.isEmpty {
-            errors.append("Family name cannot be empty")
-        } else if trimmedName.count < 2 {
-            errors.append("Family name must be at least 2 characters")
-        } else if trimmedName.count > 50 {
-            errors.append("Family name cannot exceed 50 characters")
+        let nameValidation = Validation.validateFamilyName(name)
+        if !nameValidation.isValid {
+            return nameValidation
         }
         
-        // Validate code format
-        if code.count < 6 || code.count > 8 {
-            errors.append("Family code must be 6-8 characters")
-        } else if !code.allSatisfy({ $0.isLetter || $0.isNumber }) {
-            errors.append("Family code must be alphanumeric")
+        // Validate code
+        let codeValidation = Validation.validateFamilyCode(code)
+        if !codeValidation.isValid {
+            return codeValidation
         }
         
         // Check code uniqueness
         if try familyCodeExists(code) {
-            errors.append("Family code already exists")
+            return ValidationResult(isValid: false, message: "Family code already exists")
         }
         
-        return ValidationResult(isValid: errors.isEmpty, errors: errors)
+        return ValidationResult(isValid: true, message: "Valid family data")
     }
     
     /// Validates a user profile before creation
     func validateUserProfile(displayName: String, appleUserIdHash: String) -> ValidationResult {
-        var errors: [String] = []
-        
         // Validate display name
-        let trimmedName = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmedName.isEmpty {
-            errors.append("Display name cannot be empty")
-        } else if trimmedName.count > 50 {
-            errors.append("Display name cannot exceed 50 characters")
+        let displayNameValidation = Validation.validateDisplayName(displayName)
+        if !displayNameValidation.isValid {
+            return displayNameValidation
         }
         
         // Validate Apple ID hash
         if appleUserIdHash.isEmpty {
-            errors.append("Apple ID hash cannot be empty")
+            return ValidationResult(isValid: false, message: "Apple ID hash cannot be empty")
         } else if appleUserIdHash.count < 10 {
-            errors.append("Invalid Apple ID hash format")
+            return ValidationResult(isValid: false, message: "Invalid Apple ID hash format")
         }
         
-        return ValidationResult(isValid: errors.isEmpty, errors: errors)
+        return ValidationResult(isValid: true, message: "Valid user profile")
     }
     
     /// Validates a role change
     func validateRoleChange(membership: Membership, newRole: Role) throws -> ValidationResult {
-        var errors: [String] = []
-        
         guard let family = membership.family else {
-            errors.append("Invalid membership: no family associated")
-            return ValidationResult(isValid: false, errors: errors)
+            return ValidationResult(isValid: false, message: "Invalid membership: no family associated")
         }
         
         // Check if role change is valid
         if !membership.canChangeRole(to: newRole, in: family) {
             if newRole == .parentAdmin && family.hasParentAdmin {
-                errors.append("A Parent Admin already exists for this family")
+                return ValidationResult(isValid: false, message: "A Parent Admin already exists for this family")
             } else if membership.role == newRole {
-                errors.append("Member already has this role")
+                return ValidationResult(isValid: false, message: "Member already has this role")
             }
         }
         
-        return ValidationResult(isValid: errors.isEmpty, errors: errors)
+        return ValidationResult(isValid: true, message: "Valid role change")
     }
     
     // MARK: - Constraint Checking
