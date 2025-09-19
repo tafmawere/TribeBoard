@@ -40,25 +40,10 @@ struct TribeBoardApp: App {
     
     var body: some Scene {
         WindowGroup {
-            MainNavigationView()
-                .modelContainer(modelContainer)
-                .environmentObject(cloudKitService)
-                .onAppear {
-                    Task {
-                        await setupCloudKit()
-                        await requestNotificationPermissions()
-                    }
-                }
-                .onReceive(NotificationCenter.default.publisher(for: UIApplication.didFinishLaunchingNotification)) { _ in
-                    UIApplication.shared.registerForRemoteNotifications()
-                }
-                .onReceive(NotificationCenter.default.publisher(for: .didReceiveRemoteNotificationNotification)) { notification in
-                    if let userInfo = notification.userInfo {
-                        Task {
-                            await cloudKitService.handleRemoteNotification(userInfo)
-                        }
-                    }
-                }
+            AppLaunchView(
+                modelContainer: modelContainer,
+                cloudKitService: cloudKitService
+            )
         }
     }
     
@@ -107,5 +92,112 @@ extension UIApplication {
             object: nil,
             userInfo: userInfo
         )
+    }
+}
+
+// MARK: - App Launch View
+
+struct AppLaunchView: View {
+    let modelContainer: ModelContainer
+    let cloudKitService: CloudKitService
+    
+    @State private var isInitializing = true
+    @State private var initializationMessage = "Starting TribeBoard..."
+    
+    var body: some View {
+        ZStack {
+            if isInitializing {
+                AnimatedSplashScreenView(message: initializationMessage)
+                    .transition(.opacity)
+            } else {
+                MainNavigationView()
+                    .modelContainer(modelContainer)
+                    .environmentObject(cloudKitService)
+                    .transition(.opacity)
+            }
+        }
+        .onAppear {
+            initializeApp()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didFinishLaunchingNotification)) { _ in
+            UIApplication.shared.registerForRemoteNotifications()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .didReceiveRemoteNotificationNotification)) { notification in
+            if let userInfo = notification.userInfo {
+                Task {
+                    await cloudKitService.handleRemoteNotification(userInfo)
+                }
+            }
+        }
+    }
+    
+    private func initializeApp() {
+        Task {
+            let minimumSplashDuration: TimeInterval = 3.0
+            let startTime = Date()
+            
+            // Setup CloudKit
+            await MainActor.run {
+                initializationMessage = "Connecting to iCloud..."
+            }
+            
+            await setupCloudKit()
+            
+            // Request notification permissions
+            await MainActor.run {
+                initializationMessage = "Setting up notifications..."
+            }
+            
+            await requestNotificationPermissions()
+            
+            // Final setup
+            await MainActor.run {
+                initializationMessage = "Almost ready..."
+            }
+            
+            // Ensure minimum splash duration
+            let elapsedTime = Date().timeIntervalSince(startTime)
+            let remainingTime = max(0, minimumSplashDuration - elapsedTime)
+            
+            if remainingTime > 0 {
+                try? await Task.sleep(nanoseconds: UInt64(remainingTime * 1_000_000_000))
+            }
+            
+            // Hide splash screen
+            await MainActor.run {
+                withAnimation(.easeInOut(duration: 0.6)) {
+                    isInitializing = false
+                }
+            }
+        }
+    }
+    
+    // MARK: - CloudKit Setup
+    
+    @MainActor
+    private func setupCloudKit() async {
+        do {
+            try await cloudKitService.performInitialSetup()
+            print("CloudKit setup completed successfully")
+        } catch {
+            print("CloudKit setup failed: \(error)")
+            // Continue without CloudKit - app should work offline
+        }
+    }
+    
+    // MARK: - Notification Permissions
+    
+    private func requestNotificationPermissions() async {
+        let center = UNUserNotificationCenter.current()
+        do {
+            let granted = try await center.requestAuthorization(options: [.alert, .sound, .badge])
+            if granted {
+                print("Notification permissions granted")
+            } else {
+                print("Notification permissions denied")
+            }
+        } catch {
+            print("Failed to request notification permissions: \(error)")
+        }
     }
 }

@@ -10,52 +10,63 @@ struct MainNavigationView: View {
     @State private var authService: AuthService?
     @State private var dataService: DataService?
     @State private var servicesInitialized = false
+    @State private var showSplashScreen = true
     
     var body: some View {
-        NavigationStack(path: $appState.navigationPath) {
-            Group {
-                if servicesInitialized {
-                    switch appState.currentFlow {
-                    case .onboarding:
-                        if let authService = authService {
-                            OnboardingView(authService: authService)
+        ZStack {
+            if showSplashScreen {
+                // Show splash screen during initial loading
+                AnimatedSplashScreenView(message: "Initializing TribeBoard...")
+                    .transition(.opacity)
+            } else {
+                // Main app content
+                NavigationStack(path: $appState.navigationPath) {
+                    Group {
+                        if servicesInitialized {
+                            switch appState.currentFlow {
+                            case .onboarding:
+                                if let authService = authService {
+                                    OnboardingView(authService: authService)
+                                } else {
+                                    LoadingStateView()
+                                }
+                            case .familySelection:
+                                FamilySelectionView()
+                            case .createFamily:
+                                CreateFamilyView()
+                            case .joinFamily:
+                                JoinFamilyView()
+                            case .roleSelection:
+                                if let user = appState.currentUser,
+                                   let family = appState.currentFamily {
+                                    RoleSelectionView(family: family, user: user)
+                                } else {
+                                    RoleSelectionPlaceholderView()
+                                }
+                            case .familyDashboard:
+                                if let user = appState.currentUser,
+                                   let family = appState.currentFamily,
+                                   let membership = appState.currentMembership {
+                                    FamilyDashboardView(
+                                        family: family,
+                                        currentUserId: user.id,
+                                        currentUserRole: membership.role
+                                    )
+                                } else {
+                                    FamilyDashboardPlaceholderView()
+                                }
+                            }
                         } else {
-                            LoadingStateView()
-                        }
-                    case .familySelection:
-                        FamilySelectionView()
-                    case .createFamily:
-                        CreateFamilyView()
-                    case .joinFamily:
-                        JoinFamilyView()
-                    case .roleSelection:
-                        if let user = appState.currentUser,
-                           let family = appState.currentFamily {
-                            RoleSelectionView(family: family, user: user)
-                        } else {
-                            RoleSelectionPlaceholderView()
-                        }
-                    case .familyDashboard:
-                        if let user = appState.currentUser,
-                           let family = appState.currentFamily,
-                           let membership = appState.currentMembership {
-                            FamilyDashboardView(
-                                family: family,
-                                currentUserId: user.id,
-                                currentUserRole: membership.role
-                            )
-                        } else {
-                            FamilyDashboardPlaceholderView()
+                            SplashScreenView(message: "Setting up services...")
                         }
                     }
-                } else {
-                    LoadingStateView()
+                    .environmentObject(appState)
                 }
+                .transition(.opacity)
             }
-            .environmentObject(appState)
         }
         .onAppear {
-            initializeServices()
+            initializeApp()
         }
         .overlay {
             // Global loading overlay
@@ -74,23 +85,50 @@ struct MainNavigationView: View {
         }
     }
     
-    // MARK: - Service Initialization
+    // MARK: - App Initialization
     
-    private func initializeServices() {
-        guard !servicesInitialized else { return }
-        
-        // Initialize DataService with the environment model context
-        let dataService = DataService(modelContext: modelContext)
-        self.dataService = dataService
-        
-        // Initialize AuthService and set DataService
-        let authService = AuthService()
-        authService.setDataService(dataService)
-        self.authService = authService
-        
-        // Services are now initialized and ready
-        
-        servicesInitialized = true
+    private func initializeApp() {
+        Task {
+            // Show splash screen for minimum duration for better UX
+            let minimumSplashDuration: TimeInterval = 2.0
+            let startTime = Date()
+            
+            // Initialize services
+            await initializeServices()
+            
+            // Calculate remaining time to show splash screen
+            let elapsedTime = Date().timeIntervalSince(startTime)
+            let remainingTime = max(0, minimumSplashDuration - elapsedTime)
+            
+            if remainingTime > 0 {
+                try? await Task.sleep(nanoseconds: UInt64(remainingTime * 1_000_000_000))
+            }
+            
+            // Hide splash screen with animation
+            await MainActor.run {
+                withAnimation(.easeInOut(duration: 0.5)) {
+                    showSplashScreen = false
+                }
+            }
+        }
+    }
+    
+    private func initializeServices() async {
+        await MainActor.run {
+            guard !servicesInitialized else { return }
+            
+            // Initialize DataService with the environment model context
+            let dataService = DataService(modelContext: modelContext)
+            self.dataService = dataService
+            
+            // Initialize AuthService and set DataService
+            let authService = AuthService()
+            authService.setDataService(dataService)
+            self.authService = authService
+            
+            // Services are now initialized and ready
+            servicesInitialized = true
+        }
     }
 }
 
