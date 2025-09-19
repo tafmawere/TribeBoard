@@ -5,7 +5,7 @@ import CloudKit
 /// SwiftData model for UserProfile with CloudKit sync capabilities
 @Model
 final class UserProfile {
-    // Primary identifier - no unique constraint for CloudKit compatibility
+    // Primary identifier
     var id: UUID = UUID()
     
     // Core properties - with default values for CloudKit compatibility

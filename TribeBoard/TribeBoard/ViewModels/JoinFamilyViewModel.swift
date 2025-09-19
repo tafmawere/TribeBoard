@@ -97,26 +97,13 @@ class JoinFamilyViewModel: ObservableObject {
         isSearching = true
         errorMessage = nil
         
-        do {
-            // TODO: Camera scanning functionality will be implemented in a separate QRScannerService
-            // For now, we'll simulate the scanning process
-            errorMessage = "QR code scanning will be implemented in a future update"
-            isSearching = false
-            return
-            
-            // Note: In a real implementation, this would integrate with the camera view
-            // For now, we'll simulate a successful scan with a test code
-            // The actual camera integration would be handled by the SwiftUI view
-            
-            // This is a placeholder - the actual scanning would be triggered from the view
-            errorMessage = "Please use the camera view to scan QR codes"
-            
-        } catch {
-            errorMessage = "Failed to set up QR code scanning: \(error.localizedDescription)"
-            HapticManager.shared.error()
-        }
-        
+        // TODO: Camera scanning functionality will be implemented in a separate QRScannerService
+        // For now, we'll simulate the scanning process
+        errorMessage = "QR code scanning will be implemented in a future update"
         isSearching = false
+        
+        // Note: In a real implementation, this would integrate with the camera view
+        // The actual camera integration would be handled by the SwiftUI view
     }
     
     /// Handle scanned QR code from camera view

@@ -5,7 +5,7 @@ import CloudKit
 /// SwiftData model for Membership with CloudKit sync capabilities
 @Model
 final class Membership {
-    // Primary identifier - no unique constraint for CloudKit compatibility
+    // Primary identifier
     var id: UUID = UUID()
     
     // Core properties - with default values for CloudKit compatibility

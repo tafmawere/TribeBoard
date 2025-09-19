@@ -46,32 +46,3 @@ extension CloudKitSyncable {
     }
 }
 
-/// CloudKit record type names
-enum CKRecordType {
-    static let family = "CKFamily"
-    static let userProfile = "CKUserProfile"
-    static let membership = "CKMembership"
-}
-
-/// CloudKit field names for consistency
-enum CKFieldName {
-    // Family fields
-    static let familyName = "name"
-    static let familyCode = "code"
-    static let familyCreatedByUserId = "createdByUserId"
-    static let familyCreatedAt = "createdAt"
-    
-    // UserProfile fields
-    static let userDisplayName = "displayName"
-    static let userAppleUserIdHash = "appleUserIdHash"
-    static let userAvatarUrl = "avatarUrl"
-    static let userCreatedAt = "createdAt"
-    
-    // Membership fields
-    static let membershipRole = "role"
-    static let membershipJoinedAt = "joinedAt"
-    static let membershipStatus = "status"
-    static let membershipLastRoleChangeAt = "lastRoleChangeAt"
-    static let membershipFamilyReference = "family"
-    static let membershipUserReference = "user"
-}

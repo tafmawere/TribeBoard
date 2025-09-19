@@ -322,7 +322,7 @@ class FamilyDashboardViewModel: ObservableObject {
         }
         
         // Check if membership exists locally
-        let membershipId = UUID(uuidString: record.recordID.recordName)!
+        let _ = UUID(uuidString: record.recordID.recordName)!
         
         // For now, create a temporary membership - in a real implementation,
         // this would properly sync with local storage

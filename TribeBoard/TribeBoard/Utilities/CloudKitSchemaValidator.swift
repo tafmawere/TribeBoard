@@ -47,12 +47,12 @@ class CloudKitSchemaValidator {
             _ = try await cloudKitService.fetch(Family.self, predicate: NSPredicate(value: true))
         } catch let error as CKError {
             if error.code == .unknownItem {
-                issues.append(.missingRecordType(CKRecordType.family))
+                issues.append(SchemaIssue.missingRecordType(CKRecordType.family))
             } else {
-                issues.append(.recordTypeValidationError(CKRecordType.family, error))
+                issues.append(SchemaIssue.recordTypeValidationError(CKRecordType.family, error))
             }
         } catch {
-            issues.append(.recordTypeValidationError(CKRecordType.family, error))
+            issues.append(SchemaIssue.recordTypeValidationError(CKRecordType.family, error))
         }
         
         // Test UserProfile record type
@@ -60,12 +60,12 @@ class CloudKitSchemaValidator {
             _ = try await cloudKitService.fetch(UserProfile.self, predicate: NSPredicate(value: true))
         } catch let error as CKError {
             if error.code == .unknownItem {
-                issues.append(.missingRecordType(CKRecordType.userProfile))
+                issues.append(SchemaIssue.missingRecordType(CKRecordType.userProfile))
             } else {
-                issues.append(.recordTypeValidationError(CKRecordType.userProfile, error))
+                issues.append(SchemaIssue.recordTypeValidationError(CKRecordType.userProfile, error))
             }
         } catch {
-            issues.append(.recordTypeValidationError(CKRecordType.userProfile, error))
+            issues.append(SchemaIssue.recordTypeValidationError(CKRecordType.userProfile, error))
         }
         
         // Test Membership record type
@@ -73,12 +73,12 @@ class CloudKitSchemaValidator {
             _ = try await cloudKitService.fetch(Membership.self, predicate: NSPredicate(value: true))
         } catch let error as CKError {
             if error.code == .unknownItem {
-                issues.append(.missingRecordType(CKRecordType.membership))
+                issues.append(SchemaIssue.missingRecordType(CKRecordType.membership))
             } else {
-                issues.append(.recordTypeValidationError(CKRecordType.membership, error))
+                issues.append(SchemaIssue.recordTypeValidationError(CKRecordType.membership, error))
             }
         } catch {
-            issues.append(.recordTypeValidationError(CKRecordType.membership, error))
+            issues.append(SchemaIssue.recordTypeValidationError(CKRecordType.membership, error))
         }
     }
     
