@@ -477,33 +477,4 @@ final class OfflineAndSyncTests: XCTestCase {
 
 // MARK: - Mock CloudKit Service for Offline Testing
 
-class MockCloudKitService: CloudKitService {
-    var shouldSucceed = true
-    var errorToThrow: Error?
-    var simulateDelay = false
-    
-    override init() {
-        super.init(containerIdentifier: "test")
-    }
-    
-    override func save<T: CloudKitSyncable>(_ record: T) async throws {
-        if simulateDelay {
-            try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
-        }
-        
-        if !shouldSucceed {
-            throw errorToThrow ?? CloudKitError.networkUnavailable
-        }
-        
-        // Simulate successful sync
-        record.markAsSynced(recordID: "mock_record_\(UUID().uuidString)")
-    }
-    
-    override func fetch<T: CloudKitSyncable>(_ type: T.Type, predicate: NSPredicate) async throws -> [T] {
-        if !shouldSucceed {
-            throw errorToThrow ?? CloudKitError.networkUnavailable
-        }
-        
-        return [] // Return empty for mock
-    }
-}
+// MockCloudKitService moved to TribeBoardTests/Database/Utilities/MockCloudKitService.swift

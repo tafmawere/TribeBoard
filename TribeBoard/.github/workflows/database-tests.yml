@@ -1,0 +1,348 @@
+name: Database Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'TribeBoard/Models/**'
+      - 'TribeBoard/Services/**'
+      - 'TribeBoardTests/Database/**'
+      - '.github/workflows/database-tests.yml'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'TribeBoard/Models/**'
+      - 'TribeBoard/Services/**'
+      - 'TribeBoardTests/Database/**'
+      - '.github/workflows/database-tests.yml'
+  schedule:
+    # Run tests daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      test_category:
+        description: 'Test category to run'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - fast
+          - performance
+          - integration
+          - model
+          - crud
+          - cloudkit
+
+env:
+  DEVELOPER_DIR: /Applications/Xcode_15.0.app/Contents/Developer
+
+jobs:
+  database-tests:
+    name: Database Tests
+    runs-on: macos-13
+    timeout-minutes: 30
+    
+    strategy:
+      matrix:
+        destination: 
+          - 'platform=iOS Simulator,name=iPhone 15,OS=17.0'
+        include:
+          - destination: 'platform=iOS Simulator,name=iPhone 15,OS=17.0'
+            scheme: TribeBoard
+            sdk: iphonesimulator
+    
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Setup Xcode
+      uses: maxim-lobanov/setup-xcode@v1
+      with:
+        xcode-version: '15.0'
+    
+    - name: Cache Derived Data
+      uses: actions/cache@v3
+      with:
+        path: ~/Library/Developer/Xcode/DerivedData
+        key: ${{ runner.os }}-derived-data-${{ hashFiles('**/*.xcodeproj') }}
+        restore-keys: |
+          ${{ runner.os }}-derived-data-
+    
+    - name: List Available Simulators
+      run: xcrun simctl list devices available
+    
+    - name: Boot Simulator
+      run: |
+        SIMULATOR_ID=$(xcrun simctl list devices available | grep "iPhone 15" | grep "17.0" | head -1 | grep -o '[A-F0-9-]\{36\}')
+        echo "Booting simulator: $SIMULATOR_ID"
+        xcrun simctl boot $SIMULATOR_ID
+        xcrun simctl list devices | grep "iPhone 15"
+    
+    - name: Build for Testing
+      run: |
+        xcodebuild build-for-testing \
+          -scheme ${{ matrix.scheme }} \
+          -destination '${{ matrix.destination }}' \
+          -sdk ${{ matrix.sdk }} \
+          -configuration Debug \
+          -derivedDataPath DerivedData \
+          -enableCodeCoverage YES \
+          CODE_SIGNING_ALLOWED=NO
+    
+    - name: Determine Test Category
+      id: test-category
+      run: |
+        CATEGORY="${{ github.event.inputs.test_category || 'all' }}"
+        echo "category=$CATEGORY" >> $GITHUB_OUTPUT
+        
+        case $CATEGORY in
+          "all")
+            echo "test_args=-only-testing:TribeBoardTests/Database" >> $GITHUB_OUTPUT
+            echo "description=All Database Tests" >> $GITHUB_OUTPUT
+            ;;
+          "fast")
+            echo "test_args=-only-testing:TribeBoardTests/Database/ModelValidationTests -only-testing:TribeBoardTests/Database/ContainerConfigurationTests -only-testing:TribeBoardTests/Database/SchemaValidationTests -only-testing:TribeBoardTests/Database/DataServiceCRUDTests -only-testing:TribeBoardTests/Database/DataServiceValidationTests -only-testing:TribeBoardTests/Database/DataServiceConstraintTests -only-testing:TribeBoardTests/Database/DataServiceAdvancedTests -only-testing:TribeBoardTests/Database/CloudKitSyncTests -only-testing:TribeBoardTests/Database/CloudKitConflictResolutionTests -only-testing:TribeBoardTests/Database/CloudKitErrorHandlingTests -only-testing:TribeBoardTests/Database/RelationshipTests -only-testing:TribeBoardTests/Database/ConstraintTests -only-testing:TribeBoardTests/Database/EndToEndWorkflowTests -only-testing:TribeBoardTests/Database/CrossServiceIntegrationTests -only-testing:TribeBoardTests/Database/AppLaunchIntegrationTests -only-testing:TribeBoardTests/Database/SchemaMigrationTests -only-testing:TribeBoardTests/Database/CloudKitSchemaMigrationTests" >> $GITHUB_OUTPUT
+            echo "description=Fast Database Tests (excluding performance)" >> $GITHUB_OUTPUT
+            ;;
+          "performance")
+            echo "test_args=-only-testing:TribeBoardTests/Database/DatabasePerformanceTests -only-testing:TribeBoardTests/Database/LoadTests -only-testing:TribeBoardTests/Database/MemoryTests" >> $GITHUB_OUTPUT
+            echo "description=Performance Tests" >> $GITHUB_OUTPUT
+            ;;
+          "integration")
+            echo "test_args=-only-testing:TribeBoardTests/Database/EndToEndWorkflowTests -only-testing:TribeBoardTests/Database/CrossServiceIntegrationTests -only-testing:TribeBoardTests/Database/AppLaunchIntegrationTests" >> $GITHUB_OUTPUT
+            echo "description=Integration Tests" >> $GITHUB_OUTPUT
+            ;;
+          "model")
+            echo "test_args=-only-testing:TribeBoardTests/Database/ModelValidationTests" >> $GITHUB_OUTPUT
+            echo "description=Model Validation Tests" >> $GITHUB_OUTPUT
+            ;;
+          "crud")
+            echo "test_args=-only-testing:TribeBoardTests/Database/DataServiceCRUDTests -only-testing:TribeBoardTests/Database/DataServiceValidationTests -only-testing:TribeBoardTests/Database/DataServiceConstraintTests -only-testing:TribeBoardTests/Database/DataServiceAdvancedTests" >> $GITHUB_OUTPUT
+            echo "description=CRUD Operation Tests" >> $GITHUB_OUTPUT
+            ;;
+          "cloudkit")
+            echo "test_args=-only-testing:TribeBoardTests/Database/CloudKitSyncTests -only-testing:TribeBoardTests/Database/CloudKitConflictResolutionTests -only-testing:TribeBoardTests/Database/CloudKitErrorHandlingTests" >> $GITHUB_OUTPUT
+            echo "description=CloudKit Synchronization Tests" >> $GITHUB_OUTPUT
+            ;;
+        esac
+    
+    - name: Run Database Tests
+      id: run-tests
+      run: |
+        echo "Running ${{ steps.test-category.outputs.description }}"
+        
+        # Set timeout based on test category
+        TIMEOUT=1800  # 30 minutes default
+        if [[ "${{ steps.test-category.outputs.category }}" == "performance" ]]; then
+          TIMEOUT=2400  # 40 minutes for performance tests
+        elif [[ "${{ steps.test-category.outputs.category }}" == "fast" ]]; then
+          TIMEOUT=900   # 15 minutes for fast tests
+        fi
+        
+        # Run tests with timeout
+        timeout $TIMEOUT xcodebuild test-without-building \
+          -scheme ${{ matrix.scheme }} \
+          -destination '${{ matrix.destination }}' \
+          -derivedDataPath DerivedData \
+          -resultBundlePath TestResults.xcresult \
+          -enableCodeCoverage YES \
+          ${{ steps.test-category.outputs.test_args }} \
+          | tee test-output.log
+    
+    - name: Process Test Results
+      if: always()
+      run: |
+        # Extract test summary
+        if [ -f test-output.log ]; then
+          echo "## Test Output Summary" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          tail -50 test-output.log >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        # Check for test results
+        if [ -d TestResults.xcresult ]; then
+          echo "✅ Test results bundle created"
+          
+          # Extract basic test info
+          xcrun xccov view --report TestResults.xcresult > coverage-report.txt || true
+          
+          if [ -f coverage-report.txt ]; then
+            echo "## Code Coverage" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            head -20 coverage-report.txt >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          fi
+        else
+          echo "❌ No test results bundle found"
+        fi
+    
+    - name: Generate Test Reports
+      if: always()
+      run: |
+        # Check if our custom test reports were generated
+        if [ -f ci-test-report.json ]; then
+          echo "📊 CI test report found"
+          cat ci-test-report.json | jq '.summary' || true
+        fi
+        
+        if [ -f coverage-report-*.json ]; then
+          echo "📈 Coverage report found"
+          ls -la coverage-report-*.json
+        fi
+        
+        if [ -f test-report-*.json ]; then
+          echo "📋 Test metrics report found"
+          ls -la test-report-*.json
+        fi
+    
+    - name: Upload Test Results
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: test-results-${{ matrix.destination }}-${{ steps.test-category.outputs.category }}
+        path: |
+          TestResults.xcresult
+          test-output.log
+          coverage-report.txt
+          ci-test-report.json
+          coverage-report-*.json
+          test-report-*.json
+          performance-trends.jsonl
+        retention-days: 30
+    
+    - name: Upload Coverage to Codecov
+      if: always() && steps.test-category.outputs.category == 'all'
+      uses: codecov/codecov-action@v3
+      with:
+        xcode: true
+        xcode_archive_path: TestResults.xcresult
+        fail_ci_if_error: false
+        verbose: true
+    
+    - name: Comment PR with Test Results
+      if: always() && github.event_name == 'pull_request'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const fs = require('fs');
+          
+          let comment = `## 📊 Database Test Results - ${{ steps.test-category.outputs.description }}\n\n`;
+          
+          // Add test summary if available
+          if (fs.existsSync('ci-test-report.json')) {
+            try {
+              const report = JSON.parse(fs.readFileSync('ci-test-report.json', 'utf8'));
+              const summary = report.summary;
+              
+              comment += `### Summary\n`;
+              comment += `- **Total Tests:** ${summary.totalTests}\n`;
+              comment += `- **Passed:** ${summary.passedTests} ✅\n`;
+              comment += `- **Failed:** ${summary.failedTests} ❌\n`;
+              comment += `- **Duration:** ${summary.totalDuration.toFixed(2)}s\n\n`;
+              
+              if (summary.totalPerformanceTests > 0) {
+                comment += `### Performance Tests\n`;
+                comment += `- **Total:** ${summary.totalPerformanceTests}\n`;
+                comment += `- **Passed:** ${summary.passedPerformanceTests} ⚡\n`;
+                comment += `- **Failed:** ${summary.failedPerformanceTests} 🐌\n\n`;
+              }
+              
+              if (summary.failedTests > 0) {
+                comment += `### ❌ Failed Tests\n`;
+                comment += `${summary.failedTests} test(s) failed. Check the [test results](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) for details.\n\n`;
+              }
+              
+              if (summary.failedPerformanceTests > 0) {
+                comment += `### 🐌 Performance Regressions\n`;
+                comment += `${summary.failedPerformanceTests} performance test(s) failed. Check the [test results](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) for details.\n\n`;
+              }
+              
+            } catch (error) {
+              comment += `Error reading test report: ${error.message}\n\n`;
+            }
+          }
+          
+          comment += `### 📁 Artifacts\n`;
+          comment += `- [Test Results Bundle](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})\n`;
+          comment += `- [Coverage Report](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})\n`;
+          
+          // Find existing comment
+          const { data: comments } = await github.rest.issues.listComments({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+          });
+          
+          const existingComment = comments.find(comment => 
+            comment.body.includes('📊 Database Test Results') && 
+            comment.user.type === 'Bot'
+          );
+          
+          if (existingComment) {
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: existingComment.id,
+              body: comment
+            });
+          } else {
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: comment
+            });
+          }
+    
+    - name: Fail on Test Failures
+      if: always() && steps.run-tests.outcome == 'failure'
+      run: |
+        echo "❌ Database tests failed"
+        exit 1
+
+  performance-trend-analysis:
+    name: Performance Trend Analysis
+    runs-on: macos-13
+    needs: database-tests
+    if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Download Test Artifacts
+      uses: actions/download-artifact@v3
+      with:
+        pattern: test-results-*
+        merge-multiple: true
+    
+    - name: Analyze Performance Trends
+      run: |
+        echo "📈 Analyzing performance trends..."
+        
+        if [ -f performance-trends.jsonl ]; then
+          echo "Performance trend data found"
+          wc -l performance-trends.jsonl
+          
+          # Extract latest performance data
+          tail -1 performance-trends.jsonl > latest-performance.json
+          
+          echo "## Latest Performance Metrics" >> $GITHUB_STEP_SUMMARY
+          echo '```json' >> $GITHUB_STEP_SUMMARY
+          cat latest-performance.json | jq '.' >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+        else
+          echo "No performance trend data found"
+        fi
+    
+    - name: Store Performance History
+      run: |
+        # In a real implementation, this would store performance data
+        # in a database or append to a historical file
+        echo "📊 Performance data stored for trend analysis"
