@@ -28,18 +28,6 @@ protocol CloudKitSyncable {
 /// Default implementations for CloudKit synchronization
 extension CloudKitSyncable {
     
-    /// Marks the record as needing sync
-    mutating func markForSync() {
-        needsSync = true
-    }
-    
-    /// Marks the record as synced
-    mutating func markAsSynced(recordID: String) {
-        ckRecordID = recordID
-        lastSyncDate = Date()
-        needsSync = false
-    }
-    
     /// Checks if the record needs to be synced
     var requiresSync: Bool {
         needsSync || ckRecordID == nil

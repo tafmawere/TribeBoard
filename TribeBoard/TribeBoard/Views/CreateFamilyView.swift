@@ -3,22 +3,28 @@ import SwiftUI
 /// View for creating a new family with name input and QR code generation
 struct CreateFamilyView: View {
     @EnvironmentObject private var appState: AppState
-    @Environment(\.modelContext) private var modelContext
+    @EnvironmentObject private var syncManager: SyncManager
     @StateObject private var viewModel: CreateFamilyViewModel
     @FocusState private var isTextFieldFocused: Bool
     
+    init(viewModel: CreateFamilyViewModel) {
+        self._viewModel = StateObject(wrappedValue: viewModel)
+    }
+    
+    // Fallback initializer for previews and testing
     init() {
         // Create temporary services for initialization
-        // In a real app, these would be injected properly
         let tempContainer = try! ModelContainerConfiguration.createInMemory()
         let dataService = DataService(modelContext: tempContainer.mainContext)
         let cloudKitService = CloudKitService()
+        let syncManager = SyncManager(dataService: dataService, cloudKitService: cloudKitService)
         let qrCodeService = QRCodeService()
         let codeGenerator = CodeGenerator()
         
         self._viewModel = StateObject(wrappedValue: CreateFamilyViewModel(
             dataService: dataService,
             cloudKitService: cloudKitService,
+            syncManager: syncManager,
             qrCodeService: qrCodeService,
             codeGenerator: codeGenerator
         ))
@@ -33,6 +39,9 @@ struct CreateFamilyView: View {
                 
                 ScrollView {
                     VStack(spacing: 32) {
+                        // Sync status banner
+                        SyncStatusBanner(syncManager: syncManager)
+                        
                         Spacer(minLength: geometry.size.height * 0.05)
                         
                         // Header section
@@ -72,6 +81,10 @@ struct CreateFamilyView: View {
                     .foregroundColor(.brandPrimary)
                 }
                 .accessibilityLabel("Go back to family selection")
+            }
+            
+            ToolbarItem(placement: .navigationBarTrailing) {
+                CompactSyncStatusView(syncManager: syncManager)
             }
         }
 

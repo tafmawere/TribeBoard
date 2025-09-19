@@ -116,6 +116,13 @@ final class Membership {
         status = .active
         needsSync = true
     }
+    
+    /// Marks the record as synced
+    func markAsSynced(recordID: String) {
+        ckRecordID = recordID
+        lastSyncDate = Date()
+        needsSync = false
+    }
 }
 
 // MARK: - CloudKit Synchronization

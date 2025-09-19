@@ -7,8 +7,7 @@ struct MainNavigationView: View {
     @Environment(\.modelContext) private var modelContext
     
     // Services - will be initialized in onAppear
-    @State private var authService: AuthService?
-    @State private var dataService: DataService?
+    @State private var serviceCoordinator: ServiceCoordinator?
     @State private var servicesInitialized = false
     @State private var showSplashScreen = true
     
@@ -25,15 +24,21 @@ struct MainNavigationView: View {
                         if servicesInitialized {
                             switch appState.currentFlow {
                             case .onboarding:
-                                if let authService = authService {
-                                    OnboardingView(authService: authService)
+                                if let serviceCoordinator = serviceCoordinator {
+                                    OnboardingView(authService: serviceCoordinator.authService)
+                                        .environmentObject(serviceCoordinator.syncManager)
                                 } else {
                                     LoadingStateView()
                                 }
                             case .familySelection:
                                 FamilySelectionView()
                             case .createFamily:
-                                CreateFamilyView()
+                                if let serviceCoordinator = serviceCoordinator {
+                                    CreateFamilyView(viewModel: serviceCoordinator.createFamilyViewModel())
+                                        .environmentObject(serviceCoordinator.syncManager)
+                                } else {
+                                    LoadingStateView()
+                                }
                             case .joinFamily:
                                 JoinFamilyView()
                             case .roleSelection:
@@ -117,14 +122,9 @@ struct MainNavigationView: View {
         await MainActor.run {
             guard !servicesInitialized else { return }
             
-            // Initialize DataService with the environment model context
-            let dataService = DataService(modelContext: modelContext)
-            self.dataService = dataService
-            
-            // Initialize AuthService and set DataService
-            let authService = AuthService()
-            authService.setDataService(dataService)
-            self.authService = authService
+            // Initialize ServiceCoordinator with all services including SyncManager
+            let serviceCoordinator = ServiceCoordinator(modelContext: modelContext)
+            self.serviceCoordinator = serviceCoordinator
             
             // Services are now initialized and ready
             servicesInitialized = true

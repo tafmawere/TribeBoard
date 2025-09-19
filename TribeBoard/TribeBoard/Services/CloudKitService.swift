@@ -1,6 +1,7 @@
 import Foundation
 import CloudKit
 import SwiftData
+import Network
 
 /// Errors that can occur during CloudKit operations
 enum CloudKitError: LocalizedError {
@@ -54,6 +55,19 @@ class CloudKitService: ObservableObject {
     /// Base delay for exponential backoff (in seconds)
     private let baseRetryDelay: TimeInterval = 1.0
     
+    /// Network path monitor for connectivity detection
+    private let networkMonitor = NWPathMonitor()
+    private let networkQueue = DispatchQueue(label: "NetworkMonitor")
+    
+    /// Current network connectivity status
+    @Published private(set) var isNetworkAvailable = true
+    
+    /// Current CloudKit availability status
+    @Published private(set) var isCloudKitAvailable = true
+    
+    /// Offline mode flag
+    @Published private(set) var isOfflineMode = false
+    
     /// Subscription IDs for tracking active subscriptions
     private let familySubscriptionID = "family-changes"
     private let membershipSubscriptionID = "membership-changes"
@@ -67,14 +81,70 @@ class CloudKitService: ObservableObject {
         
         // Create custom zone for better organization
         self.customZone = CKRecordZone(zoneName: "TribeBoardZone")
+        
+        // Start network monitoring
+        startNetworkMonitoring()
+    }
+    
+    deinit {
+        networkMonitor.cancel()
+    }
+    
+    // MARK: - Network and Connectivity Management
+    
+    /// Starts network monitoring for connectivity detection
+    private func startNetworkMonitoring() {
+        networkMonitor.pathUpdateHandler = { [weak self] path in
+            DispatchQueue.main.async {
+                self?.isNetworkAvailable = path.status == .satisfied
+                self?.updateOfflineMode()
+            }
+        }
+        networkMonitor.start(queue: networkQueue)
+    }
+    
+    /// Updates offline mode based on network and CloudKit availability
+    private func updateOfflineMode() {
+        isOfflineMode = !isNetworkAvailable || !isCloudKitAvailable
+    }
+    
+    /// Checks current network connectivity
+    func checkNetworkConnectivity() -> Bool {
+        return isNetworkAvailable
+    }
+    
+    /// Checks CloudKit availability with enhanced error handling
+    func checkCloudKitAvailability() async -> Bool {
+        do {
+            let status = try await checkAccountStatus()
+            let available = status == .available
+            
+            await MainActor.run {
+                isCloudKitAvailable = available
+                updateOfflineMode()
+            }
+            
+            return available
+        } catch {
+            await MainActor.run {
+                isCloudKitAvailable = false
+                updateOfflineMode()
+            }
+            return false
+        }
     }
     
     // MARK: - Setup and Configuration
     
     /// Performs initial CloudKit setup including zone creation and subscriptions
     func performInitialSetup() async throws {
+        // Check network connectivity first
+        guard isNetworkAvailable else {
+            throw CloudKitError.networkUnavailable
+        }
+        
         // Verify CloudKit availability
-        guard try await verifyCloudKitAvailability() else {
+        guard await checkCloudKitAvailability() else {
             throw CloudKitError.containerNotFound
         }
         
@@ -328,9 +398,16 @@ class CloudKitService: ObservableObject {
     
     // MARK: - CRUD Operations
     
-    /// Saves a CloudKit syncable record with retry logic
+    /// Saves a CloudKit syncable record with enhanced retry logic and fallback
     func save<T: CloudKitSyncable>(_ record: T) async throws {
-        try await withRetry(maxAttempts: maxRetryAttempts) { [self] in
+        // Check if we should fall back to local-only mode
+        if shouldFallbackToLocal() {
+            markRecordForLaterSync(record)
+            handleCloudKitUnavailable(operation: "save")
+            throw CloudKitError.networkUnavailable
+        }
+        
+        try await withEnhancedRetry(maxAttempts: maxRetryAttempts, operation: "save") { [self] in
             var ckRecord = try record.toCKRecord()
             // Create record with custom zone
             let recordID = CKRecord.ID(recordName: record.id.uuidString, zoneID: customZone.zoneID)
@@ -385,10 +462,23 @@ class CloudKitService: ObservableObject {
         }
     }
     
-    /// Fetches records by type with predicate
+    /// Fetches records by type with predicate using enhanced retry logic
     func fetch<T: CloudKitSyncable>(_ type: T.Type, predicate: NSPredicate? = nil) async throws -> [CKRecord] {
-        return try await withRetry(maxAttempts: maxRetryAttempts) { [self] in
-            let query = CKQuery(recordType: type.recordType, predicate: predicate ?? NSPredicate(value: true))
+        // Check if we should fall back to local-only mode
+        if shouldFallbackToLocal() {
+            handleCloudKitUnavailable(operation: "fetch")
+            throw CloudKitError.networkUnavailable
+        }
+        
+        return try await withEnhancedRetry(maxAttempts: maxRetryAttempts, operation: "fetch") { [self] in
+            let safePredicate = predicate ?? NSPredicate(value: true)
+            
+            // Validate predicate before use
+            guard validatePredicate(safePredicate) else {
+                throw CloudKitError.invalidRecord
+            }
+            
+            let query = CKQuery(recordType: type.recordType, predicate: safePredicate)
             query.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
             
             let (matchResults, _) = try await privateDatabase.records(matching: query, inZoneWith: customZone.zoneID)
@@ -399,7 +489,8 @@ class CloudKitService: ObservableObject {
                 case .success(let record):
                     records.append(record)
                 case .failure(let error):
-                    print("Failed to fetch record: \(error)")
+                    print("⚠️ CloudKitService: Failed to fetch individual record: \(error)")
+                    // Continue processing other records instead of failing completely
                 }
             }
             
@@ -407,15 +498,21 @@ class CloudKitService: ObservableObject {
         }
     }
     
-    /// Fetches a single record by ID
+    /// Fetches a single record by ID with enhanced error handling
     func fetchRecord(withID recordID: String, recordType: String) async throws -> CKRecord? {
-        return try await withRetry(maxAttempts: maxRetryAttempts) { [self] in
+        // Check if we should fall back to local-only mode
+        if shouldFallbackToLocal() {
+            handleCloudKitUnavailable(operation: "fetchRecord")
+            throw CloudKitError.networkUnavailable
+        }
+        
+        return try await withEnhancedRetry(maxAttempts: maxRetryAttempts, operation: "fetchRecord") { [self] in
             let ckRecordID = CKRecord.ID(recordName: recordID, zoneID: customZone.zoneID)
             
             do {
                 return try await privateDatabase.record(for: ckRecordID)
             } catch let error as CKError where error.code == .unknownItem {
-                return nil
+                return nil // Record not found is not an error
             }
         }
     }
@@ -430,11 +527,158 @@ class CloudKitService: ObservableObject {
     
     // MARK: - Family Operations
     
-    /// Fetches a family by code
+    /// Fetches a family by code with enhanced safety and fallback mechanisms
     func fetchFamily(byCode code: String) async throws -> CKRecord? {
-        let predicate = NSPredicate(format: "%K == %@", CKFieldName.familyCode, code)
-        let records = try await fetch(Family.self, predicate: predicate)
-        return records.first
+        return try await fetchFamilyWithFallback(byCode: code)
+    }
+    
+    /// Enhanced family fetching with comprehensive error handling and fallback
+    func fetchFamilyWithFallback(byCode code: String) async throws -> CKRecord? {
+        // Input validation
+        guard !code.isEmpty else {
+            throw CloudKitError.invalidRecord
+        }
+        
+        // Check if we're in offline mode
+        if isOfflineMode {
+            print("⚠️ CloudKitService: Operating in offline mode, cannot fetch family by code")
+            throw CloudKitError.networkUnavailable
+        }
+        
+        // Check CloudKit availability before attempting operation
+        guard await checkCloudKitAvailability() else {
+            print("⚠️ CloudKitService: CloudKit unavailable, cannot fetch family")
+            throw CloudKitError.containerNotFound
+        }
+        
+        return try await withEnhancedRetry(maxAttempts: maxRetryAttempts, operation: "fetchFamily") { [self] in
+            try await performSafeFamilyFetch(byCode: code)
+        }
+    }
+    
+    /// Performs safe family fetch with enhanced predicate handling
+    private func performSafeFamilyFetch(byCode code: String) async throws -> CKRecord? {
+        do {
+            // Create safer predicate with explicit field validation
+            guard let familyCodeField = CKFieldName.familyCode as String? else {
+                throw CloudKitError.invalidRecord
+            }
+            
+            // Use safer predicate construction
+            let predicate = NSPredicate(format: "%K == %@", familyCodeField, code as NSString)
+            
+            // Validate predicate before use
+            guard validatePredicate(predicate) else {
+                throw CloudKitError.invalidRecord
+            }
+            
+            let records = try await fetchWithSafePredicate(Family.self, predicate: predicate)
+            
+            // Validate results
+            if records.count > 1 {
+                print("⚠️ CloudKitService: Multiple families found with same code: \(code)")
+                // Return the most recently modified one
+                return records.max { record1, record2 in
+                    let date1 = record1.modificationDate ?? Date.distantPast
+                    let date2 = record2.modificationDate ?? Date.distantPast
+                    return date1 < date2
+                }
+            }
+            
+            return records.first
+            
+        } catch let error as CKError {
+            // Handle specific CloudKit errors
+            switch error.code {
+            case .networkUnavailable, .networkFailure:
+                await MainActor.run {
+                    isCloudKitAvailable = false
+                    updateOfflineMode()
+                }
+                throw CloudKitError.networkUnavailable
+            case .serviceUnavailable:
+                await MainActor.run {
+                    isCloudKitAvailable = false
+                    updateOfflineMode()
+                }
+                throw CloudKitError.syncFailed(error)
+            case .unknownItem:
+                return nil // Family not found is not an error
+            case .invalidArguments:
+                throw CloudKitError.invalidRecord
+            default:
+                throw CloudKitError.syncFailed(error)
+            }
+        } catch {
+            throw CloudKitError.syncFailed(error)
+        }
+    }
+    
+    /// Validates predicate safety before CloudKit operations
+    private func validatePredicate(_ predicate: NSPredicate) -> Bool {
+        // Basic validation to prevent crashes
+        let predicateString = predicate.predicateFormat
+        
+        // Check for potentially problematic patterns
+        let dangerousPatterns = ["SUBQUERY", "FUNCTION", "@", "SELF"]
+        for pattern in dangerousPatterns {
+            if predicateString.contains(pattern) {
+                print("⚠️ CloudKitService: Potentially unsafe predicate detected: \(predicateString)")
+                return false
+            }
+        }
+        
+        return true
+    }
+    
+    /// Safe predicate-based fetch with enhanced error handling
+    private func fetchWithSafePredicate<T: CloudKitSyncable>(_ type: T.Type, predicate: NSPredicate) async throws -> [CKRecord] {
+        let query = CKQuery(recordType: type.recordType, predicate: predicate)
+        query.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
+        
+        do {
+            let (matchResults, _) = try await privateDatabase.records(matching: query, inZoneWith: customZone.zoneID)
+            
+            var records: [CKRecord] = []
+            for (_, result) in matchResults {
+                switch result {
+                case .success(let record):
+                    records.append(record)
+                case .failure(let error):
+                    print("⚠️ CloudKitService: Failed to fetch individual record: \(error)")
+                    // Continue processing other records instead of failing completely
+                }
+            }
+            
+            return records
+        } catch let error as CKError {
+            // Handle zone-related errors by falling back to default zone
+            if error.code == .zoneNotFound || error.code == .unknownItem {
+                print("🔄 CloudKitService: Custom zone issue, falling back to default zone")
+                return try await fetchWithDefaultZone(type, predicate: predicate)
+            }
+            throw error
+        }
+    }
+    
+    /// Fallback fetch using default zone when custom zone fails
+    private func fetchWithDefaultZone<T: CloudKitSyncable>(_ type: T.Type, predicate: NSPredicate) async throws -> [CKRecord] {
+        let query = CKQuery(recordType: type.recordType, predicate: predicate)
+        query.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
+        
+        let (matchResults, _) = try await privateDatabase.records(matching: query)
+        
+        var records: [CKRecord] = []
+        for (_, result) in matchResults {
+            switch result {
+            case .success(let record):
+                records.append(record)
+            case .failure(let error):
+                print("⚠️ CloudKitService: Failed to fetch record from default zone: \(error)")
+            }
+        }
+        
+        return records
     }
     
     /// Fetches families created by a specific user
@@ -556,59 +800,235 @@ class CloudKitService: ObservableObject {
     
     // MARK: - Retry Logic
     
-    /// Executes an operation with exponential backoff retry logic
-    private func withRetry<T>(maxAttempts: Int, operation: @escaping () async throws -> T) async throws -> T {
+    /// Enhanced retry logic with exponential backoff and jitter
+    private func withEnhancedRetry<T>(
+        maxAttempts: Int,
+        operation: String,
+        retryOperation: @escaping () async throws -> T
+    ) async throws -> T {
+        var lastError: Error?
+        
         for attempt in 1...maxAttempts {
             do {
-                return try await operation()
+                // Check connectivity before each attempt
+                if !isNetworkAvailable {
+                    await MainActor.run {
+                        isCloudKitAvailable = false
+                        updateOfflineMode()
+                    }
+                    throw CloudKitError.networkUnavailable
+                }
+                
+                print("🔄 CloudKitService: Attempting \(operation) (attempt \(attempt)/\(maxAttempts))")
+                return try await retryOperation()
+                
             } catch let error as CKError {
+                lastError = error
+                
                 // Check if error is retryable
                 if !isRetryableError(error) {
+                    print("❌ CloudKitService: Non-retryable error in \(operation): \(error)")
                     throw CloudKitError.syncFailed(error)
                 }
                 
+                // Update availability status based on error
+                await updateAvailabilityFromError(error)
+                
                 // Don't retry on the last attempt
                 if attempt == maxAttempts {
+                    print("❌ CloudKitService: Max retry attempts exceeded for \(operation)")
                     throw CloudKitError.retryLimitExceeded
                 }
                 
-                // Calculate delay with exponential backoff
-                let delay = baseRetryDelay * pow(2.0, Double(attempt - 1))
+                // Calculate delay with exponential backoff and jitter
+                let baseDelay = baseRetryDelay * pow(2.0, Double(attempt - 1))
+                let jitter = Double.random(in: 0.0...0.1) * baseDelay
+                let delay = baseDelay + jitter
+                
+                print("⏳ CloudKitService: Retrying \(operation) in \(String(format: "%.2f", delay)) seconds")
                 try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
                 
             } catch {
+                lastError = error
+                print("❌ CloudKitService: Unexpected error in \(operation): \(error)")
                 throw CloudKitError.syncFailed(error)
             }
         }
         
-        throw CloudKitError.retryLimitExceeded
+        // This should never be reached, but provide a fallback
+        if let lastError = lastError {
+            throw CloudKitError.syncFailed(lastError)
+        } else {
+            throw CloudKitError.retryLimitExceeded
+        }
     }
     
-    /// Determines if a CloudKit error is retryable
+    /// Updates availability status based on CloudKit errors
+    private func updateAvailabilityFromError(_ error: CKError) async {
+        await MainActor.run {
+            switch error.code {
+            case .networkUnavailable, .networkFailure:
+                isNetworkAvailable = false
+                isCloudKitAvailable = false
+            case .serviceUnavailable, .zoneBusy:
+                isCloudKitAvailable = false
+            case .quotaExceeded:
+                isCloudKitAvailable = false
+            default:
+                break
+            }
+            updateOfflineMode()
+        }
+    }
+    
+    /// Executes an operation with exponential backoff retry logic (legacy method for compatibility)
+    private func withRetry<T>(maxAttempts: Int, operation: @escaping () async throws -> T) async throws -> T {
+        return try await withEnhancedRetry(maxAttempts: maxAttempts, operation: "legacy", retryOperation: operation)
+    }
+    
+    /// Determines if a CloudKit error is retryable with enhanced logic
     private func isRetryableError(_ error: CKError) -> Bool {
         switch error.code {
+        // Always retryable - network and service issues
         case .networkUnavailable, .networkFailure, .serviceUnavailable, .requestRateLimited, .zoneBusy:
             return true
-        case .quotaExceeded:
+            
+        // Conditionally retryable - temporary server issues
+        case .internalError, .serverRejectedRequest:
+            return true
+            
+        // Retryable with caution - might indicate temporary issues
+        case .partialFailure:
+            return true
+            
+        // Never retryable - permanent failures
+        case .quotaExceeded, .unknownItem, .invalidArguments, .incompatibleVersion:
             return false
-        case .unknownItem:
+            
+        // Account and permission issues - not retryable
+        case .notAuthenticated, .permissionFailure, .managedAccountRestricted:
             return false
+            
+        // Zone issues - might be retryable depending on context
+        case .zoneNotFound, .userDeletedZone:
+            return false
+            
+        // Record issues - generally not retryable
+        case .serverRecordChanged, .batchRequestFailed:
+            return false
+            
+        // Default to not retryable for unknown errors
         default:
+            print("⚠️ CloudKitService: Unknown CloudKit error code: \(error.code.rawValue)")
             return false
         }
     }
     
-    // MARK: - Account Status
+    // MARK: - Offline Mode and Fallback Operations
     
-    /// Checks CloudKit account status
-    func checkAccountStatus() async throws -> CKAccountStatus {
-        return try await container.accountStatus()
+    /// Checks if operation should fall back to local-only mode
+    func shouldFallbackToLocal() -> Bool {
+        return isOfflineMode || !isNetworkAvailable || !isCloudKitAvailable
     }
     
-    /// Verifies CloudKit availability
+    /// Marks records for later sync when CloudKit becomes available
+    func markRecordForLaterSync<T: CloudKitSyncable>(_ record: T) {
+        // This would typically update a local flag or queue
+        // The actual implementation would depend on how the local storage tracks sync status
+        print("📝 CloudKitService: Marking record \(record.id) for later sync")
+        
+        // Post notification for other services to handle local-only storage
+        NotificationCenter.default.post(
+            name: .recordMarkedForSync,
+            object: nil,
+            userInfo: ["recordId": record.id.uuidString, "recordType": T.recordType]
+        )
+    }
+    
+    /// Handles graceful degradation when CloudKit is unavailable
+    func handleCloudKitUnavailable(operation: String) {
+        print("⚠️ CloudKitService: CloudKit unavailable for operation: \(operation)")
+        print("   Falling back to local-only mode")
+        
+        // Update status
+        Task { @MainActor in
+            isCloudKitAvailable = false
+            updateOfflineMode()
+        }
+        
+        // Notify observers about offline mode
+        NotificationCenter.default.post(
+            name: .cloudKitUnavailable,
+            object: nil,
+            userInfo: ["operation": operation, "timestamp": Date()]
+        )
+    }
+    
+    /// Attempts to restore CloudKit connectivity
+    func attemptCloudKitReconnection() async -> Bool {
+        print("🔄 CloudKitService: Attempting to restore CloudKit connectivity")
+        
+        // Check network first
+        guard isNetworkAvailable else {
+            print("❌ CloudKitService: Network still unavailable")
+            return false
+        }
+        
+        // Check CloudKit availability
+        let available = await checkCloudKitAvailability()
+        
+        if available {
+            print("✅ CloudKitService: CloudKit connectivity restored")
+            
+            // Notify observers about restored connectivity
+            NotificationCenter.default.post(
+                name: .cloudKitRestored,
+                object: nil,
+                userInfo: ["timestamp": Date()]
+            )
+        } else {
+            print("❌ CloudKitService: CloudKit still unavailable")
+        }
+        
+        return available
+    }
+    
+    // MARK: - Account Status
+    
+    /// Checks CloudKit account status with enhanced error handling
+    func checkAccountStatus() async throws -> CKAccountStatus {
+        do {
+            return try await container.accountStatus()
+        } catch {
+            print("❌ CloudKitService: Failed to check account status: \(error)")
+            throw CloudKitError.syncFailed(error)
+        }
+    }
+    
+    /// Verifies CloudKit availability with comprehensive checks
     func verifyCloudKitAvailability() async throws -> Bool {
-        let status = try await checkAccountStatus()
-        return status == .available
+        // Check network connectivity first
+        guard isNetworkAvailable else {
+            throw CloudKitError.networkUnavailable
+        }
+        
+        do {
+            let status = try await checkAccountStatus()
+            let available = status == .available
+            
+            await MainActor.run {
+                isCloudKitAvailable = available
+                updateOfflineMode()
+            }
+            
+            return available
+        } catch {
+            await MainActor.run {
+                isCloudKitAvailable = false
+                updateOfflineMode()
+            }
+            throw error
+        }
     }
 }
 
@@ -621,5 +1041,11 @@ extension Notification.Name {
     static let membershipRecordDeleted = Notification.Name("membershipRecordDeleted")
     static let userProfileRecordChanged = Notification.Name("userProfileRecordChanged")
     static let userProfileRecordDeleted = Notification.Name("userProfileRecordDeleted")
+    
+    // CloudKit availability notifications
+    static let cloudKitUnavailable = Notification.Name("cloudKitUnavailable")
+    static let cloudKitRestored = Notification.Name("cloudKitRestored")
+    static let recordMarkedForSync = Notification.Name("recordMarkedForSync")
+    static let networkConnectivityChanged = Notification.Name("networkConnectivityChanged")
 }
 

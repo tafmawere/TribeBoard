@@ -69,6 +69,13 @@ final class Family {
     var hasParentAdmin: Bool {
         parentAdmin != nil
     }
+    
+    /// Marks the record as synced
+    func markAsSynced(recordID: String) {
+        ckRecordID = recordID
+        lastSyncDate = Date()
+        needsSync = false
+    }
 }
 
 // MARK: - CloudKit Synchronization

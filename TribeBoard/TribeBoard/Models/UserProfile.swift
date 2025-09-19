@@ -62,6 +62,13 @@ final class UserProfile {
     var currentFamilyMembership: Membership? {
         activeMemberships.first
     }
+    
+    /// Marks the record as synced
+    func markAsSynced(recordID: String) {
+        ckRecordID = recordID
+        lastSyncDate = Date()
+        needsSync = false
+    }
 }
 
 // MARK: - CloudKit Synchronization

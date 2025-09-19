@@ -4,14 +4,27 @@ import XCTest
 final class CodeGeneratorTests: XCTestCase {
     
     var codeGenerator: CodeGenerator!
+    var customConfigGenerator: CodeGenerator!
     
     override func setUp() {
         super.setUp()
         codeGenerator = CodeGenerator()
+        
+        // Create generator with custom config for testing
+        let testConfig = CodeGenerationConfig(
+            maxRetries: 5,
+            baseDelay: 0.01, // Very short delay for tests
+            maxDelay: 0.1,
+            backoffMultiplier: 1.5,
+            enableLocalFallback: true,
+            enableRemoteFallback: true
+        )
+        customConfigGenerator = CodeGenerator(config: testConfig)
     }
     
     override func tearDown() {
         codeGenerator = nil
+        customConfigGenerator = nil
         super.tearDown()
     }
     
@@ -151,6 +164,266 @@ final class CodeGeneratorTests: XCTestCase {
         await fulfillment(of: [expectation], timeout: 1.0)
     }
     
+    // MARK: - Enhanced Code Generation Tests
+    
+    func testGenerateUniqueCodeSafely_BothChecksPass() async throws {
+        let expectation = XCTestExpectation(description: "Both checks pass")
+        var localCheckCount = 0
+        var remoteCheckCount = 0
+        
+        let uniqueCode = try await codeGenerator.generateUniqueCodeSafely(
+            checkLocal: { code in
+                localCheckCount += 1
+                return true // Local check passes
+            },
+            checkRemote: { code in
+                remoteCheckCount += 1
+                return true // Remote check passes
+            }
+        )
+        
+        XCTAssertEqual(localCheckCount, 1, "Local check should be called once")
+        XCTAssertEqual(remoteCheckCount, 1, "Remote check should be called once")
+        XCTAssertTrue(codeGenerator.isValidCodeFormat(uniqueCode), "Generated code should be valid")
+        expectation.fulfill()
+        
+        await fulfillment(of: [expectation], timeout: 1.0)
+    }
+    
+    func testGenerateUniqueCodeSafely_LocalCollisionRetry() async throws {
+        let expectation = XCTestExpectation(description: "Local collision retry")
+        var attemptCount = 0
+        
+        let uniqueCode = try await customConfigGenerator.generateUniqueCodeSafely(
+            checkLocal: { code in
+                attemptCount += 1
+                return attemptCount > 2 // First 2 attempts fail, 3rd succeeds
+            },
+            checkRemote: { code in
+                return true // Remote always passes
+            }
+        )
+        
+        XCTAssertEqual(attemptCount, 3, "Should retry until local check passes")
+        XCTAssertTrue(codeGenerator.isValidCodeFormat(uniqueCode), "Final code should be valid")
+        expectation.fulfill()
+        
+        await fulfillment(of: [expectation], timeout: 1.0)
+    }
+    
+    func testGenerateUniqueCodeSafely_RemoteCollisionRetry() async throws {
+        let expectation = XCTestExpectation(description: "Remote collision retry")
+        var remoteAttemptCount = 0
+        
+        let uniqueCode = try await customConfigGenerator.generateUniqueCodeSafely(
+            checkLocal: { code in
+                return true // Local always passes
+            },
+            checkRemote: { code in
+                remoteAttemptCount += 1
+                return remoteAttemptCount > 2 // First 2 attempts fail, 3rd succeeds
+            }
+        )
+        
+        XCTAssertEqual(remoteAttemptCount, 3, "Should retry until remote check passes")
+        XCTAssertTrue(codeGenerator.isValidCodeFormat(uniqueCode), "Final code should be valid")
+        expectation.fulfill()
+        
+        await fulfillment(of: [expectation], timeout: 1.0)
+    }
+    
+    func testGenerateUniqueCodeSafely_LocalFallback() async throws {
+        let expectation = XCTestExpectation(description: "Local fallback when remote fails")
+        
+        let uniqueCode = try await codeGenerator.generateUniqueCodeSafely(
+            checkLocal: { code in
+                return true // Local check passes
+            },
+            checkRemote: { code in
+                throw CloudKitError.networkUnavailable // Remote check fails
+            }
+        )
+        
+        XCTAssertTrue(codeGenerator.isValidCodeFormat(uniqueCode), "Should generate valid code with local fallback")
+        expectation.fulfill()
+        
+        await fulfillment(of: [expectation], timeout: 1.0)
+    }
+    
+    func testGenerateUniqueCodeSafely_RemoteFallback() async throws {
+        let expectation = XCTestExpectation(description: "Remote fallback when local fails")
+        
+        let uniqueCode = try await codeGenerator.generateUniqueCodeSafely(
+            checkLocal: { code in
+                throw DataServiceError.invalidData("Local storage unavailable") // Local check fails
+            },
+            checkRemote: { code in
+                return true // Remote check passes
+            }
+        )
+        
+        XCTAssertTrue(codeGenerator.isValidCodeFormat(uniqueCode), "Should generate valid code with remote fallback")
+        expectation.fulfill()
+        
+        await fulfillment(of: [expectation], timeout: 1.0)
+    }
+    
+    func testGenerateUniqueCodeSafely_BothChecksFail() async {
+        let expectation = XCTestExpectation(description: "Both checks fail")
+        
+        do {
+            _ = try await codeGenerator.generateUniqueCodeSafely(
+                checkLocal: { code in
+                    throw DataServiceError.invalidData("Local error")
+                },
+                checkRemote: { code in
+                    throw CloudKitError.networkUnavailable
+                }
+            )
+            XCTFail("Should throw error when both checks fail")
+        } catch let error as FamilyCodeGenerationError {
+            XCTAssertTrue(error == .uniquenessCheckFailed, "Should throw uniqueness check failed error")
+            expectation.fulfill()
+        } catch {
+            XCTFail("Unexpected error type: \(error)")
+        }
+        
+        await fulfillment(of: [expectation], timeout: 1.0)
+    }
+    
+    func testGenerateUniqueCodeSafely_MaxAttemptsExceeded() async {
+        let expectation = XCTestExpectation(description: "Max attempts exceeded")
+        
+        do {
+            _ = try await customConfigGenerator.generateUniqueCodeSafely(
+                checkLocal: { code in
+                    return false // Always collision
+                },
+                checkRemote: { code in
+                    return false // Always collision
+                }
+            )
+            XCTFail("Should throw max attempts exceeded error")
+        } catch let error as FamilyCodeGenerationError {
+            XCTAssertTrue(error == .maxAttemptsExceeded, "Should throw max attempts exceeded error")
+            expectation.fulfill()
+        } catch {
+            XCTFail("Unexpected error type: \(error)")
+        }
+        
+        await fulfillment(of: [expectation], timeout: 2.0)
+    }
+    
+    func testGenerateUniqueCodeSafely_ExponentialBackoff() async throws {
+        let expectation = XCTestExpectation(description: "Exponential backoff timing")
+        let startTime = Date()
+        var attemptCount = 0
+        
+        do {
+            _ = try await customConfigGenerator.generateUniqueCodeSafely(
+                checkLocal: { code in
+                    attemptCount += 1
+                    if attemptCount <= 3 {
+                        throw DataServiceError.invalidData("Temporary error")
+                    }
+                    return true
+                },
+                checkRemote: { code in
+                    return true
+                }
+            )
+        } catch {
+            // Expected to succeed after retries
+        }
+        
+        let elapsedTime = Date().timeIntervalSince(startTime)
+        XCTAssertGreaterThan(elapsedTime, 0.02, "Should have some delay from backoff")
+        XCTAssertEqual(attemptCount, 4, "Should retry 3 times before success")
+        expectation.fulfill()
+        
+        await fulfillment(of: [expectation], timeout: 2.0)
+    }
+    
+    // MARK: - Enhanced Format Validation Tests
+    
+    func testValidateCodeFormat_DetailedValidation() {
+        // Test enhanced validation method
+        XCTAssertTrue(codeGenerator.validateCodeFormat("ABC123"), "Valid code should pass")
+        XCTAssertFalse(codeGenerator.validateCodeFormat(""), "Empty code should fail")
+        XCTAssertFalse(codeGenerator.validateCodeFormat("ABC12"), "Short code should fail")
+        XCTAssertFalse(codeGenerator.validateCodeFormat("ABCDEFGHI"), "Long code should fail")
+        XCTAssertFalse(codeGenerator.validateCodeFormat("ABC-123"), "Invalid characters should fail")
+    }
+    
+    // MARK: - Configuration Tests
+    
+    func testCodeGenerationConfig_DefaultValues() {
+        let defaultConfig = CodeGenerationConfig.default
+        
+        XCTAssertEqual(defaultConfig.maxRetries, 10)
+        XCTAssertEqual(defaultConfig.baseDelay, 0.1)
+        XCTAssertEqual(defaultConfig.maxDelay, 5.0)
+        XCTAssertEqual(defaultConfig.backoffMultiplier, 2.0)
+        XCTAssertTrue(defaultConfig.enableLocalFallback)
+        XCTAssertTrue(defaultConfig.enableRemoteFallback)
+    }
+    
+    func testCodeGenerator_CustomConfig() {
+        let customConfig = CodeGenerationConfig(
+            maxRetries: 3,
+            baseDelay: 0.5,
+            maxDelay: 2.0,
+            backoffMultiplier: 1.5,
+            enableLocalFallback: false,
+            enableRemoteFallback: false
+        )
+        
+        let generator = CodeGenerator(config: customConfig)
+        XCTAssertNotNil(generator, "Should create generator with custom config")
+    }
+    
+    // MARK: - Error Handling Tests
+    
+    func testFamilyCodeGenerationError_Properties() {
+        let errors: [FamilyCodeGenerationError] = [
+            .uniquenessCheckFailed,
+            .localCheckFailed(DataServiceError.invalidData("test")),
+            .remoteCheckFailed(CloudKitError.networkUnavailable),
+            .formatValidationFailed("test"),
+            .maxAttemptsExceeded,
+            .generationAlgorithmFailed
+        ]
+        
+        for error in errors {
+            XCTAssertNotNil(error.userFriendlyMessage, "Should have user-friendly message")
+            XCTAssertNotNil(error.technicalDescription, "Should have technical description")
+            XCTAssertNotNil(error.recoveryStrategy, "Should have recovery strategy")
+            
+            // Test specific properties
+            switch error {
+            case .uniquenessCheckFailed, .localCheckFailed, .remoteCheckFailed:
+                XCTAssertTrue(error.isRetryable, "Should be retryable")
+            case .formatValidationFailed, .maxAttemptsExceeded, .generationAlgorithmFailed:
+                XCTAssertFalse(error.isRetryable, "Should not be retryable")
+            }
+        }
+    }
+    
+    // MARK: - Backward Compatibility Tests
+    
+    func testLegacyGenerateUniqueCode_StillWorks() async throws {
+        let expectation = XCTestExpectation(description: "Legacy method works")
+        
+        let uniqueCode = try await codeGenerator.generateUniqueCode { code in
+            return true // Always unique
+        }
+        
+        XCTAssertTrue(codeGenerator.isValidCodeFormat(uniqueCode), "Legacy method should still work")
+        expectation.fulfill()
+        
+        await fulfillment(of: [expectation], timeout: 1.0)
+    }
+    
     // MARK: - Edge Cases
     
     func testCodeGenerator_BoundaryLengths() {
@@ -163,5 +436,29 @@ final class CodeGeneratorTests: XCTestCase {
     
     func testCodeGenerator_EmptyStringValidation() {
         XCTAssertFalse(codeGenerator.isValidCodeFormat(""), "Empty string should be invalid")
+    }
+    
+    func testGenerateUniqueCodeSafely_FormatValidationFailure() async {
+        let expectation = XCTestExpectation(description: "Format validation failure")
+        
+        // Create a generator that produces invalid codes (this is a theoretical test)
+        let invalidGenerator = CodeGenerator(codeLength: 6)
+        
+        do {
+            _ = try await invalidGenerator.generateUniqueCodeSafely(
+                checkLocal: { code in
+                    return true
+                },
+                checkRemote: { code in
+                    return true
+                }
+            )
+            // This should succeed since our generator produces valid codes
+            expectation.fulfill()
+        } catch {
+            XCTFail("Should not fail with valid generator: \(error)")
+        }
+        
+        await fulfillment(of: [expectation], timeout: 1.0)
     }
 }

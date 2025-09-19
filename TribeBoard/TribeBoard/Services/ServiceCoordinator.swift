@@ -9,6 +9,7 @@ class ServiceCoordinator: ObservableObject {
     
     let dataService: DataService
     let cloudKitService: CloudKitService
+    let syncManager: SyncManager
     let authService: AuthService
     let qrCodeService: QRCodeService
     let codeGenerator: CodeGenerator
@@ -18,6 +19,7 @@ class ServiceCoordinator: ObservableObject {
     init(modelContext: ModelContext) {
         self.dataService = DataService(modelContext: modelContext)
         self.cloudKitService = CloudKitService()
+        self.syncManager = SyncManager(dataService: dataService, cloudKitService: cloudKitService)
         self.authService = AuthService()
         self.qrCodeService = QRCodeService()
         self.codeGenerator = CodeGenerator()
@@ -38,6 +40,7 @@ class ServiceCoordinator: ObservableObject {
         return CreateFamilyViewModel(
             dataService: dataService,
             cloudKitService: cloudKitService,
+            syncManager: syncManager,
             qrCodeService: qrCodeService,
             codeGenerator: codeGenerator
         )
