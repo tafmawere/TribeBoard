@@ -66,6 +66,9 @@ class FamilyDashboardViewModel: ObservableObject {
         
         do {
             // Load from local storage first for immediate display
+            // Add a small delay to allow SwiftData relationships to stabilize
+            try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+            
             let localMemberships = try dataService.fetchActiveMemberships(forFamily: currentFamily)
             var allProfiles: [UUID: UserProfile] = [:]
             
@@ -87,8 +90,23 @@ class FamilyDashboardViewModel: ObservableObject {
             try await syncMembersFromCloudKit()
             
         } catch {
+            print("❌ FamilyDashboardViewModel: Error loading members: \(error.localizedDescription)")
+            
             await MainActor.run {
-                self.errorMessage = "Failed to load family members: \(error.localizedDescription)"
+                // For SwiftData relationship errors, provide a more user-friendly message
+                if error.localizedDescription.contains("SwiftData") || 
+                   error.localizedDescription.contains("relationship") ||
+                   error.localizedDescription.contains("EXC_BREAKPOINT") {
+                    self.errorMessage = "Loading family members... Please wait a moment and try again."
+                    
+                    // Try to reload after a short delay
+                    Task {
+                        try await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
+                        await self.loadMembers()
+                    }
+                } else {
+                    self.errorMessage = "Failed to load family members: \(error.localizedDescription)"
+                }
             }
         }
         

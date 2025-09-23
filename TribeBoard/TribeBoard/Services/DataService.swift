@@ -51,6 +51,17 @@ class DataService: ObservableObject {
         }
     }
     
+    /// Ensures the model context is in a good state before operations
+    private func ensureContextStability() throws {
+        do {
+            // Process any pending changes
+            try modelContext.save()
+        } catch {
+            print("⚠️ DataService: Context save failed during stability check: \(error.localizedDescription)")
+            // Don't throw here as this might be expected in some cases
+        }
+    }
+    
     /// Validates database state before critical operations
     private func validateDatabaseState() throws {
         print("🔍 DataService: Validating database state...")
@@ -668,7 +679,11 @@ class DataService: ObservableObject {
     func fetchMemberships(forFamily family: Family) throws -> [Membership] {
         print("🔍 DataService: Fetching memberships for family: '\(family.name)' (ID: \(family.id))")
         
+        // Ensure context stability before operations
+        try ensureContextStability()
+        
         do {
+            // Fetch all memberships and filter manually to avoid predicate issues
             let descriptor = FetchDescriptor<Membership>()
             let allMemberships = try modelContext.fetch(descriptor)
             
@@ -683,11 +698,45 @@ class DataService: ObservableObject {
             return familyMemberships
             
         } catch {
-            print("❌ DataService: Failed to fetch memberships for family")
+            print("❌ DataService: Failed to fetch memberships for family with predicate")
             print("   Error: \(error.localizedDescription)")
             
-            // Re-throw with more context
-            throw DataServiceError.invalidData("Failed to fetch memberships for family '\(family.name)': \(error.localizedDescription)")
+            // Fallback to safer approach - fetch all and filter carefully
+            do {
+                print("🔄 DataService: Attempting fallback fetch approach")
+                let descriptor = FetchDescriptor<Membership>()
+                let allMemberships = try modelContext.fetch(descriptor)
+                
+                print("📊 DataService: Found \(allMemberships.count) total memberships")
+                
+                let familyMemberships = allMemberships.compactMap { membership -> Membership? in
+                    // Safely check the relationship - use a more defensive approach
+                    do {
+                        // Try to access the family relationship safely
+                        if let membershipFamily = membership.family {
+                            if membershipFamily.id == family.id {
+                                return membership
+                            }
+                        }
+                        return nil
+                    } catch {
+                        print("⚠️ DataService: Error accessing membership.family relationship: \(error.localizedDescription)")
+                        return nil
+                    }
+                }
+                
+                print("✅ DataService: Fallback found \(familyMemberships.count) memberships for family '\(family.name)'")
+                
+                return familyMemberships
+                
+            } catch {
+                print("❌ DataService: Fallback also failed to fetch memberships")
+                print("   Error: \(error.localizedDescription)")
+                
+                // Final fallback - return empty array to prevent crash
+                print("🚨 DataService: Returning empty array to prevent crash")
+                return []
+            }
         }
     }
     

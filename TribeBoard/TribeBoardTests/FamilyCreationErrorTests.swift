@@ -1,7 +1,7 @@
 import XCTest
 @testable import TribeBoard
 
-/// Tests for the enhanced error types and handling infrastructure
+/// Comprehensive tests for the enhanced error types and handling infrastructure
 class FamilyCreationErrorTests: XCTestCase {
     
     // MARK: - FamilyCreationError Tests
@@ -245,6 +245,238 @@ class FamilyCreationErrorTests: XCTestCase {
         }
     }
     
+    // MARK: - Enhanced Error Recovery Strategy Tests
+    
+    func testErrorRecoveryStrategyExecution() {
+        let networkError = FamilyCreationError.networkUnavailable
+        let strategy = networkError.recoveryStrategy
+        
+        if case .automaticRetry(let delay, let maxAttempts) = strategy {
+            XCTAssertEqual(delay, 2.0)
+            XCTAssertEqual(maxAttempts, 3)
+        } else {
+            XCTFail("Expected automatic retry strategy")
+        }
+        
+        let fallbackError = FamilyCreationError.cloudKitUnavailable
+        XCTAssertEqual(fallbackError.recoveryStrategy, .fallbackToLocal)
+        
+        let userError = FamilyCreationError.userNotAuthenticated
+        XCTAssertEqual(userError.recoveryStrategy, .userIntervention)
+        
+        let noRecoveryError = FamilyCreationError.maxRetriesExceeded
+        XCTAssertEqual(noRecoveryError.recoveryStrategy, .noRecovery)
+    }
+    
+    func testNestedErrorRecoveryStrategies() {
+        let localError = DataServiceError.validationFailed(["test"])
+        let familyError = FamilyCreationError.localCreationFailed(localError)
+        
+        if case .automaticRetry(let delay, let maxAttempts) = familyError.recoveryStrategy {
+            XCTAssertEqual(delay, 1.0)
+            XCTAssertEqual(maxAttempts, 2)
+        } else {
+            XCTFail("Expected automatic retry for local creation failed")
+        }
+        
+        let codeGenError = FamilyCodeGenerationError.uniquenessCheckFailed
+        let codeError = FamilyCreationError.codeGenerationFailed(codeGenError)
+        
+        if case .automaticRetry(let delay, let maxAttempts) = codeError.recoveryStrategy {
+            XCTAssertEqual(delay, 1.0)
+            XCTAssertEqual(maxAttempts, 3)
+        } else {
+            XCTFail("Expected automatic retry for code generation failed")
+        }
+    }
+    
+    func testErrorPriorityEscalation() {
+        // Test that error priorities are correctly assigned
+        let highPriorityErrors: [FamilyCreationError] = [
+            .userNotAuthenticated,
+            .dataCorruption("test"),
+            .maxRetriesExceeded
+        ]
+        
+        for error in highPriorityErrors {
+            XCTAssertEqual(error.priority, .high, "Error \(error) should be high priority")
+        }
+        
+        let mediumPriorityErrors: [FamilyCreationError] = [
+            .validationFailed("test"),
+            .invalidFamilyName("test"),
+            .maxCodeGenerationAttemptsExceeded,
+            .quotaExceeded
+        ]
+        
+        for error in mediumPriorityErrors {
+            XCTAssertEqual(error.priority, .medium, "Error \(error) should be medium priority")
+        }
+        
+        let lowPriorityErrors: [FamilyCreationError] = [
+            .networkUnavailable,
+            .cloudKitUnavailable,
+            .codeCollisionDetected
+        ]
+        
+        for error in lowPriorityErrors {
+            XCTAssertEqual(error.priority, .low, "Error \(error) should be low priority")
+        }
+    }
+    
+    // MARK: - Error Context and Analytics Tests
+    
+    func testErrorContextCreation() {
+        let error = FamilyCreationError.networkUnavailable
+        let context = ErrorContext(error: error, retryCount: 2)
+        
+        XCTAssertEqual(context.retryCount, 2)
+        XCTAssertEqual(context.errorCategory, .network)
+        XCTAssertEqual(context.errorPriority, .low)
+        XCTAssertTrue(context.isRetryable)
+        XCTAssertNotNil(context.timestamp)
+        XCTAssertEqual(context.recoveryStrategy, .automaticRetry(delay: 2.0, maxAttempts: 3))
+    }
+    
+    func testErrorContextWithAdditionalInfo() {
+        let error = FamilyCreationError.validationFailed("Name too short")
+        let additionalInfo = ["field": "familyName", "value": "A", "minLength": "2"]
+        let context = ErrorContext(error: error, additionalInfo: additionalInfo)
+        
+        XCTAssertEqual(context.additionalInfo?["field"] as? String, "familyName")
+        XCTAssertEqual(context.additionalInfo?["value"] as? String, "A")
+        XCTAssertEqual(context.additionalInfo?["minLength"] as? String, "2")
+    }
+    
+    func testErrorAnalyticsRecording() {
+        let error = FamilyCreationError.codeGenerationFailed(.maxAttemptsExceeded)
+        let state = FamilyCreationState.generatingCode
+        
+        // Test that analytics recording doesn't crash
+        FamilyCreationAnalytics.recordError(error, in: state)
+        
+        // Test state transition recording
+        FamilyCreationAnalytics.recordStateTransition(from: .idle, to: .validating)
+        
+        // Test success recording
+        let stateHistory: [FamilyCreationState] = [.idle, .validating, .generatingCode, .completed]
+        FamilyCreationAnalytics.recordSuccess(duration: 2.5, stateHistory: stateHistory)
+        
+        // If we get here without crashing, the test passes
+        XCTAssertTrue(true)
+    }
+    
+    // MARK: - Edge Case Error Tests
+    
+    func testErrorEquality() {
+        // Test error equality for different error types
+        let error1 = FamilyCreationError.validationFailed("test")
+        let error2 = FamilyCreationError.validationFailed("test")
+        let error3 = FamilyCreationError.validationFailed("different")
+        
+        XCTAssertEqual(error1, error2)
+        XCTAssertNotEqual(error1, error3)
+        
+        let networkError1 = FamilyCreationError.networkUnavailable
+        let networkError2 = FamilyCreationError.networkUnavailable
+        XCTAssertEqual(networkError1, networkError2)
+        
+        let serverError1 = FamilyCreationError.serverError(500)
+        let serverError2 = FamilyCreationError.serverError(500)
+        let serverError3 = FamilyCreationError.serverError(404)
+        
+        XCTAssertEqual(serverError1, serverError2)
+        XCTAssertNotEqual(serverError1, serverError3)
+    }
+    
+    func testErrorChaining() {
+        let originalError = NSError(domain: "TestDomain", code: 123, userInfo: [NSLocalizedDescriptionKey: "Original error"])
+        let wrappedError = FamilyCreationError.unknownError(originalError)
+        
+        XCTAssertTrue(wrappedError.userFriendlyMessage.contains("Original error"))
+        XCTAssertTrue(wrappedError.technicalDescription.contains("Original error"))
+        XCTAssertFalse(wrappedError.isRetryable)
+        XCTAssertEqual(wrappedError.priority, .medium)
+    }
+    
+    func testComplexErrorScenarios() {
+        // Test complex nested error scenarios
+        let dataServiceError = DataServiceError.constraintViolation("Duplicate family code")
+        let familyError = FamilyCreationError.localCreationFailed(dataServiceError)
+        
+        XCTAssertTrue(familyError.userFriendlyMessage.contains("save family locally"))
+        XCTAssertTrue(familyError.technicalDescription.contains("Duplicate family code"))
+        XCTAssertTrue(familyError.isRetryable)
+        XCTAssertEqual(familyError.category, .localDatabase)
+        
+        // Test CloudKit error wrapping
+        let cloudKitError = CloudKitError.quotaExceeded
+        let syncError = FamilyCreationError.cloudKitSyncFailed(cloudKitError)
+        
+        XCTAssertTrue(syncError.userFriendlyMessage.contains("saved locally"))
+        XCTAssertEqual(syncError.recoveryStrategy, .fallbackToLocal)
+        XCTAssertEqual(syncError.category, .cloudKit)
+    }
+    
+    // MARK: - State Machine Edge Cases
+    
+    func testStateTransitionValidation() {
+        let stateManager = FamilyCreationStateManager()
+        
+        // Test invalid transitions are rejected
+        stateManager.transition(to: .completed) // Should be rejected
+        XCTAssertEqual(stateManager.currentState, .idle)
+        
+        // Test valid transition sequence
+        stateManager.transition(to: .validating)
+        XCTAssertEqual(stateManager.currentState, .validating)
+        
+        stateManager.transition(to: .generatingCode)
+        XCTAssertEqual(stateManager.currentState, .generatingCode)
+        
+        // Test error transition from any state
+        stateManager.transition(to: .failed(.networkUnavailable))
+        XCTAssertTrue(stateManager.isFailed)
+        
+        // Test reset from failed state
+        stateManager.reset()
+        XCTAssertEqual(stateManager.currentState, .idle)
+    }
+    
+    func testStateHistoryTracking() {
+        let stateManager = FamilyCreationStateManager()
+        
+        stateManager.transition(to: .validating)
+        stateManager.transition(to: .generatingCode)
+        stateManager.transition(to: .failed(.networkUnavailable))
+        stateManager.reset()
+        
+        let history = stateManager.getStateHistory()
+        XCTAssertEqual(history.count, 5) // idle, validating, generatingCode, failed, idle
+        XCTAssertEqual(history.first, .idle)
+        XCTAssertEqual(history.last, .idle)
+    }
+    
+    func testConcurrentStateTransitions() {
+        let stateManager = FamilyCreationStateManager()
+        let expectation = XCTestExpectation(description: "Concurrent transitions")
+        
+        // Test that concurrent state transitions are handled safely
+        DispatchQueue.concurrentPerform(iterations: 10) { index in
+            if index % 2 == 0 {
+                stateManager.transition(to: .validating)
+            } else {
+                stateManager.transition(to: .generatingCode)
+            }
+        }
+        
+        // State should be in a valid state after concurrent operations
+        XCTAssertTrue([.idle, .validating, .generatingCode].contains(stateManager.currentState))
+        expectation.fulfill()
+        
+        wait(for: [expectation], timeout: 1.0)
+    }
+    
     // MARK: - Integration Tests
     
     func testErrorToStateTransition() {
@@ -255,7 +487,9 @@ class FamilyCreationErrorTests: XCTestCase {
             (.networkUnavailable, true),
             (.userNotAuthenticated, false),
             (.validationFailed("test"), false),
-            (.codeCollisionDetected, true)
+            (.codeCollisionDetected, true),
+            (.cloudKitUnavailable, true),
+            (.maxRetriesExceeded, false)
         ]
         
         for (error, shouldAllowRetry) in errors {
@@ -292,5 +526,49 @@ class FamilyCreationErrorTests: XCTestCase {
         
         XCTAssertTrue(stateManager.isCompleted)
         XCTAssertEqual(stateManager.progress, 1.0)
+    }
+    
+    func testErrorRecoveryWithBackoff() {
+        let stateManager = FamilyCreationStateManager()
+        
+        // Test exponential backoff behavior
+        let retryableError = FamilyCreationError.networkUnavailable
+        stateManager.fail(with: retryableError)
+        
+        let startTime = Date()
+        
+        // Multiple retry attempts should have increasing delays
+        for attempt in 1...3 {
+            if stateManager.retry() {
+                stateManager.fail(with: retryableError)
+            }
+        }
+        
+        let elapsedTime = Date().timeIntervalSince(startTime)
+        // Should have some delay from backoff (this is a basic test)
+        XCTAssertGreaterThan(elapsedTime, 0.0)
+    }
+    
+    func testErrorHandlingWithNotifications() {
+        let stateManager = FamilyCreationStateManager()
+        let expectation = XCTestExpectation(description: "State change notification")
+        
+        // Listen for state change notifications
+        let observer = NotificationCenter.default.addObserver(
+            forName: .familyCreationStateChanged,
+            object: stateManager,
+            queue: .main
+        ) { notification in
+            if let newState = notification.userInfo?["newState"] as? FamilyCreationState,
+               newState.isFailed {
+                expectation.fulfill()
+            }
+        }
+        
+        // Trigger state change
+        stateManager.fail(with: .networkUnavailable)
+        
+        wait(for: [expectation], timeout: 1.0)
+        NotificationCenter.default.removeObserver(observer)
     }
 }

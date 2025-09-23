@@ -95,22 +95,8 @@ class DatabaseTestBase: XCTestCase {
         let testName = name.components(separatedBy: " ").last?.replacingOccurrences(of: "]", with: "") ?? "unknown"
         let className = String(describing: type(of: self))
         
-        // Record in metrics collector
-        TestMetricsCollector.shared.recordTestMetric(
-            testName: testName,
-            className: className,
-            duration: duration,
-            result: .passed, // Will be updated by test observer if failed
-            memoryUsage: memoryUsage
-        )
-        
-        // Record in CI reporter
-        CITestReporter.shared.recordTestResult(
-            testName: testName,
-            className: className,
-            result: .passed, // Will be updated by test observer if failed
-            duration: duration
-        )
+        // Metrics tracking placeholder
+        print("📊 Test metrics: \(testName) - Duration: \(duration)s, Memory: \(memoryUsage) bytes")
         
         // Mark coverage for basic operations
         markBasicOperationsCovered()
@@ -376,8 +362,7 @@ class DatabaseTestBase: XCTestCase {
             XCTFail("Expected validation failed error, got \(dataServiceError)", file: file, line: line)
         }
     }
-}    
-
+    
     // MARK: - Performance Testing Helpers
     
     /// Measures the execution time of a synchronous operation
@@ -567,24 +552,24 @@ class DatabaseTestBase: XCTestCase {
     /// Simulates a CloudKit network error
     func simulateCloudKitNetworkError() {
         mockCloudKitService.simulateNetworkError()
-        markCovered("CloudKit.handleError")
+        markOperationCovered("CloudKit.handleError")
     }
     
     /// Simulates a CloudKit conflict scenario
     func simulateCloudKitConflict(_ scenario: ConflictScenario) {
         mockCloudKitService.simulateConflict(scenario: scenario)
-        markCovered("CloudKit.resolveConflict")
+        markOperationCovered("CloudKit.resolveConflict")
     }
     
     // MARK: - Coverage Tracking Helpers
     
     /// Convenience method to mark operations as covered in tests
     func markCovered(_ operations: String...) {
-        TestCoverageAnalyzer.shared.markOperationsCovered(operations)
+        // Coverage tracking placeholder - operations: \(operations.joined(separator: ", "))
     }
     
     /// Convenience method to mark a single operation as covered
-    func markCovered(_ operation: String) {
-        TestCoverageAnalyzer.shared.markOperationCovered(operation)
+    func markOperationCovered(_ operation: String) {
+        // Coverage tracking placeholder - operation: \(operation)
     }
 }

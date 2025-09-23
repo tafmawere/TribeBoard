@@ -419,6 +419,13 @@ class CreateFamilyViewModel: ObservableObject {
         let syncStatus = family.needsSync ? " (will sync when online)" : ""
         ToastManager.shared.success("Family '\(family.name)' created successfully!\(syncStatus)")
         
+        // Add a small delay to allow SwiftData relationships to stabilize
+        do {
+            try await Task.sleep(nanoseconds: 200_000_000) // 0.2 seconds
+        } catch {
+            // Sleep interruption is not critical, continue
+        }
+        
         // Update app state and navigate to dashboard
         if let memberships = family.memberships,
            let currentUserId = appState.currentUser?.id,

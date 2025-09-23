@@ -536,6 +536,24 @@ class SyncManager: ObservableObject {
         
         print("📝 SyncManager: Marked user profile for sync - ID: \(record.id)")
     }
+    
+    /// Sets offline mode manually (for testing)
+    func setOfflineMode(_ isOffline: Bool) {
+        isOfflineMode = isOffline
+        isNetworkAvailable = !isOffline
+        isCloudKitAvailable = !isOffline
+        
+        print("🧪 SyncManager: Manually set offline mode to \(isOffline)")
+    }
+    
+    /// Syncs all pending records (for testing)
+    func syncPendingRecords() async throws {
+        await performAutomaticSync()
+        
+        if syncStatus.isFailed, let error = syncStatus.error {
+            throw error
+        }
+    }
 }
 
 // MARK: - Supporting Types

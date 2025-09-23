@@ -2,23 +2,21 @@ import SwiftUI
 
 /// View for joining an existing family using family code or QR scan
 struct JoinFamilyView: View {
-    @StateObject private var viewModel: JoinFamilyViewModel
+    @StateObject private var mockViewModel: MockJoinFamilyViewModel
     @EnvironmentObject private var appState: AppState
     @FocusState private var isCodeFieldFocused: Bool
     
     init() {
-        // Create temporary services for initialization
-        let tempContainer = try! ModelContainerConfiguration.createInMemory()
-        let dataService = DataService(modelContext: tempContainer.mainContext)
-        let cloudKitService = CloudKitService()
-        let qrCodeService = QRCodeService()
-        
-        self._viewModel = StateObject(wrappedValue: JoinFamilyViewModel(
-            dataService: dataService,
-            cloudKitService: cloudKitService,
-            qrCodeService: qrCodeService
+        // Initialize with mock services for prototype
+        let mockServiceCoordinator = MockServiceCoordinator()
+        self._mockViewModel = StateObject(wrappedValue: MockJoinFamilyViewModel(
+            mockDataService: mockServiceCoordinator.dataService,
+            mockCloudKitService: mockServiceCoordinator.cloudKitService
         ))
     }
+    
+    // Computed property to maintain compatibility with existing UI code
+    private var viewModel: MockJoinFamilyViewModel { mockViewModel }
     
     var body: some View {
         GeometryReader { geometry in
@@ -49,14 +47,14 @@ struct JoinFamilyView: View {
                         VStack(spacing: 24) {
                             // Family code input
                             FamilyCodeInputSection(
-                                familyCode: $viewModel.familyCode,
+                                familyCode: $mockViewModel.familyCode,
                                 isCodeFieldFocused: $isCodeFieldFocused,
-                                isValidFormat: viewModel.isValidCodeFormat,
-                                canSearch: viewModel.canSearch,
-                                isSearching: viewModel.isSearching,
+                                isValidFormat: mockViewModel.isValidCodeFormat,
+                                canSearch: mockViewModel.canSearch,
+                                isSearching: mockViewModel.isSearching,
                                 onSearch: {
                                     Task {
-                                        await viewModel.searchFamily(by: viewModel.familyCode)
+                                        await mockViewModel.searchFamily(by: mockViewModel.familyCode)
                                     }
                                 }
                             )
@@ -81,11 +79,11 @@ struct JoinFamilyView: View {
                             
                             // QR scan button
                             QRScanButton(
-                                isScanning: viewModel.isSearching,
+                                isScanning: mockViewModel.isSearching,
                                 onScan: {
                                     isCodeFieldFocused = false
                                     Task {
-                                        await viewModel.scanQRCode()
+                                        await mockViewModel.scanQRCode()
                                     }
                                 }
                             )
@@ -93,9 +91,9 @@ struct JoinFamilyView: View {
                         .padding(.horizontal, 20)
                         
                         // Error message with enhanced styling
-                        if let errorMessage = viewModel.errorMessage {
+                        if let errorMessage = mockViewModel.errorMessage {
                             InlineErrorView(message: errorMessage) {
-                                viewModel.clearError()
+                                mockViewModel.clearError()
                             }
                             .padding(.horizontal, 20)
                         }
@@ -111,39 +109,28 @@ struct JoinFamilyView: View {
         .navigationBarBackButtonHidden(false)
         .confirmationDialog(
             "Join Family",
-            isPresented: $viewModel.showConfirmation,
+            isPresented: $mockViewModel.showConfirmation,
             titleVisibility: .visible
         ) {
             FamilyConfirmationDialog(
-                family: viewModel.foundFamily,
-                memberCount: viewModel.memberCount,
-                isJoining: viewModel.isJoining,
+                family: mockViewModel.foundFamily,
+                memberCount: mockViewModel.memberCount,
+                isJoining: mockViewModel.isJoining,
                 onJoin: {
                     Task {
-                        await viewModel.joinFamily(with: appState)
-                        // Set the found family in app state and navigate to role selection
-                        if let family = viewModel.foundFamily,
-                           let user = appState.currentUser {
-                            // Create a temporary membership for role selection
-                            let tempMembership = Membership(
-                                family: family,
-                                user: user,
-                                role: .adult // Default role, will be updated in role selection
-                            )
-                            appState.currentFamily = family
-                            appState.currentMembership = tempMembership
-                            appState.navigateTo(.roleSelection)
-                        }
+                        await mockViewModel.joinFamily(with: appState)
+                        // Navigation is handled by the mock view model
+                        appState.navigateTo(.roleSelection)
                     }
                 },
                 onCancel: {
-                    viewModel.cancelJoin()
+                    mockViewModel.cancelJoin()
                 }
             )
         }
         .withToast()
         .onAppear {
-            viewModel.reset()
+            mockViewModel.reset()
         }
     }
 }

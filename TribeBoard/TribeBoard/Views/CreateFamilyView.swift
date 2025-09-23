@@ -3,31 +3,27 @@ import SwiftUI
 /// View for creating a new family with name input and QR code generation
 struct CreateFamilyView: View {
     @EnvironmentObject private var appState: AppState
-    @EnvironmentObject private var syncManager: SyncManager
-    @StateObject private var viewModel: CreateFamilyViewModel
+    @StateObject private var mockViewModel: MockCreateFamilyViewModel
     @FocusState private var isTextFieldFocused: Bool
     
-    init(viewModel: CreateFamilyViewModel) {
-        self._viewModel = StateObject(wrappedValue: viewModel)
+    // MARK: - Initialization
+    
+    init() {
+        // Initialize with mock services for prototype
+        let mockServiceCoordinator = MockServiceCoordinator()
+        self._mockViewModel = StateObject(wrappedValue: MockCreateFamilyViewModel(
+            mockDataService: mockServiceCoordinator.dataService,
+            mockCloudKitService: mockServiceCoordinator.cloudKitService
+        ))
     }
     
-    // Fallback initializer for previews and testing
-    init() {
-        // Create temporary services for initialization
-        let tempContainer = try! ModelContainerConfiguration.createInMemory()
-        let dataService = DataService(modelContext: tempContainer.mainContext)
-        let cloudKitService = CloudKitService()
-        let syncManager = SyncManager(dataService: dataService, cloudKitService: cloudKitService)
-        let qrCodeService = QRCodeService()
-        let codeGenerator = CodeGenerator()
-        
-        self._viewModel = StateObject(wrappedValue: CreateFamilyViewModel(
-            dataService: dataService,
-            cloudKitService: cloudKitService,
-            syncManager: syncManager,
-            qrCodeService: qrCodeService,
-            codeGenerator: codeGenerator
-        ))
+    // Computed properties to maintain compatibility with existing UI code
+    private var viewModel: MockCreateFamilyViewModel { mockViewModel }
+    private var syncManager: MockSyncManager { 
+        MockSyncManager(
+            dataService: mockViewModel.mockDataService, 
+            cloudKitService: mockViewModel.mockCloudKitService
+        ) 
     }
     
     var body: some View {
@@ -39,9 +35,6 @@ struct CreateFamilyView: View {
                 
                 ScrollView {
                     VStack(spacing: 32) {
-                        // Sync status banner
-                        SyncStatusBanner(syncManager: syncManager)
-                        
                         Spacer(minLength: geometry.size.height * 0.05)
                         
                         // Header section
@@ -54,7 +47,7 @@ struct CreateFamilyView: View {
                         createFamilyButton
                         
                         // Family code display (shown after creation)
-                        if let family = viewModel.createdFamily {
+                        if let family = mockViewModel.createdFamily {
                             familyCodeSection(family: family)
                         }
                         
@@ -83,13 +76,11 @@ struct CreateFamilyView: View {
                 .accessibilityLabel("Go back to family selection")
             }
             
-            ToolbarItem(placement: .navigationBarTrailing) {
-                CompactSyncStatusView(syncManager: syncManager)
-            }
+            // Removed sync status for prototype
         }
 
         .overlay {
-            if viewModel.isCreating {
+            if mockViewModel.isCreating {
                 LoadingStateView(
                     message: "Creating your family...",
                     style: .overlay
@@ -97,12 +88,12 @@ struct CreateFamilyView: View {
             }
         }
         .withToast()
-        .alert("Error", isPresented: .constant(viewModel.errorMessage != nil)) {
+        .alert("Error", isPresented: .constant(mockViewModel.errorMessage != nil)) {
             Button("OK") {
-                viewModel.clearError()
+                mockViewModel.clearError()
             }
         } message: {
-            if let errorMessage = viewModel.errorMessage {
+            if let errorMessage = mockViewModel.errorMessage {
                 Text(errorMessage)
             }
         }
@@ -139,13 +130,13 @@ struct CreateFamilyView: View {
             ValidatedTextField(
                 title: "Family Name",
                 placeholder: "Enter your family name",
-                text: $viewModel.familyName,
+                text: $mockViewModel.familyName,
                 validation: ValidationRules.familyName,
                 submitLabel: .done,
                 onSubmit: {
-                    if viewModel.canCreateFamily {
+                    if mockViewModel.canCreateFamily {
                         Task {
-                            await viewModel.createFamily(with: appState)
+                            await mockViewModel.createFamily(with: appState)
                         }
                     }
                 }
@@ -175,18 +166,18 @@ struct CreateFamilyView: View {
     private var createFamilyButton: some View {
         LoadingButton(
             title: "Create Family",
-            isLoading: viewModel.isCreating,
+            isLoading: mockViewModel.isCreating,
             action: {
                 isTextFieldFocused = false
                 Task {
-                    await viewModel.createFamily(with: appState)
+                    await mockViewModel.createFamily(with: appState)
                 }
             },
             style: .primary
         )
-        .disabled(!viewModel.canCreateFamily)
-        .opacity(viewModel.canCreateFamily ? 1.0 : 0.6)
-        .animation(.easeInOut(duration: 0.2), value: viewModel.canCreateFamily)
+        .disabled(!mockViewModel.canCreateFamily)
+        .opacity(mockViewModel.canCreateFamily ? 1.0 : 0.6)
+        .animation(.easeInOut(duration: 0.2), value: mockViewModel.canCreateFamily)
         .accessibilityLabel("Create Family")
         .accessibilityHint("Creates a new family with the entered name")
     }
@@ -244,7 +235,7 @@ struct CreateFamilyView: View {
             }
             
             // QR Code display
-            if let qrImage = viewModel.qrCodeImage {
+            if let qrImage = mockViewModel.qrCodeImage {
                 VStack(spacing: 12) {
                     Text("QR Code")
                         .font(.headline)
@@ -302,7 +293,7 @@ struct CreateFamilyView: View {
                 )
         )
         .transition(.scale.combined(with: .opacity))
-        .animation(.spring(response: 0.6, dampingFraction: 0.8), value: viewModel.createdFamily != nil)
+        .animation(.spring(response: 0.6, dampingFraction: 0.8), value: mockViewModel.createdFamily != nil)
     }
 }
 
