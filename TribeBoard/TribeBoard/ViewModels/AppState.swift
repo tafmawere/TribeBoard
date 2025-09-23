@@ -32,6 +32,9 @@ class AppState: ObservableObject {
     /// Navigation path for deep linking and programmatic navigation
     @Published var navigationPath = NavigationPath()
     
+    /// Currently selected navigation tab for bottom navigation
+    @Published var selectedNavigationTab: NavigationTab = .home
+    
     // MARK: - Mock Service Integration
     
     /// Current user journey scenario for prototype
@@ -268,6 +271,7 @@ class AppState: ObservableObject {
         isAuthenticated = false
         currentFlow = .onboarding
         navigationPath = NavigationPath()
+        selectedNavigationTab = .home
         isLoading = false
     }
     
@@ -435,6 +439,83 @@ class AppState: ObservableObject {
         navigationPath = NavigationPath()
     }
     
+    // MARK: - Bottom Navigation Methods
+    
+    /// Select a navigation tab and handle navigation logic
+    func selectTab(_ tab: NavigationTab) {
+        selectedNavigationTab = tab
+        
+        // Handle navigation logic based on selected tab
+        switch tab {
+        case .home:
+            // Navigate to family dashboard (home)
+            currentFlow = .familyDashboard
+            resetNavigation()
+            
+        case .schoolRun:
+            // Navigate to school run view
+            // The actual navigation will be handled by MainNavigationView
+            break
+            
+        case .shopping:
+            // Navigate to shopping view
+            // The actual navigation will be handled by MainNavigationView
+            break
+            
+        case .tasks:
+            // Navigate to tasks view
+            // The actual navigation will be handled by MainNavigationView
+            break
+        }
+    }
+    
+    /// Computed property to determine if bottom navigation should be shown
+    var shouldShowBottomNavigation: Bool {
+        // Show bottom navigation only when user is authenticated and in family dashboard flow
+        guard isAuthenticated, currentFamily != nil else { return false }
+        
+        // Show on main app screens, hide on onboarding and setup flows
+        switch currentFlow {
+        case .familyDashboard:
+            return true
+        case .onboarding, .familySelection, .createFamily, .joinFamily, .roleSelection:
+            return false
+        }
+    }
+    
+    /// Handle tab selection with coordination for NavigationStack
+    func handleTabSelection(_ tab: NavigationTab) {
+        // Update selected tab
+        selectedNavigationTab = tab
+        
+        // Reset navigation path to ensure clean navigation
+        navigationPath = NavigationPath()
+        
+        // Handle specific navigation logic for each tab
+        switch tab {
+        case .home:
+            // Ensure we're in the family dashboard flow
+            if currentFlow != .familyDashboard {
+                currentFlow = .familyDashboard
+            }
+            
+        case .schoolRun:
+            // Navigation to SchoolRunView will be handled by MainNavigationView
+            // based on the selectedNavigationTab state
+            break
+            
+        case .shopping:
+            // Navigation to ShoppingView will be handled by MainNavigationView
+            // based on the selectedNavigationTab state
+            break
+            
+        case .tasks:
+            // Navigation to TasksView will be handled by MainNavigationView
+            // based on the selectedNavigationTab state
+            break
+        }
+    }
+    
     /// Navigate through predefined user journey for demo
     func executeUserJourney(_ scenario: UserJourneyScenario) async {
         switch scenario {
@@ -533,6 +614,7 @@ class AppState: ObservableObject {
         currentMembership = nil
         currentFlow = .onboarding
         navigationPath = NavigationPath()
+        selectedNavigationTab = .home
         errorMessage = nil
         isLoading = false
         

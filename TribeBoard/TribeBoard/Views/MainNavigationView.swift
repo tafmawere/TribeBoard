@@ -48,17 +48,8 @@ struct MainNavigationView: View {
                                     RoleSelectionPlaceholderView()
                                 }
                             case .familyDashboard:
-                                if let user = appState.currentUser,
-                                   let family = appState.currentFamily,
-                                   let membership = appState.currentMembership {
-                                    MockFamilyDashboardView(
-                                        family: family,
-                                        currentUserId: user.id,
-                                        currentUserRole: membership.role
-                                    )
-                                } else {
-                                    FamilyDashboardPlaceholderView()
-                                }
+                                // Main dashboard content with navigation support
+                                dashboardContent
                             }
                         } else {
                             // Show loading state during mock service initialization
@@ -73,8 +64,33 @@ struct MainNavigationView: View {
                     .environmentObject(appState)
                     .environmentObject(mockServiceCoordinator ?? MockServiceCoordinator())
                     .animation(AnimationUtilities.smooth, value: appState.currentFlow)
+                    // Navigation destinations for bottom navigation
+                    .navigationDestination(for: NavigationTab.self) { tab in
+                        destinationView(for: tab)
+                    }
                 }
                 .transition(AnimationUtilities.slideTransition)
+                .overlay(alignment: .bottom) {
+                    // Floating bottom navigation overlay with enhanced animations
+                    if appState.shouldShowBottomNavigation {
+                        FloatingBottomNavigation(
+                            selectedTab: $appState.selectedNavigationTab,
+                            onTabSelected: { tab in
+                                handleTabSelection(tab)
+                            }
+                        )
+                        .transition(
+                            .asymmetric(
+                                insertion: .move(edge: .bottom)
+                                    .combined(with: .opacity)
+                                    .combined(with: .scale(scale: 0.9)),
+                                removal: .move(edge: .bottom)
+                                    .combined(with: .opacity)
+                            )
+                        )
+                        .animation(DesignSystem.Animation.spring, value: appState.shouldShowBottomNavigation)
+                    }
+                }
             }
         }
         .onAppear {
@@ -110,6 +126,116 @@ struct MainNavigationView: View {
             // Demo launcher can be accessed via the floating button
             DemoLauncherView()
                 .environmentObject(appState)
+        }
+    }
+    
+    // MARK: - Navigation Support
+    
+    /// Dashboard content that responds to bottom navigation with smooth transitions
+    @ViewBuilder
+    private var dashboardContent: some View {
+        Group {
+            switch appState.selectedNavigationTab {
+            case .home:
+                // Main family dashboard
+                if let user = appState.currentUser,
+                   let family = appState.currentFamily,
+                   let membership = appState.currentMembership {
+                    MockFamilyDashboardView(
+                        family: family,
+                        currentUserId: user.id,
+                        currentUserRole: membership.role
+                    )
+                } else {
+                    FamilyDashboardPlaceholderView()
+                }
+                
+            case .schoolRun:
+                // School run view
+                SchoolRunView()
+                
+            case .shopping:
+                // Shopping view
+                ShoppingView()
+                
+            case .tasks:
+                // Tasks view
+                if let user = appState.currentUser,
+                   let membership = appState.currentMembership {
+                    TasksView(
+                        currentUserId: user.id,
+                        currentUserRole: membership.role
+                    )
+                } else {
+                    TasksPlaceholderView()
+                }
+            }
+        }
+        .transition(
+            .asymmetric(
+                insertion: .move(edge: .trailing).combined(with: .opacity),
+                removal: .move(edge: .leading).combined(with: .opacity)
+            )
+        )
+        .animation(DesignSystem.Animation.smooth, value: appState.selectedNavigationTab)
+    }
+    
+    /// Handle tab selection with enhanced navigation coordination
+    private func handleTabSelection(_ tab: NavigationTab) {
+        // Skip if already selected
+        guard appState.selectedNavigationTab != tab else {
+            // Light haptic for already selected tab
+            HapticManager.shared.lightImpact()
+            return
+        }
+        
+        // Enhanced haptic feedback sequence
+        HapticManager.shared.selection()
+        
+        // Coordinated animation sequence
+        withAnimation(DesignSystem.Animation.smooth) {
+            appState.handleTabSelection(tab)
+        }
+        
+        // Additional success feedback after transition
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            HapticManager.shared.lightImpact()
+        }
+    }
+    
+    /// Get destination view for navigation
+    @ViewBuilder
+    private func destinationView(for tab: NavigationTab) -> some View {
+        switch tab {
+        case .home:
+            if let user = appState.currentUser,
+               let family = appState.currentFamily,
+               let membership = appState.currentMembership {
+                MockFamilyDashboardView(
+                    family: family,
+                    currentUserId: user.id,
+                    currentUserRole: membership.role
+                )
+            } else {
+                FamilyDashboardPlaceholderView()
+            }
+            
+        case .schoolRun:
+            SchoolRunView()
+            
+        case .shopping:
+            ShoppingView()
+            
+        case .tasks:
+            if let user = appState.currentUser,
+               let membership = appState.currentMembership {
+                TasksView(
+                    currentUserId: user.id,
+                    currentUserRole: membership.role
+                )
+            } else {
+                TasksPlaceholderView()
+            }
         }
     }
     
@@ -389,6 +515,32 @@ struct CreateFamilyPlaceholderView: View {
                 ToastManager.shared.showMockFamilyCreated()
             }
         }
+    }
+}
+
+/// Placeholder for tasks view when user data is not available
+struct TasksPlaceholderView: View {
+    var body: some View {
+        VStack(spacing: DesignSystem.Spacing.xl) {
+            Image(systemName: "checkmark.circle")
+                .font(.system(size: 64))
+                .foregroundColor(.brandPrimary)
+                .accessibilityHidden(true)
+            
+            Text("Tasks")
+                .headlineLarge()
+                .foregroundColor(.primary)
+            
+            Text("Sign in to view your family tasks")
+                .bodyMedium()
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+            
+            Spacer()
+        }
+        .padding()
+        .navigationTitle("Tasks")
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
 

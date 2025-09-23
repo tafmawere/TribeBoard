@@ -85,6 +85,20 @@ struct AnimationUtilities {
     /// Slide up animation for sheets
     static let slideUp = Animation.spring(response: 0.5, dampingFraction: 0.8)
     
+    // MARK: - Navigation Animations
+    
+    /// Navigation tab selection animation
+    static let tabSelection = Animation.spring(response: 0.4, dampingFraction: 0.7)
+    
+    /// Navigation container entrance animation
+    static let navigationEntrance = Animation.spring(response: 0.6, dampingFraction: 0.8)
+    
+    /// Navigation item bounce animation
+    static let navigationBounce = Animation.spring(response: 0.3, dampingFraction: 0.6)
+    
+    /// Navigation view transition animation
+    static let viewTransition = Animation.easeInOut(duration: 0.4)
+    
     // MARK: - Error Animations
     
     /// Shake animation for validation errors
@@ -287,6 +301,40 @@ struct FloatingAnimation: ViewModifier {
     }
 }
 
+/// Navigation selection animation modifier
+struct NavigationSelectionAnimation: ViewModifier {
+    let isSelected: Bool
+    let hapticFeedback: Bool
+    @State private var scale: CGFloat = 1.0
+    @State private var brightness: Double = 0.0
+    
+    func body(content: Content) -> some View {
+        content
+            .scaleEffect(scale)
+            .brightness(brightness)
+            .onChange(of: isSelected) { _, newValue in
+                if newValue {
+                    // Selection animation sequence
+                    withAnimation(AnimationUtilities.tabSelection) {
+                        scale = 1.05
+                        brightness = 0.1
+                    }
+                    
+                    // Return to normal with slight delay
+                    withAnimation(AnimationUtilities.tabSelection.delay(0.1)) {
+                        scale = 1.0
+                        brightness = 0.0
+                    }
+                    
+                    // Haptic feedback
+                    if hapticFeedback {
+                        HapticManager.shared.selection()
+                    }
+                }
+            }
+    }
+}
+
 // MARK: - View Extensions
 
 extension View {
@@ -318,6 +366,11 @@ extension View {
     /// Applies floating animation for subtle movement
     func floatingAnimation(isAnimating: Bool) -> some View {
         modifier(FloatingAnimation(isAnimating: isAnimating))
+    }
+    
+    /// Applies navigation selection animation
+    func navigationSelectionAnimation(isSelected: Bool, hapticFeedback: Bool = true) -> some View {
+        modifier(NavigationSelectionAnimation(isSelected: isSelected, hapticFeedback: hapticFeedback))
     }
     
     /// Applies standard page transition

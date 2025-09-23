@@ -48,48 +48,6 @@
 			<key>uniqueIdentifier</key>
 			<string>06E963B5-930C-49FA-AEBB-D61C3904E4D1</string>
 		</dict>
-		<key>74159096-7546-420A-BF2D-B5D5B102380F</key>
-		<dict>
-			<key>className</key>
-			<string>IDECommandLineBuildLog</string>
-			<key>documentTypeString</key>
-			<string>&lt;nil&gt;</string>
-			<key>domainType</key>
-			<string>Xcode.IDEActivityLogDomainType.BuildLog</string>
-			<key>fileName</key>
-			<string>74159096-7546-420A-BF2D-B5D5B102380F.xcactivitylog</string>
-			<key>hasPrimaryLog</key>
-			<true/>
-			<key>primaryObservable</key>
-			<dict>
-				<key>highLevelStatus</key>
-				<string>S</string>
-				<key>totalNumberOfAnalyzerIssues</key>
-				<integer>0</integer>
-				<key>totalNumberOfErrors</key>
-				<integer>0</integer>
-				<key>totalNumberOfTestFailures</key>
-				<integer>0</integer>
-				<key>totalNumberOfWarnings</key>
-				<integer>0</integer>
-			</dict>
-			<key>schemeIdentifier-containerName</key>
-			<string>TribeBoard project</string>
-			<key>schemeIdentifier-schemeName</key>
-			<string>TribeBoard</string>
-			<key>schemeIdentifier-sharedScheme</key>
-			<integer>1</integer>
-			<key>signature</key>
-			<string>Cleaning project TribeBoard with scheme TribeBoard</string>
-			<key>timeStartedRecording</key>
-			<real>779789963.65823495</real>
-			<key>timeStoppedRecording</key>
-			<real>779789964.01491296</real>
-			<key>title</key>
-			<string>Cleaning project TribeBoard with scheme TribeBoard</string>
-			<key>uniqueIdentifier</key>
-			<string>74159096-7546-420A-BF2D-B5D5B102380F</string>
-		</dict>
 	</dict>
 </dict>
 </plist>
