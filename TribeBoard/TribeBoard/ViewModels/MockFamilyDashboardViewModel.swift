@@ -48,6 +48,9 @@ class MockFamilyDashboardViewModel: ObservableObject {
     /// Show school run view
     @Published var showSchoolRunView = false
     
+    /// Show settings view
+    @Published var showSettingsView = false
+    
     // MARK: - Dashboard Widget Data
     
     /// Recent calendar events for dashboard widget
@@ -195,6 +198,11 @@ class MockFamilyDashboardViewModel: ObservableObject {
     /// Show messages view
     func showMessages() {
         showMessagesView = true
+    }
+    
+    /// Show settings view
+    func showSettings() {
+        showSettingsView = true
     }
     
     /// Clear success message

@@ -43,7 +43,7 @@ struct CalendarEvent {
 }
 
 /// Family task for prototype
-struct FamilyTask {
+struct FamilyTask: Codable {
     let id: UUID
     let title: String
     let description: String?
@@ -55,7 +55,7 @@ struct FamilyTask {
     let category: TaskCategory
     let createdAt: Date
     
-    enum TaskStatus: String, CaseIterable {
+    enum TaskStatus: String, CaseIterable, Codable {
         case pending = "pending"
         case inProgress = "in_progress"
         case completed = "completed"
@@ -80,7 +80,7 @@ struct FamilyTask {
         }
     }
     
-    enum TaskCategory: String, CaseIterable {
+    enum TaskCategory: String, CaseIterable, Codable {
         case chores = "chores"
         case homework = "homework"
         case personal = "personal"
@@ -107,7 +107,7 @@ struct FamilyTask {
 }
 
 /// Family message for prototype
-struct FamilyMessage {
+struct FamilyMessage: Codable {
     let id: UUID
     let content: String
     let sender: UUID
@@ -116,7 +116,7 @@ struct FamilyMessage {
     let isRead: Bool
     let attachmentUrl: URL?
     
-    enum MessageType: String, CaseIterable {
+    enum MessageType: String, CaseIterable, Codable {
         case text = "text"
         case announcement = "announcement"
         case photo = "photo"
@@ -166,7 +166,7 @@ struct NoticeboardPost {
 }
 
 /// School run data for prototype
-struct SchoolRun {
+struct SchoolRun: Codable {
     let id: UUID
     let route: String
     let pickupTime: Date
@@ -176,7 +176,7 @@ struct SchoolRun {
     let status: RunStatus
     let notes: String?
     
-    enum RunStatus: String, CaseIterable {
+    enum RunStatus: String, CaseIterable, Codable {
         case scheduled = "scheduled"
         case inProgress = "in_progress"
         case completed = "completed"
@@ -231,8 +231,8 @@ struct SchoolRunNotification {
     }
 }
 
-/// Mock error scenarios for prototype
-struct MockError {
+/// Mock error data structure for prototype
+struct MockErrorData {
     let type: ErrorType
     let title: String
     let message: String
@@ -260,7 +260,7 @@ struct MockError {
 }
 
 /// User journey scenarios for prototype
-enum UserJourneyScenario: String, CaseIterable {
+enum UserJourneyScenario: String, CaseIterable, Codable {
     case newUser = "new_user"
     case existingUser = "existing_user"
     case familyAdmin = "family_admin"
@@ -421,6 +421,175 @@ struct MockDataGenerator {
             "abc123",    // Valid but lowercase
             "123ABC"     // Valid numbers first
         ]
+    }
+    
+    // MARK: - Demo-Specific Data Generation
+    
+    /// Generates comprehensive demo data that showcases all app features
+    static func mockDemoShowcaseData() -> DemoShowcaseData {
+        let (family, users, memberships) = mockMawereFamily()
+        
+        return DemoShowcaseData(
+            family: family,
+            users: users,
+            memberships: memberships,
+            calendarEvents: mockCalendarEvents(),
+            tasks: mockFamilyTasks(),
+            messages: mockFamilyMessages(),
+            noticeboardPosts: mockNoticeboardPosts(),
+            schoolRuns: mockSchoolRuns(),
+            settings: mockFamilySettings(for: family.id)
+        )
+    }
+    
+    /// Generates role-specific mock data for different user experiences
+    static func mockDataForRole(_ role: Role) -> (
+        calendarEvents: [CalendarEvent],
+        tasks: [FamilyTask],
+        messages: [FamilyMessage],
+        schoolRuns: [SchoolRun]
+    ) {
+        let allEvents = mockCalendarEvents()
+        let allTasks = mockFamilyTasks()
+        let allMessages = mockFamilyMessages()
+        let allSchoolRuns = mockSchoolRuns()
+        
+        switch role {
+        case .parentAdmin:
+            // Admins see everything
+            return (allEvents, allTasks, allMessages, allSchoolRuns)
+            
+        case .adult:
+            // Adults see most things but not admin-specific tasks
+            let filteredTasks = allTasks.filter { $0.category != .family || $0.points <= 15 }
+            return (allEvents, filteredTasks, allMessages, allSchoolRuns)
+            
+        case .kid:
+            // Kids see only their own tasks and family events
+            let (_, users, _) = mockMawereFamily()
+            let childUserId = users[2].id // Ethan
+            let filteredEvents = allEvents.filter { $0.participants.contains(childUserId) || $0.type == .familyActivity }
+            let filteredTasks = allTasks.filter { $0.assignedTo == childUserId }
+            let filteredMessages = allMessages.filter { $0.type != .announcement || $0.sender == childUserId }
+            let filteredSchoolRuns = allSchoolRuns.filter { $0.passengers.contains(childUserId) }
+            
+            return (filteredEvents, filteredTasks, filteredMessages, filteredSchoolRuns)
+            
+        case .visitor:
+            // Visitors see limited information
+            let publicEvents = allEvents.filter { $0.type == .familyActivity || $0.type == .birthday }
+            let publicMessages = allMessages.filter { $0.type == .announcement }
+            
+            return (publicEvents, [], publicMessages, [])
+        }
+    }
+    
+    /// Generates demo data for specific user journey scenarios
+    static func mockDataForDemoScenario(_ scenario: DemoScenario) -> DemoScenarioData {
+        let (family, users, memberships) = mockMawereFamily()
+        
+        switch scenario {
+        case .newUserOnboarding:
+            return DemoScenarioData(
+                family: family,
+                users: users,
+                memberships: memberships,
+                currentUser: users[0], // Start as admin for demo
+                calendarEvents: [],
+                tasks: [],
+                messages: [],
+                schoolRuns: []
+            )
+            
+        case .existingUserLogin:
+            return DemoScenarioData(
+                family: family,
+                users: users,
+                memberships: memberships,
+                currentUser: users[1], // Grace - existing adult user
+                calendarEvents: mockCalendarEvents(),
+                tasks: mockFamilyTasks(),
+                messages: mockFamilyMessages(),
+                schoolRuns: mockSchoolRuns()
+            )
+            
+        case .familyAdminTasks:
+            return DemoScenarioData(
+                family: family,
+                users: users,
+                memberships: memberships,
+                currentUser: users[0], // Tafadzwa - admin
+                calendarEvents: mockCalendarEvents(),
+                tasks: mockFamilyTasks(),
+                messages: mockFamilyMessages(),
+                schoolRuns: mockSchoolRuns()
+            )
+            
+        case .childUserExperience:
+            let childData = mockDataForRole(.kid)
+            return DemoScenarioData(
+                family: family,
+                users: users,
+                memberships: memberships,
+                currentUser: users[2], // Ethan - child user
+                calendarEvents: childData.calendarEvents,
+                tasks: childData.tasks,
+                messages: childData.messages,
+                schoolRuns: childData.schoolRuns
+            )
+            
+        case .completeFeatureTour:
+            return DemoScenarioData(
+                family: family,
+                users: users,
+                memberships: memberships,
+                currentUser: users[0], // Admin for full access
+                calendarEvents: mockCalendarEvents(),
+                tasks: mockFamilyTasks(),
+                messages: mockFamilyMessages(),
+                schoolRuns: mockSchoolRuns()
+            )
+        }
+    }
+    
+    /// Generates mock family settings
+    static func mockFamilySettings(for familyId: UUID) -> FamilySettings {
+        let calendar = Calendar.current
+        let quietStart = calendar.date(bySettingHour: 21, minute: 0, second: 0, of: Date())!
+        let quietEnd = calendar.date(bySettingHour: 7, minute: 0, second: 0, of: Date())!
+        
+        return FamilySettings(
+            familyId: familyId,
+            notificationsEnabled: true,
+            quietHoursStart: quietStart,
+            quietHoursEnd: quietEnd,
+            allowChildMessaging: true,
+            requireTaskApproval: false,
+            pointsSystemEnabled: true,
+            maxPointsPerTask: 25
+        )
+    }
+    
+    /// Generates mock error scenarios for demo purposes
+    static func mockErrorScenarios() -> [MockErrorScenario] {
+        return [
+            .networkOutage,
+            .authenticationIssues,
+            .validationProblems,
+            .permissionDenials,
+            .syncConflicts,
+            .prototypeDemo
+        ]
+    }
+    
+    /// Generates demo reset data to return app to initial state
+    static func mockInitialDemoState() -> DemoResetData {
+        return DemoResetData(
+            shouldClearUserData: true,
+            shouldResetToOnboarding: true,
+            shouldClearNotifications: true,
+            defaultScenario: .newUserOnboarding
+        )
     }
     
     // MARK: - Calendar Events Mock Data
@@ -918,48 +1087,7 @@ struct MockDataGenerator {
     }
     
     // MARK: - Error Scenarios
-    
-    /// Provides comprehensive mock error scenarios for testing error handling flows
-    static func mockErrorScenarios() -> [MockError] {
-        return [
-            MockError(
-                type: .network,
-                title: "No Internet Connection",
-                message: "Please check your internet connection and try again.",
-                recoveryAction: "Retry"
-            ),
-            MockError(
-                type: .authentication,
-                title: "Sign In Failed",
-                message: "Unable to sign in with Apple ID. Please try again.",
-                recoveryAction: "Try Again"
-            ),
-            MockError(
-                type: .validation,
-                title: "Invalid Family Code",
-                message: "The family code you entered is not valid. Please check and try again.",
-                recoveryAction: "Enter Code Again"
-            ),
-            MockError(
-                type: .permission,
-                title: "Access Denied",
-                message: "You don't have permission to perform this action.",
-                recoveryAction: "Contact Family Admin"
-            ),
-            MockError(
-                type: .notFound,
-                title: "Family Not Found",
-                message: "No family found with that code. Please check the code and try again.",
-                recoveryAction: "Try Different Code"
-            ),
-            MockError(
-                type: .serverError,
-                title: "Server Error",
-                message: "Something went wrong on our end. Please try again later.",
-                recoveryAction: "Try Again Later"
-            )
-        ]
-    }
+
     
     /// Provides error scenarios for testing error handling (legacy method)
     static func errorScenarios() -> [(description: String, shouldSucceed: Bool)] {
@@ -985,7 +1113,7 @@ struct MockDataGenerator {
         messages: [FamilyMessage],
         schoolRuns: [SchoolRun],
         settings: FamilySettings,
-        errors: [MockError]
+        errors: [MockErrorScenario]
     ) {
         let (family, users, memberships) = mockMawereFamily()
         
@@ -1001,45 +1129,7 @@ struct MockDataGenerator {
             errors: mockErrorScenarios()
         )
     }
-    
-    /// Generates mock data filtered by user role for appropriate access levels
-    static func mockDataForRole(_ role: Role) -> (
-        calendarEvents: [CalendarEvent],
-        tasks: [FamilyTask],
-        messages: [FamilyMessage],
-        schoolRuns: [SchoolRun]
-    ) {
-        let allEvents = mockCalendarEvents()
-        let allTasks = mockFamilyTasks()
-        let allMessages = mockFamilyMessages()
-        let allSchoolRuns = mockSchoolRuns()
-        
-        switch role {
-        case .parentAdmin, .adult:
-            // Full access to all data
-            return (allEvents, allTasks, allMessages, allSchoolRuns)
-            
-        case .kid:
-            // Limited access - only their own tasks and family events
-            let (_, users, _) = mockMawereFamily()
-            let kidIds = users.filter { user in
-                // Assuming Ethan and Zoe are kids (indices 2 and 3)
-                return user.displayName.contains("Ethan") || user.displayName.contains("Zoe")
-            }.map { $0.id }
-            
-            let kidTasks = allTasks.filter { kidIds.contains($0.assignedTo) }
-            let familyEvents = allEvents.filter { $0.type == .familyActivity || $0.type == .birthday }
-            
-            return (familyEvents, kidTasks, allMessages, allSchoolRuns)
-            
-        case .visitor:
-            // Very limited access - only announcements and family activities
-            let visitorEvents = allEvents.filter { $0.type == .familyActivity }
-            let visitorMessages = allMessages.filter { $0.type == .announcement }
-            
-            return (visitorEvents, [], visitorMessages, [])
-        }
-    }
+
 }
 
 // MARK: - Preview Helpers
@@ -1067,3 +1157,92 @@ extension MockDataGenerator {
     static let previewVisitorData = mockDataForRole(.visitor)
 }
 #endif
+
+// MARK: - Demo Data Structures
+
+/// Comprehensive demo data that showcases all app features
+struct DemoShowcaseData {
+    let family: Family
+    let users: [UserProfile]
+    let memberships: [Membership]
+    let calendarEvents: [CalendarEvent]
+    let tasks: [FamilyTask]
+    let messages: [FamilyMessage]
+    let noticeboardPosts: [NoticeboardPost]
+    let schoolRuns: [SchoolRun]
+    let settings: FamilySettings
+}
+
+/// Demo scenario-specific data
+struct DemoScenarioData {
+    let family: Family
+    let users: [UserProfile]
+    let memberships: [Membership]
+    let currentUser: UserProfile
+    let calendarEvents: [CalendarEvent]
+    let tasks: [FamilyTask]
+    let messages: [FamilyMessage]
+    let schoolRuns: [SchoolRun]
+}
+
+/// Demo reset configuration
+struct DemoResetData {
+    let shouldClearUserData: Bool
+    let shouldResetToOnboarding: Bool
+    let shouldClearNotifications: Bool
+    let defaultScenario: DemoScenario
+}
+
+/// Demo scenario types for guided tours
+enum DemoScenario: String, CaseIterable {
+    case newUserOnboarding = "new_user_onboarding"
+    case existingUserLogin = "existing_user_login"
+    case familyAdminTasks = "family_admin_tasks"
+    case childUserExperience = "child_user_experience"
+    case completeFeatureTour = "complete_feature_tour"
+    
+    var displayName: String {
+        switch self {
+        case .newUserOnboarding:
+            return "New User Onboarding"
+        case .existingUserLogin:
+            return "Existing User Login"
+        case .familyAdminTasks:
+            return "Family Admin Tasks"
+        case .childUserExperience:
+            return "Child User Experience"
+        case .completeFeatureTour:
+            return "Complete Feature Tour"
+        }
+    }
+    
+    var description: String {
+        switch self {
+        case .newUserOnboarding:
+            return "Experience the complete onboarding flow for first-time users, from sign-in to family creation."
+        case .existingUserLogin:
+            return "See how returning users quickly access their family dashboard with existing data."
+        case .familyAdminTasks:
+            return "Explore admin features for managing family members, settings, and permissions."
+        case .childUserExperience:
+            return "View the app from a child's perspective with age-appropriate features and restrictions."
+        case .completeFeatureTour:
+            return "Tour all major features and modules of the TribeBoard app in a comprehensive walkthrough."
+        }
+    }
+    
+    var estimatedDuration: TimeInterval {
+        switch self {
+        case .newUserOnboarding:
+            return 120 // 2 minutes
+        case .existingUserLogin:
+            return 30 // 30 seconds
+        case .familyAdminTasks:
+            return 180 // 3 minutes
+        case .childUserExperience:
+            return 150 // 2.5 minutes
+        case .completeFeatureTour:
+            return 300 // 5 minutes
+        }
+    }
+}

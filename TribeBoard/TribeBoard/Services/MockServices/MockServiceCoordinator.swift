@@ -110,17 +110,17 @@ class MockServiceCoordinator: ObservableObject {
     /// Configure services for specific demo scenario
     func configureDemoScenario(_ scenario: DemoScenario) {
         switch scenario {
-        case .newUser:
+        case .newUserOnboarding:
             // Start with unauthenticated state
             authService.setMockAuthenticationState(authenticated: false)
             
-        case .existingUser:
+        case .existingUserLogin:
             // Start with authenticated state and existing family
             if let mockUser = dataService.getMockUsers().first {
                 authService.setMockAuthenticationState(authenticated: true, user: mockUser)
             }
             
-        case .familyAdmin:
+        case .familyAdminTasks:
             // Start as authenticated parent admin
             let adminUser = UserProfile(
                 displayName: "Admin User",
@@ -128,27 +128,62 @@ class MockServiceCoordinator: ObservableObject {
             )
             authService.setMockAuthenticationState(authenticated: true, user: adminUser)
             
-        case .childUser:
+        case .childUserExperience:
             // Start as authenticated child
             if let childUser = dataService.getMockUsers().first(where: { $0.displayName.contains("Alex") }) {
                 authService.setMockAuthenticationState(authenticated: true, user: childUser)
             }
+            
+        case .completeFeatureTour:
+            // Start as authenticated admin for full access
+            let adminUser = UserProfile(
+                displayName: "Tour User",
+                appleUserIdHash: "mock_tour_hash"
+            )
+            authService.setMockAuthenticationState(authenticated: true, user: adminUser)
         }
     }
     
     /// Simulate various error scenarios for demo
     func simulateErrorScenario(_ errorType: MockErrorScenario) {
         switch errorType {
+        case .networkOutage:
+            cloudKitService.simulateNetworkError()
+            
         case .networkError:
             cloudKitService.simulateNetworkError()
             
+        case .syncConflicts:
+            cloudKitService.simulateSyncConflict()
+            
         case .syncConflict:
             cloudKitService.simulateSyncConflict()
+            
+        case .authenticationIssues:
+            Task {
+                try? await authService.signOut()
+            }
             
         case .authenticationError:
             Task {
                 try? await authService.signOut()
             }
+            
+        case .validationProblems:
+            // Simulate validation errors
+            print("Simulating validation problems")
+            
+        case .permissionDenials:
+            // Simulate permission errors
+            print("Simulating permission denials")
+            
+        case .mixedErrors:
+            // Simulate a mix of different errors
+            print("Simulating mixed error scenarios")
+            
+        case .prototypeDemo:
+            // Simulate prototype-specific demo errors
+            print("Simulating prototype demo errors")
         }
     }
     
@@ -176,21 +211,10 @@ class MockServiceCoordinator: ObservableObject {
 }
 
 // MARK: - Demo Scenarios
-
-enum DemoScenario {
-    case newUser
-    case existingUser
-    case familyAdmin
-    case childUser
-}
+// DemoScenario is defined in TribeBoard/Models/MockDataGenerator.swift
 
 // MARK: - Mock Error Scenarios
-
-enum MockErrorScenario {
-    case networkError
-    case syncConflict
-    case authenticationError
-}
+// MockErrorScenario is defined in TribeBoard/Models/MockErrorTypes.swift
 
 // MARK: - Mock Sync Manager
 

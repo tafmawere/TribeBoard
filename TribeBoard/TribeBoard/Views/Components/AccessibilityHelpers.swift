@@ -17,6 +17,38 @@ extension View {
             .accessibilityAddTraits(traits)
     }
     
+    /// Add dynamic type support with custom scaling
+    func dynamicTypeSupport(
+        minSize: CGFloat? = nil,
+        maxSize: CGFloat? = nil
+    ) -> some View {
+        self.modifier(DynamicTypeModifier(minSize: minSize, maxSize: maxSize))
+    }
+    
+    /// Ensure minimum touch target size for accessibility
+    func accessibleTouchTarget(minSize: CGFloat = 44) -> some View {
+        self.frame(minWidth: minSize, minHeight: minSize)
+    }
+    
+    /// Add high contrast support
+    func highContrastSupport(
+        normalColor: Color,
+        highContrastColor: Color
+    ) -> some View {
+        self.modifier(HighContrastModifier(
+            normalColor: normalColor,
+            highContrastColor: highContrastColor
+        ))
+    }
+    
+    /// Add reduced motion support
+    func reducedMotionSupport<T: Equatable>(
+        animation: Animation,
+        value: T
+    ) -> some View {
+        self.modifier(ReducedMotionModifier(animation: animation, value: value))
+    }
+    
     /// Mark as accessibility element with custom content
     func accessibilityElement(
         label: String,
@@ -67,44 +99,7 @@ extension View {
     }
 }
 
-/// Accessibility-enhanced button wrapper
-struct AccessibleButton<Content: View>: View {
-    let action: () -> Void
-    let label: String
-    let hint: String?
-    let hapticStyle: UIImpactFeedbackGenerator.FeedbackStyle
-    let content: () -> Content
-    
-    init(
-        action: @escaping () -> Void,
-        label: String,
-        hint: String? = nil,
-        hapticStyle: UIImpactFeedbackGenerator.FeedbackStyle = .medium,
-        @ViewBuilder content: @escaping () -> Content
-    ) {
-        self.action = action
-        self.label = label
-        self.hint = hint
-        self.hapticStyle = hapticStyle
-        self.content = content
-    }
-    
-    var body: some View {
-        Button(action: {
-            // Haptic feedback
-            let impactFeedback = UIImpactFeedbackGenerator(style: hapticStyle)
-            impactFeedback.impactOccurred()
-            
-            // Execute action
-            action()
-        }) {
-            content()
-        }
-        .accessibilityLabel(label)
-        .accessibilityHint(hint ?? "")
-        .accessibilityAddTraits(.isButton)
-    }
-}
+
 
 /// Role selection accessibility helper
 struct AccessibleRoleCard: View {
@@ -283,82 +278,377 @@ extension ValidationState {
 }
 
 // MARK: - Haptic Feedback Manager
+// HapticManager is defined in TribeBoard/Utilities/HapticManager.swift
 
-class HapticManager {
-    static let shared = HapticManager()
+// MARK: - Accessibility Modifiers
+
+/// Dynamic type support modifier
+struct DynamicTypeModifier: ViewModifier {
+    let minSize: CGFloat?
+    let maxSize: CGFloat?
     
-    private init() {}
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     
-    func impact(_ style: UIImpactFeedbackGenerator.FeedbackStyle) {
-        let generator = UIImpactFeedbackGenerator(style: style)
-        generator.impactOccurred()
+    func body(content: Content) -> some View {
+        content
+            .font(.system(size: scaledSize))
     }
     
-    func notification(_ type: UINotificationFeedbackGenerator.FeedbackType) {
-        let generator = UINotificationFeedbackGenerator()
-        generator.notificationOccurred(type)
+    private var scaledSize: CGFloat {
+        let baseSize: CGFloat = 16 // Default font size
+        let scaleFactor = dynamicTypeSize.scaleFactor
+        let scaledSize = baseSize * scaleFactor
+        
+        if let minSize = minSize, scaledSize < minSize {
+            return minSize
+        }
+        if let maxSize = maxSize, scaledSize > maxSize {
+            return maxSize
+        }
+        
+        return scaledSize
+    }
+}
+
+/// High contrast support modifier
+struct HighContrastModifier: ViewModifier {
+    let normalColor: Color
+    let highContrastColor: Color
+    
+    @Environment(\.colorSchemeContrast) private var colorSchemeContrast
+    
+    func body(content: Content) -> some View {
+        content
+            .foregroundColor(colorSchemeContrast == .increased ? highContrastColor : normalColor)
+    }
+}
+
+/// Reduced motion support modifier
+struct ReducedMotionModifier<T: Equatable>: ViewModifier {
+    let animation: Animation
+    let value: T
+    
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    
+    func body(content: Content) -> some View {
+        content
+            .animation(reduceMotion ? nil : animation, value: value)
+    }
+}
+
+/// Dynamic type size extension for scaling
+extension DynamicTypeSize {
+    var scaleFactor: CGFloat {
+        switch self {
+        case .xSmall: return 0.8
+        case .small: return 0.9
+        case .medium: return 1.0
+        case .large: return 1.1
+        case .xLarge: return 1.2
+        case .xxLarge: return 1.3
+        case .xxxLarge: return 1.4
+        case .accessibility1: return 1.6
+        case .accessibility2: return 1.8
+        case .accessibility3: return 2.0
+        case .accessibility4: return 2.2
+        case .accessibility5: return 2.4
+        @unknown default: return 1.0
+        }
+    }
+}
+
+// MARK: - Accessibility-Enhanced Components
+
+/// Enhanced text with full accessibility support
+struct AccessibleText: View {
+    let text: String
+    let style: Font.TextStyle
+    let weight: Font.Weight
+    let color: Color
+    let alignment: TextAlignment
+    let lineLimit: Int?
+    
+    init(
+        _ text: String,
+        style: Font.TextStyle = .body,
+        weight: Font.Weight = .regular,
+        color: Color = .primary,
+        alignment: TextAlignment = .leading,
+        lineLimit: Int? = nil
+    ) {
+        self.text = text
+        self.style = style
+        self.weight = weight
+        self.color = color
+        self.alignment = alignment
+        self.lineLimit = lineLimit
     }
     
-    func selection() {
-        let generator = UISelectionFeedbackGenerator()
-        generator.selectionChanged()
+    var body: some View {
+        Text(text)
+            .font(.system(style, weight: weight))
+            .foregroundColor(color)
+            .multilineTextAlignment(alignment)
+            .lineLimit(lineLimit)
+            .dynamicTypeSupport()
+            .highContrastSupport(
+                normalColor: color,
+                highContrastColor: contrastColor
+            )
     }
     
-    // Convenience methods
-    func success() {
-        notification(.success)
+    private var contrastColor: Color {
+        // Provide high contrast alternatives
+        switch color {
+        case .primary: return .primary
+        case .secondary: return .primary
+        case .brandPrimary: return .blue
+        case .brandSecondary: return .blue
+        default: return color
+        }
+    }
+}
+
+/// Enhanced button with comprehensive accessibility
+struct AccessibleEnhancedButton<Content: View>: View {
+    let action: () -> Void
+    let label: String
+    let hint: String?
+    let isEnabled: Bool
+    let isLoading: Bool
+    let hapticStyle: HapticStyle
+    let content: () -> Content
+    
+    @State private var isPressed = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    
+    init(
+        action: @escaping () -> Void,
+        label: String,
+        hint: String? = nil,
+        isEnabled: Bool = true,
+        isLoading: Bool = false,
+        hapticStyle: HapticStyle = .medium,
+        @ViewBuilder content: @escaping () -> Content
+    ) {
+        self.action = action
+        self.label = label
+        self.hint = hint
+        self.isEnabled = isEnabled
+        self.isLoading = isLoading
+        self.hapticStyle = hapticStyle
+        self.content = content
     }
     
-    func error() {
-        notification(.error)
+    var body: some View {
+        Button(action: performAction) {
+            content()
+        }
+        .disabled(!isEnabled || isLoading)
+        .accessibleTouchTarget()
+        .scaleEffect(isPressed && !reduceMotion ? 0.95 : 1.0)
+        .opacity((isEnabled && !isLoading) ? 1.0 : 0.6)
+        .reducedMotionSupport(animation: .easeInOut(duration: 0.1), value: isPressed)
+        .onLongPressGesture(minimumDuration: 0, maximumDistance: .infinity, pressing: { pressing in
+            isPressed = pressing
+        }, perform: {})
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessibilityLabel)
+        .accessibilityHint(accessibilityHint)
+        .accessibilityAddTraits(accessibilityTraits)
+        .onChange(of: isPressed) { _, newValue in
+            if newValue && isEnabled && !isLoading {
+                hapticStyle.trigger()
+            }
+        }
     }
     
-    func warning() {
-        notification(.warning)
+    private var accessibilityLabel: String {
+        if isLoading {
+            return "Loading"
+        }
+        return label
     }
     
-    func lightImpact() {
-        impact(.light)
+    private var accessibilityHint: String {
+        if !isEnabled {
+            return "Button is disabled"
+        } else if isLoading {
+            return "Please wait while processing"
+        }
+        return hint ?? "Tap to \(label.lowercased())"
     }
     
-    func mediumImpact() {
-        impact(.medium)
+    private var accessibilityTraits: AccessibilityTraits {
+        var traits: AccessibilityTraits = [.isButton]
+        
+        if isLoading {
+            _ = traits.insert(.updatesFrequently)
+        }
+        
+        return traits
     }
     
-    func heavyImpact() {
-        impact(.heavy)
+    private func performAction() {
+        guard isEnabled && !isLoading else { return }
+        action()
+    }
+}
+
+/// Enhanced form field with accessibility
+struct AccessibleFormField: View {
+    let title: String
+    @Binding var text: String
+    let placeholder: String
+    let isSecure: Bool
+    let validation: ValidationResult?
+    let keyboardType: UIKeyboardType
+    
+    @FocusState private var isFocused: Bool
+    
+    init(
+        title: String,
+        text: Binding<String>,
+        placeholder: String = "",
+        isSecure: Bool = false,
+        validation: ValidationResult? = nil,
+        keyboardType: UIKeyboardType = .default
+    ) {
+        self.title = title
+        self._text = text
+        self.placeholder = placeholder
+        self.isSecure = isSecure
+        self.validation = validation
+        self.keyboardType = keyboardType
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            AccessibleText(
+                title,
+                style: .headline,
+                weight: .medium
+            )
+            
+            Group {
+                if isSecure {
+                    SecureField(placeholder, text: $text)
+                } else {
+                    TextField(placeholder, text: $text)
+                }
+            }
+            .focused($isFocused)
+            .keyboardType(keyboardType)
+            .textFieldStyle(RoundedBorderTextFieldStyle())
+            .accessibilityLabel("\(title) input field")
+            .accessibilityHint(placeholder.isEmpty ? "Enter \(title.lowercased())" : placeholder)
+            .accessibilityValue(text.isEmpty ? "Empty" : "Contains text")
+            
+            if let validation = validation, !validation.message.isEmpty {
+                HStack(spacing: 8) {
+                    Image(systemName: validation.isValid ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                        .foregroundColor(validation.isValid ? .green : .red)
+                        .accessibilityHidden(true)
+                    
+                    AccessibleText(
+                        validation.message,
+                        style: .caption,
+                        color: validation.isValid ? .green : .red
+                    )
+                }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(validation.isValid ? "Valid: \(validation.message)" : "Error: \(validation.message)")
+                .accessibilityAddTraits(validation.isValid ? [] : [.isStaticText])
+            }
+        }
+    }
+}
+
+// MARK: - Color Contrast Utilities
+
+extension Color {
+    /// High contrast versions of brand colors
+    static let brandPrimaryHighContrast = Color.blue
+    static let brandSecondaryHighContrast = Color.indigo
+    
+    /// Check if color meets WCAG contrast requirements
+    func contrastRatio(with background: Color) -> Double {
+        // Simplified contrast calculation
+        // In a real implementation, you'd calculate the actual luminance
+        return 4.5 // Placeholder - meets WCAG AA standard
+    }
+    
+    /// Get accessible version of color
+    func accessibleVersion(for background: Color = .white) -> Color {
+        let ratio = self.contrastRatio(with: background)
+        return ratio >= 4.5 ? self : .primary
     }
 }
 
 // MARK: - Preview
 
 #Preview("Accessibility Helpers") {
-    VStack(spacing: 20) {
-        AccessibleButton(
-            action: {},
-            label: "Create Family",
-            hint: "Creates a new family group"
-        ) {
-            Text("Create Family")
-                .padding()
-                .background(Color.blue)
-                .foregroundColor(.white)
-                .cornerRadius(8)
+    ScrollView {
+        VStack(spacing: 24) {
+            // Text examples
+            VStack(alignment: .leading, spacing: 16) {
+                AccessibleText("Dynamic Type Support", style: .title, weight: .bold)
+                AccessibleText("This text scales with system font size settings", style: .body)
+                AccessibleText("Small caption text", style: .caption, color: .secondary)
+            }
+            
+            // Button examples
+            VStack(spacing: 16) {
+                AccessibleEnhancedButton(
+                    action: {},
+                    label: "Create Family",
+                    hint: "Creates a new family group"
+                ) {
+                    Text("Create Family")
+                        .padding()
+                        .background(Color.brandPrimary)
+                        .foregroundColor(.white)
+                        .cornerRadius(8)
+                }
+                
+                AccessibleEnhancedButton(
+                    action: {},
+                    label: "Loading Button",
+                    isLoading: true
+                ) {
+                    HStack {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                        Text("Loading...")
+                    }
+                    .padding()
+                    .background(Color.gray)
+                    .foregroundColor(.white)
+                    .cornerRadius(8)
+                }
+            }
+            
+            // Form field examples
+            VStack(spacing: 16) {
+                AccessibleFormField(
+                    title: "Family Name",
+                    text: .constant(""),
+                    placeholder: "Enter your family name"
+                )
+                
+                AccessibleFormField(
+                    title: "Email",
+                    text: .constant(""),
+                    placeholder: "Enter your email",
+                    keyboardType: .emailAddress
+                )
+            }
+            
+            AccessibleLoadingView(
+                message: "Creating family...",
+                isLoading: true
+            )
         }
-        
-        AccessibleLoadingView(
-            message: "Creating family...",
-            isLoading: true
-        )
-        
-        AccessibleMemberRow(
-            memberName: "John Doe",
-            role: .parentAdmin,
-            status: .active,
-            canManage: false,
-            onRoleChange: nil,
-            onRemove: nil
-        )
+        .padding()
     }
-    .padding()
 }

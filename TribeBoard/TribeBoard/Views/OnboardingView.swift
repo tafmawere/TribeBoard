@@ -26,27 +26,32 @@ struct OnboardingView: View {
                         VStack(spacing: 32) {
                             TribeBoardLogoWithText(size: .large)
                             
-                            VStack(spacing: 16) {
+                            VStack(spacing: DesignSystem.Spacing.lg) {
                                 Text("Welcome to TribeBoard")
-                                    .font(.title)
-                                    .fontWeight(.bold)
-                                    .foregroundColor(.brandPrimary)
+                                    .headlineLarge()
+                                    .foregroundStyle(
+                                        LinearGradient(
+                                            gradient: Gradient(colors: [.brandPrimary, .brandSecondary]),
+                                            startPoint: .leading,
+                                            endPoint: .trailing
+                                        )
+                                    )
                                     .multilineTextAlignment(.center)
                                 
                                 Text("Connect your family, organize your life")
-                                    .font(.subheadline)
+                                    .bodyLarge()
                                     .foregroundColor(.secondary)
                                     .multilineTextAlignment(.center)
-                                    .padding(.horizontal, 20)
+                                    .screenPadding()
                             }
                         }
                         
                         Spacer(minLength: 32)
                         
                         // Authentication section
-                        VStack(spacing: 24) {
+                        VStack(spacing: DesignSystem.Spacing.xxl) {
                             Text("Sign in to get started")
-                                .font(.title3)
+                                .titleLarge()
                                 .fontWeight(.medium)
                                 .foregroundColor(.primary)
                             

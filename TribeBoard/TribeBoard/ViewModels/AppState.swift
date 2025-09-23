@@ -40,6 +40,12 @@ class AppState: ObservableObject {
     /// Mock service coordinator for prototype
     private var mockServiceCoordinator: MockServiceCoordinator?
     
+    /// Demo journey manager for guided demos
+    @Published var demoJourneyManager: DemoJourneyManager?
+    
+    /// Demo data manager for data lifecycle management
+    @Published var demoDataManager: DemoDataManager?
+    
     /// Flag to indicate if using mock services (always true for prototype)
     private let useMockServices: Bool = true
     
@@ -48,6 +54,7 @@ class AppState: ObservableObject {
     init() {
         // Initialize with mock services for prototype
         setupMockServices()
+        setupDemoManager()
         checkAuthenticationState()
     }
     
@@ -59,6 +66,17 @@ class AppState: ObservableObject {
         
         // Configure initial demo scenario
         configureDemoScenario(.newUser)
+    }
+    
+    /// Setup demo journey manager
+    private func setupDemoManager() {
+        demoJourneyManager = DemoJourneyManager()
+        demoJourneyManager?.setAppState(self)
+        
+        demoDataManager = DemoDataManager()
+        if let demoJourneyManager = demoJourneyManager {
+            demoDataManager?.setDependencies(appState: self, demoJourneyManager: demoJourneyManager)
+        }
     }
     
     /// Configure app for specific demo scenario
@@ -518,8 +536,29 @@ class AppState: ObservableObject {
         errorMessage = nil
         isLoading = false
         
+        // Reset demo manager if active
+        if let demoManager = demoJourneyManager, demoManager.isDemoModeActive {
+            demoManager.stopDemo()
+        }
+        
         // Reset to new user scenario
         configureDemoScenario(.newUser)
+    }
+    
+    /// Start a guided demo journey
+    func startGuidedDemo(_ scenario: DemoScenario) {
+        guard let demoManager = demoJourneyManager else { return }
+        demoManager.startDemoJourney(scenario)
+    }
+    
+    /// Get demo manager for UI access
+    func getDemoManager() -> DemoJourneyManager? {
+        return demoJourneyManager
+    }
+    
+    /// Get demo data manager for UI access
+    func getDemoDataManager() -> DemoDataManager? {
+        return demoDataManager
     }
     
     /// Simulate error scenario for demo
@@ -530,12 +569,26 @@ class AppState: ObservableObject {
         
         // Show appropriate error message
         switch errorType {
+        case .networkOutage:
+            showError("Network outage detected. Please try again later.")
         case .networkError:
             showError("Network connection lost. Please check your internet connection.")
-        case .syncConflict:
-            showError("Sync conflict detected. Some changes may not be saved.")
+        case .authenticationIssues:
+            showError("Authentication issues detected. Please sign in again.")
         case .authenticationError:
             showError("Authentication session expired. Please sign in again.")
+        case .validationProblems:
+            showError("Validation problems detected. Please check your input.")
+        case .permissionDenials:
+            showError("Permission denied. You don't have access to this feature.")
+        case .syncConflicts:
+            showError("Sync conflicts detected. Some changes may not be saved.")
+        case .syncConflict:
+            showError("Sync conflict detected. Some changes may not be saved.")
+        case .mixedErrors:
+            showError("Multiple errors detected. Please try again.")
+        case .prototypeDemo:
+            showError("This is a prototype demo error for testing purposes.")
         }
     }
     
@@ -594,7 +647,7 @@ class AppState: ObservableObject {
 // MARK: - App Flow Enum
 
 /// Represents the main navigation flows in the app
-enum AppFlow: String, CaseIterable {
+enum AppFlow: String, CaseIterable, Codable {
     case onboarding = "onboarding"
     case familySelection = "family_selection"
     case createFamily = "create_family"

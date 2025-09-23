@@ -195,7 +195,8 @@ struct FamilyCodeInputSection: View {
                 if !familyCode.isEmpty {
                     ValidationFeedbackView(
                         state: ValidationRules.familyCode.validate(familyCode),
-                        showSuccess: false
+                        showSuccess: false,
+                        showInstant: true
                     )
                 } else {
                     Text("Family codes are 4-8 characters (letters and numbers)")

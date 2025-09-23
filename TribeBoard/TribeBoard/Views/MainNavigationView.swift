@@ -13,8 +13,11 @@ struct MainNavigationView: View {
         ZStack {
             if showSplashScreen {
                 // Enhanced branded splash screen for prototype
-                PrototypeSplashScreenView(message: "Initializing TribeBoard...")
-                    .transition(.opacity)
+                SplashScreenView()
+                    .transition(AnimationUtilities.fadeTransition)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("TribeBoard app loading")
+                    .accessibilityHint("Please wait while the app loads")
             } else {
                 // Main app content with mock services
                 NavigationStack(path: $appState.navigationPath) {
@@ -59,22 +62,32 @@ struct MainNavigationView: View {
                             }
                         } else {
                             // Show loading state during mock service initialization
-                            LoadingStateView()
+                            LoadingStateView(
+                                message: "Initializing TribeBoard...",
+                                style: .overlay,
+                                mockScenario: .authentication
+                            )
+                            .fadeTransition()
                         }
                     }
                     .environmentObject(appState)
                     .environmentObject(mockServiceCoordinator ?? MockServiceCoordinator())
+                    .animation(AnimationUtilities.smooth, value: appState.currentFlow)
                 }
-                .transition(.opacity)
+                .transition(AnimationUtilities.slideTransition)
             }
         }
         .onAppear {
             initializePrototypeApp()
         }
         .overlay {
-            // Global loading overlay
+            // Enhanced global loading overlay
             if appState.isLoading {
-                LoadingOverlay()
+                LoadingOverlay(
+                    message: "Processing your request...",
+                    showProgress: false
+                )
+                .transition(AnimationUtilities.fadeTransition)
             }
         }
         .alert("Error", isPresented: .constant(appState.errorMessage != nil)) {
@@ -85,6 +98,18 @@ struct MainNavigationView: View {
             if let errorMessage = appState.errorMessage {
                 Text(errorMessage)
             }
+        }
+        .overlay(alignment: .bottomTrailing) {
+            // Demo control overlay for prototype
+            if let demoManager = appState.getDemoManager() {
+                DemoControlOverlay(demoManager: demoManager)
+                    .transition(.scale.combined(with: .opacity))
+            }
+        }
+        .sheet(isPresented: .constant(false)) {
+            // Demo launcher can be accessed via the floating button
+            DemoLauncherView()
+                .environmentObject(appState)
         }
     }
     
@@ -109,9 +134,12 @@ struct MainNavigationView: View {
             
             // Hide splash screen with smooth animation
             await MainActor.run {
-                withAnimation(.easeInOut(duration: 0.8)) {
+                withAnimation(AnimationUtilities.smooth) {
                     showSplashScreen = false
                 }
+                
+                // Trigger haptic feedback for app launch completion
+                HapticManager.shared.success()
             }
         }
     }
@@ -160,14 +188,17 @@ struct RoleSelectionPlaceholderView: View {
                 .font(.subheadline)
                 .foregroundColor(.secondary)
             
-            Button("Mock Select Role") {
-                // Mock role selection
-                let mockData = MockDataGenerator.mockFamilyWithMembers()
-                let mockFamily = mockData.family
-                let mockMembership = mockData.memberships[1] // Use the adult membership
-                appState.setFamily(mockFamily, membership: mockMembership)
-            }
-            .buttonStyle(PrimaryButtonStyle())
+            AnimatedPrimaryButton(
+                title: "Mock Select Role",
+                action: {
+                    // Mock role selection
+                    let mockData = MockDataGenerator.mockFamilyWithMembers()
+                    let mockFamily = mockData.family
+                    let mockMembership = mockData.memberships[1] // Use the adult membership
+                    appState.setFamily(mockFamily, membership: mockMembership)
+                },
+                icon: "person.crop.circle.badge.checkmark"
+            )
             
             Spacer()
         }
@@ -213,35 +244,27 @@ struct OnboardingPlaceholderView: View {
                     .foregroundColor(.primary)
                 
                 VStack(spacing: 16) {
-                    Button(action: signInWithApple) {
-                        HStack {
-                            Image(systemName: "applelogo")
-                            Text("Continue with Apple")
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.black)
-                        .foregroundColor(.white)
-                        .cornerRadius(12)
-                    }
-                    .disabled(isSigningIn)
+                    AnimatedPrimaryButton(
+                        title: "Continue with Apple",
+                        action: signInWithApple,
+                        isLoading: isSigningIn,
+                        icon: "applelogo"
+                    )
                     
-                    Button(action: signInWithGoogle) {
-                        HStack {
-                            Image(systemName: "globe")
-                            Text("Continue with Google")
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.blue)
-                        .foregroundColor(.white)
-                        .cornerRadius(12)
-                    }
-                    .disabled(isSigningIn)
+                    AnimatedSecondaryButton(
+                        title: "Continue with Google",
+                        action: signInWithGoogle,
+                        isLoading: isSigningIn,
+                        icon: "globe"
+                    )
                     
                     if isSigningIn {
-                        ProgressView("Signing in...")
-                            .progressViewStyle(CircularProgressViewStyle(tint: .brandPrimary))
+                        LoadingStateView(
+                            message: "Signing in...",
+                            style: .inline,
+                            mockScenario: .authentication
+                        )
+                        .transition(AnimationUtilities.fadeTransition)
                     }
                 }
             }
@@ -260,17 +283,31 @@ struct OnboardingPlaceholderView: View {
     }
     
     private func performMockSignIn() {
-        isSigningIn = true
+        withAnimation(AnimationUtilities.standard) {
+            isSigningIn = true
+        }
+        
+        // Haptic feedback for sign-in start
+        HapticManager.shared.mockAuthSuccess()
         
         Task {
-            // Simulate sign in delay
-            try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
+            // Simulate sign in delay with realistic timing
+            try? await Task.sleep(nanoseconds: 2_200_000_000) // 2.2 seconds
             
             await MainActor.run {
                 // Create mock user and sign in
                 let mockUser = UserProfile(displayName: "Demo User", appleUserIdHash: "demo_user_hash")
-                appState.signIn(user: mockUser)
-                isSigningIn = false
+                
+                withAnimation(AnimationUtilities.smooth) {
+                    appState.signIn(user: mockUser)
+                    isSigningIn = false
+                }
+                
+                // Success haptic feedback
+                HapticManager.shared.success()
+                
+                // Show success toast
+                ToastManager.shared.success("Authentication successful!")
             }
         }
     }
@@ -294,15 +331,21 @@ struct CreateFamilyPlaceholderView: View {
                     .textFieldStyle(RoundedBorderTextFieldStyle())
                     .padding(.horizontal)
                 
-                Button("Create Family") {
-                    createMockFamily()
-                }
-                .buttonStyle(PrimaryButtonStyle())
-                .disabled(familyName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isCreating)
+                AnimatedPrimaryButton(
+                    title: "Create Family",
+                    action: createMockFamily,
+                    isLoading: isCreating,
+                    isEnabled: !familyName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                    icon: "house.badge.plus"
+                )
                 
                 if isCreating {
-                    ProgressView("Creating family...")
-                        .progressViewStyle(CircularProgressViewStyle(tint: .brandPrimary))
+                    LoadingStateView(
+                        message: "Creating family...",
+                        style: .inline,
+                        mockScenario: .familyCreation
+                    )
+                    .transition(AnimationUtilities.fadeTransition)
                 }
             }
             
@@ -317,11 +360,16 @@ struct CreateFamilyPlaceholderView: View {
     private func createMockFamily() {
         guard !familyName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         
-        isCreating = true
+        withAnimation(AnimationUtilities.standard) {
+            isCreating = true
+        }
+        
+        // Haptic feedback for family creation start
+        HapticManager.shared.mockFamilyCreation()
         
         Task {
-            // Simulate family creation delay
-            try? await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 seconds
+            // Simulate family creation delay with realistic timing
+            try? await Task.sleep(nanoseconds: 1_800_000_000) // 1.8 seconds
             
             await MainActor.run {
                 // Create mock family and membership
@@ -329,8 +377,16 @@ struct CreateFamilyPlaceholderView: View {
                 let family = Family(name: familyName, code: "DEMO\(Int.random(in: 1000...9999))", createdByUserId: mockData.users[0].id)
                 let membership = Membership(family: family, user: mockData.users[0], role: .parentAdmin)
                 
-                appState.setFamily(family, membership: membership)
-                isCreating = false
+                withAnimation(AnimationUtilities.smooth) {
+                    appState.setFamily(family, membership: membership)
+                    isCreating = false
+                }
+                
+                // Success haptic feedback
+                HapticManager.shared.creation()
+                
+                // Show success toast with family code
+                ToastManager.shared.showMockFamilyCreated()
             }
         }
     }
@@ -359,10 +415,13 @@ struct FamilyDashboardPlaceholderView: View {
                 .font(.subheadline)
                 .foregroundColor(.secondary)
             
-            Button("Leave Family") {
-                appState.leaveFamily()
-            }
-            .buttonStyle(SecondaryButtonStyle())
+            AnimatedSecondaryButton(
+                title: "Leave Family",
+                action: {
+                    appState.leaveFamily()
+                },
+                icon: "house.badge.minus"
+            )
             
             Spacer()
         }

@@ -107,6 +107,7 @@ struct CreateFamilyView: View {
             Image(systemName: "house.circle.fill")
                 .font(.system(size: 60))
                 .foregroundColor(.brandPrimary)
+                .accessibilityHidden(true)
             
             // Title and description
             VStack(spacing: 8) {
@@ -114,14 +115,19 @@ struct CreateFamilyView: View {
                     .font(.largeTitle)
                     .fontWeight(.bold)
                     .foregroundColor(.primary)
+                    .dynamicTypeSupport(minSize: 28, maxSize: 40)
+                    .accessibilityAddTraits([.isHeader])
                 
                 Text("Give your family a name and we'll generate a unique code for others to join")
                     .font(.body)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 16)
+                    .dynamicTypeSupport(minSize: 16, maxSize: 22)
             }
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Create Your Family. Give your family a name and we'll generate a unique code for others to join")
     }
     
     private var familyNameInputSection: some View {

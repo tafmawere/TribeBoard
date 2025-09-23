@@ -45,14 +45,21 @@ struct SplashScreenView: View {
                     // App Name
                     VStack(spacing: 8) {
                         Text("TribeBoard")
-                            .font(.system(size: 42, weight: .bold, design: .rounded))
-                            .foregroundColor(.brandPrimary)
+                            .displayMedium()
+                            .foregroundStyle(
+                                LinearGradient(
+                                    gradient: Gradient(colors: [.brandPrimary, .brandSecondary]),
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
                             .opacity(textOpacity)
                         
                         Text("Family Together")
-                            .font(.system(size: 18, weight: .medium, design: .rounded))
+                            .titleMedium()
                             .foregroundColor(.brandSecondary)
                             .opacity(textOpacity)
+                            .tracking(1)
                     }
                 }
                 

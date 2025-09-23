@@ -83,7 +83,7 @@ struct MockFamilyDashboardView: View {
                         Divider()
                         
                         Button("Family Settings") {
-                            // Navigate to settings
+                            viewModel.showSettings()
                         }
                         
                         Button("Leave Family", role: .destructive) {
@@ -148,6 +148,14 @@ struct MockFamilyDashboardView: View {
         }
         .sheet(isPresented: $viewModel.showSchoolRunView) {
             SchoolRunView()
+        }
+        .sheet(isPresented: $viewModel.showSettingsView) {
+            if let currentUser = appState.currentUser {
+                SettingsView(
+                    currentUserId: currentUser.id,
+                    currentUserRole: viewModel.currentUserRole
+                )
+            }
         }
         .confirmationDialog(
             "Remove Member",
@@ -327,8 +335,7 @@ struct MockFamilyDashboardView: View {
                     icon: "gearshape",
                     color: .gray,
                     action: {
-                        // Navigate to settings
-                        viewModel.successMessage = "Settings module coming soon!"
+                        viewModel.showSettings()
                     }
                 )
                 
@@ -465,7 +472,7 @@ struct MockFamilyDashboardView: View {
                     title: "Family Settings",
                     icon: "gearshape",
                     action: {
-                        viewModel.successMessage = "Settings functionality coming soon!"
+                        viewModel.showSettings()
                     }
                 )
                 

@@ -14,6 +14,33 @@ extension Color {
     
     /// Accent color for interactive elements
     static let brandAccent = brandPrimary
+    
+    // MARK: - Accessibility Colors
+    
+    /// High contrast versions for accessibility
+    static let brandPrimaryAccessible = Color(red: 0.2, green: 0.4, blue: 0.8) // Darker blue for better contrast
+    static let brandSecondaryAccessible = Color(red: 0.15, green: 0.3, blue: 0.6) // Darker secondary
+    
+    /// Dynamic colors that adapt to accessibility settings
+    static var brandPrimaryDynamic: Color {
+        Color(UIColor { traitCollection in
+            if traitCollection.accessibilityContrast == .high {
+                return UIColor(Color.brandPrimaryAccessible)
+            } else {
+                return UIColor(Color.brandPrimary)
+            }
+        })
+    }
+    
+    static var brandSecondaryDynamic: Color {
+        Color(UIColor { traitCollection in
+            if traitCollection.accessibilityContrast == .high {
+                return UIColor(Color.brandSecondaryAccessible)
+            } else {
+                return UIColor(Color.brandSecondary)
+            }
+        })
+    }
 }
 
 // MARK: - Brand Gradients
@@ -26,6 +53,22 @@ extension LinearGradient {
         startPoint: .topLeading,
         endPoint: .bottomTrailing
     )
+    
+    /// Accessible brand gradient with higher contrast
+    static let brandGradientAccessible = LinearGradient(
+        gradient: Gradient(colors: [Color.brandPrimaryAccessible, Color.brandSecondaryAccessible]),
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
+    )
+    
+    /// Dynamic gradient that adapts to accessibility settings
+    static var brandGradientDynamic: LinearGradient {
+        LinearGradient(
+            gradient: Gradient(colors: [Color.brandPrimaryDynamic, Color.brandSecondaryDynamic]),
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
     
     /// Subtle brand gradient for backgrounds
     static let brandGradientSubtle = LinearGradient(
