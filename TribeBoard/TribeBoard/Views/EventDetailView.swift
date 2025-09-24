@@ -46,7 +46,7 @@ struct EventDetailView: View {
                     }
                     
                     // Action Buttons
-                    ActionButtonsSection(
+                    EventActionButtonsSection(
                         event: event,
                         onEdit: { showingEditView = true },
                         onDelete: { 
@@ -284,7 +284,7 @@ struct DescriptionSection: View {
 
 // MARK: - Action Buttons Section
 
-struct ActionButtonsSection: View {
+struct EventActionButtonsSection: View {
     let event: CalendarEvent
     let onEdit: () -> Void
     let onDelete: () -> Void

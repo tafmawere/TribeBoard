@@ -1,5 +1,14 @@
 import SwiftUI
 
+/// Font modifier to resolve ambiguity
+struct FontModifier: ViewModifier {
+    let font: Font
+    
+    func body(content: Content) -> some View {
+        content.font(font)
+    }
+}
+
 /// School Run UI View - UI/UX showcase implementation with static data
 struct SchoolRunView: View {
     @State private var isRunActive: Bool = false
@@ -374,7 +383,7 @@ struct DriverInfoSection: View {
             
             // Driver name with SF Pro typography
             Text(SchoolRunUIData.driverInfo.name)
-                .font(scaledNameFont)
+                .modifier(FontModifier(font: scaledNameFont))
                 .foregroundColor(.primary)
                 .dynamicTypeSupport()
             
@@ -382,7 +391,7 @@ struct DriverInfoSection: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Driver: \(SchoolRunUIData.driverInfo.name)")
-        .accessibilityHint("The person driving for this school run")
+        .accessibilityHint(Text("The person driving for this school run"))
         .accessibilityAddTraits(.isStaticText)
     }
     
@@ -423,7 +432,7 @@ struct ChildrenSection: View {
         VStack(alignment: .leading, spacing: DesignSystem.Spacing.sm) {
             // Section title with SF Pro typography
             Text("Children")
-                .font(scaledTitleFont)
+                .modifier(FontModifier(font: scaledTitleFont))
                 .foregroundColor(.secondary)
                 .dynamicTypeSupport()
             
@@ -534,7 +543,7 @@ struct DestinationInfoSection: View {
             // Destination info with SF Pro typography
             VStack(alignment: .leading, spacing: DesignSystem.Spacing.xs) {
                 Text("Destination")
-                    .font(scaledLabelFont)
+                    .modifier(FontModifier(font: scaledLabelFont))
                     .foregroundColor(.secondary)
                     .dynamicTypeSupport()
                 
@@ -548,7 +557,7 @@ struct DestinationInfoSection: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Destination: \(SchoolRunUIData.destination.name) at \(SchoolRunUIData.destination.time)")
-        .accessibilityHint("The destination and scheduled time for this school run")
+        .accessibilityHint(Text("The destination and scheduled time for this school run"))
         .accessibilityAddTraits(.isStaticText)
     }
     
@@ -608,7 +617,7 @@ struct ETASection: View {
             // ETA info with SF Pro typography
             VStack(alignment: .leading, spacing: DesignSystem.Spacing.xs) {
                 Text("Estimated Arrival")
-                    .font(scaledLabelFont)
+                    .modifier(FontModifier(font: scaledLabelFont))
                     .foregroundColor(.secondary)
                     .dynamicTypeSupport()
                 
@@ -622,7 +631,7 @@ struct ETASection: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Estimated arrival time: \(SchoolRunUIData.eta)")
-        .accessibilityHint("How long until the driver reaches the destination")
+        .accessibilityHint(Text("How long until the driver reaches the destination"))
         .accessibilityAddTraits(.isStaticText)
     }
     
@@ -694,7 +703,7 @@ struct SchoolRunStatusBadge: View {
     
     var body: some View {
         Text(status.displayText)
-            .font(scaledFont)
+            .modifier(FontModifier(font: scaledFont))
             .foregroundColor(textColor)
             .padding(.horizontal, DesignSystem.Spacing.md)
             .padding(.vertical, DesignSystem.Spacing.sm)

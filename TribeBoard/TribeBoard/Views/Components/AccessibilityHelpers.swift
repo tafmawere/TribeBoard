@@ -386,11 +386,11 @@ struct AccessibleText: View {
     
     var body: some View {
         Text(text)
-            .font(.system(style, weight: weight))
+            .font(Font.system(style, design: .default).weight(weight))
             .foregroundColor(color)
             .multilineTextAlignment(alignment)
             .lineLimit(lineLimit)
-            .dynamicTypeSupport()
+            .dynamicTypeSupport(minSize: 8, maxSize: 32)
             .highContrastSupport(
                 normalColor: color,
                 highContrastColor: contrastColor

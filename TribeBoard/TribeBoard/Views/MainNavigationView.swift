@@ -68,6 +68,10 @@ struct MainNavigationView: View {
                     .navigationDestination(for: NavigationTab.self) { tab in
                         destinationView(for: tab)
                     }
+                    // Navigation destinations for School Run feature
+                    .navigationDestination(for: SchoolRunRoute.self) { route in
+                        schoolRunDestinationView(for: route)
+                    }
                 }
                 .transition(AnimationUtilities.slideTransition)
                 .overlay(alignment: .bottom) {
@@ -155,8 +159,8 @@ struct MainNavigationView: View {
                 CalendarView()
                 
             case .schoolRun:
-                // School Run view
-                SchoolRunView()
+                // School Run Dashboard view
+                SchoolRunDashboardView()
                 
             case .tasks:
                 // Tasks view
@@ -236,7 +240,7 @@ struct MainNavigationView: View {
             CalendarView()
             
         case .schoolRun:
-            SchoolRunView()
+            SchoolRunDashboardView()
             
         case .tasks:
             if let user = appState.currentUser,
@@ -259,6 +263,27 @@ struct MainNavigationView: View {
             } else {
                 MessagesPlaceholderView()
             }
+        }
+    }
+    
+    /// Get destination view for School Run navigation
+    @ViewBuilder
+    private func schoolRunDestinationView(for route: SchoolRunRoute) -> some View {
+        switch route {
+        case .dashboard:
+            SchoolRunDashboardView()
+            
+        case .scheduleNew:
+            ScheduleNewRunView()
+            
+        case .scheduledList:
+            ScheduledRunsListView()
+            
+        case .runDetail(let run):
+            RunDetailView(run: run)
+            
+        case .runExecution(let run):
+            RunExecutionView(run: run)
         }
     }
     
