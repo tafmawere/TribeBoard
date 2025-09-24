@@ -11,8 +11,7 @@ struct PrimaryButtonStyle: ButtonStyle {
     
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.headline)
-            .fontWeight(.semibold)
+            .font(DesignSystem.Typography.buttonLarge) // SF Pro font from DesignSystem
             .foregroundColor(.white)
             .frame(maxWidth: .infinity)
             .frame(height: 56)
@@ -46,8 +45,7 @@ struct SecondaryButtonStyle: ButtonStyle {
     
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.headline)
-            .fontWeight(.semibold)
+            .font(DesignSystem.Typography.buttonLarge) // SF Pro font from DesignSystem
             .foregroundColor(.brandPrimary)
             .frame(maxWidth: .infinity)
             .frame(height: 56)
@@ -85,8 +83,7 @@ struct TertiaryButtonStyle: ButtonStyle {
     
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.subheadline)
-            .fontWeight(.medium)
+            .font(DesignSystem.Typography.buttonMedium) // SF Pro font from DesignSystem
             .foregroundColor(.brandPrimary)
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
@@ -113,8 +110,7 @@ struct DestructiveButtonStyle: ButtonStyle {
     
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.headline)
-            .fontWeight(.semibold)
+            .font(DesignSystem.Typography.buttonLarge) // SF Pro font from DesignSystem
             .foregroundColor(.white)
             .frame(maxWidth: .infinity)
             .frame(height: 56)
@@ -152,7 +148,7 @@ struct IconButtonStyle: ButtonStyle {
     
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: size * 0.4, weight: .medium))
+            .font(DesignSystem.Typography.labelMedium) // SF Pro font from DesignSystem
             .foregroundColor(.brandPrimary)
             .frame(width: size, height: size)
             .background(
@@ -208,8 +204,7 @@ struct FloatingActionButtonStyle: ButtonStyle {
     
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.title2)
-            .fontWeight(.semibold)
+            .font(DesignSystem.Typography.buttonLarge) // SF Pro font from DesignSystem
             .foregroundColor(.white)
             .frame(width: 56, height: 56)
             .background(

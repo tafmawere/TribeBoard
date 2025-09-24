@@ -134,19 +134,19 @@ struct NavigationItem: View {
 #Preview("Navigation Item - Inactive") {
     VStack(spacing: DesignSystem.Spacing.xl) {
         NavigationItem(
-            tab: .home,
+            tab: .dashboard,
             isActive: false,
             onTap: {}
         )
         
         NavigationItem(
-            tab: .schoolRun,
+            tab: .calendar,
             isActive: false,
             onTap: {}
         )
         
         NavigationItem(
-            tab: .shopping,
+            tab: .messages,
             isActive: false,
             onTap: {}
         )
@@ -164,19 +164,19 @@ struct NavigationItem: View {
 #Preview("Navigation Item - Active") {
     VStack(spacing: DesignSystem.Spacing.xl) {
         NavigationItem(
-            tab: .home,
+            tab: .dashboard,
             isActive: true,
             onTap: {}
         )
         
         NavigationItem(
-            tab: .schoolRun,
+            tab: .calendar,
             isActive: true,
             onTap: {}
         )
         
         NavigationItem(
-            tab: .shopping,
+            tab: .messages,
             isActive: true,
             onTap: {}
         )
@@ -194,19 +194,19 @@ struct NavigationItem: View {
 #Preview("Navigation Item - Mixed States") {
     HStack(spacing: DesignSystem.Spacing.lg) {
         NavigationItem(
-            tab: .home,
+            tab: .dashboard,
             isActive: true,
             onTap: {}
         )
         
         NavigationItem(
-            tab: .schoolRun,
+            tab: .calendar,
             isActive: false,
             onTap: {}
         )
         
         NavigationItem(
-            tab: .shopping,
+            tab: .messages,
             isActive: false,
             onTap: {}
         )
@@ -234,7 +234,7 @@ struct NavigationItem: View {
         
         HStack(spacing: DesignSystem.Spacing.lg) {
             NavigationItem(
-                tab: .home,
+                tab: .dashboard,
                 isActive: true,
                 onTap: {}
             )
@@ -252,7 +252,7 @@ struct NavigationItem: View {
         
         HStack(spacing: DesignSystem.Spacing.lg) {
             NavigationItem(
-                tab: .home,
+                tab: .dashboard,
                 isActive: true,
                 onTap: {}
             )
@@ -275,19 +275,19 @@ struct NavigationItem: View {
         
         HStack(spacing: DesignSystem.Spacing.lg) {
             NavigationItem(
-                tab: .home,
+                tab: .dashboard,
                 isActive: true,
                 onTap: {}
             )
             
             NavigationItem(
-                tab: .schoolRun,
+                tab: .calendar,
                 isActive: false,
                 onTap: {}
             )
             
             NavigationItem(
-                tab: .shopping,
+                tab: .messages,
                 isActive: false,
                 onTap: {}
             )
@@ -311,7 +311,7 @@ struct NavigationItem: View {
         
         HStack(spacing: DesignSystem.Spacing.lg) {
             NavigationItem(
-                tab: .home,
+                tab: .dashboard,
                 isActive: true,
                 onTap: {}
             )

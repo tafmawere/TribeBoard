@@ -136,8 +136,8 @@ struct MainNavigationView: View {
     private var dashboardContent: some View {
         Group {
             switch appState.selectedNavigationTab {
-            case .home:
-                // Main family dashboard
+            case .dashboard:
+                // Main family dashboard with School Run access
                 if let user = appState.currentUser,
                    let family = appState.currentFamily,
                    let membership = appState.currentMembership {
@@ -150,13 +150,13 @@ struct MainNavigationView: View {
                     FamilyDashboardPlaceholderView()
                 }
                 
-            case .schoolRun:
-                // School run view
-                SchoolRunView()
+            case .calendar:
+                // Calendar view
+                CalendarView()
                 
-            case .shopping:
-                // Shopping view
-                ShoppingView()
+            case .schoolRun:
+                // School Run view
+                SchoolRunView()
                 
             case .tasks:
                 // Tasks view
@@ -168,6 +168,18 @@ struct MainNavigationView: View {
                     )
                 } else {
                     TasksPlaceholderView()
+                }
+                
+            case .messages:
+                // Messages view
+                if let user = appState.currentUser,
+                   let membership = appState.currentMembership {
+                    MessagingView(
+                        currentUserId: user.id,
+                        currentUserRole: membership.role
+                    )
+                } else {
+                    MessagesPlaceholderView()
                 }
             }
         }
@@ -207,7 +219,7 @@ struct MainNavigationView: View {
     @ViewBuilder
     private func destinationView(for tab: NavigationTab) -> some View {
         switch tab {
-        case .home:
+        case .dashboard:
             if let user = appState.currentUser,
                let family = appState.currentFamily,
                let membership = appState.currentMembership {
@@ -220,11 +232,11 @@ struct MainNavigationView: View {
                 FamilyDashboardPlaceholderView()
             }
             
+        case .calendar:
+            CalendarView()
+            
         case .schoolRun:
             SchoolRunView()
-            
-        case .shopping:
-            ShoppingView()
             
         case .tasks:
             if let user = appState.currentUser,
@@ -235,6 +247,17 @@ struct MainNavigationView: View {
                 )
             } else {
                 TasksPlaceholderView()
+            }
+            
+        case .messages:
+            if let user = appState.currentUser,
+               let membership = appState.currentMembership {
+                MessagingView(
+                    currentUserId: user.id,
+                    currentUserRole: membership.role
+                )
+            } else {
+                MessagesPlaceholderView()
             }
         }
     }
@@ -540,6 +563,32 @@ struct TasksPlaceholderView: View {
         }
         .padding()
         .navigationTitle("Tasks")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+/// Placeholder for messages view when user data is not available
+struct MessagesPlaceholderView: View {
+    var body: some View {
+        VStack(spacing: DesignSystem.Spacing.xl) {
+            Image(systemName: "message.fill")
+                .font(.system(size: 64))
+                .foregroundColor(.brandPrimary)
+                .accessibilityHidden(true)
+            
+            Text("Messages")
+                .headlineLarge()
+                .foregroundColor(.primary)
+            
+            Text("Sign in to view your family messages")
+                .bodyMedium()
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+            
+            Spacer()
+        }
+        .padding()
+        .navigationTitle("Messages")
         .navigationBarTitleDisplayMode(.inline)
     }
 }

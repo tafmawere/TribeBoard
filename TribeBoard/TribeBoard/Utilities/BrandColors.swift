@@ -86,7 +86,7 @@ extension LinearGradient {
 struct BrandStyle {
     
     /// Standard corner radius matching the logo's rounded corners
-    static let cornerRadius: CGFloat = 16
+    static let cornerRadius: CGFloat = 20
     
     /// Small corner radius for buttons and cards
     static let cornerRadiusSmall: CGFloat = 8

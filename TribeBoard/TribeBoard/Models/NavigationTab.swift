@@ -3,52 +3,59 @@ import SwiftUI
 
 /// Enum representing the main navigation tabs in the TribeBoard app
 enum NavigationTab: String, CaseIterable, Identifiable {
-    case home = "home"
-    case schoolRun = "school_run"
-    case shopping = "shopping"
+    case dashboard = "dashboard"
+    case calendar = "calendar"
+    case schoolRun = "schoolRun"
     case tasks = "tasks"
+    case messages = "messages"
     
     var id: String { rawValue }
     
     /// Display name for the navigation tab
     var displayName: String {
         switch self {
-        case .home:
-            return "Home"
+        case .dashboard:
+            return "Dashboard"
+        case .calendar:
+            return "Calendar"
         case .schoolRun:
-            return "School Run"
-        case .shopping:
-            return "Shopping"
+            return "Run"
         case .tasks:
             return "Tasks"
+        case .messages:
+            return "Messages"
         }
     }
     
     /// Icon name for inactive state
     var icon: String {
         switch self {
-        case .home:
+        case .dashboard:
             return "house"
+        case .calendar:
+            return "calendar"
         case .schoolRun:
-            return "bus"
-        case .shopping:
-            return "cart"
+            return "car"
         case .tasks:
             return "checkmark.circle"
+        case .messages:
+            return "message"
         }
     }
     
     /// Icon name for active state
     var activeIcon: String {
         switch self {
-        case .home:
+        case .dashboard:
             return "house.fill"
+        case .calendar:
+            return "calendar"
         case .schoolRun:
-            return "bus.fill"
-        case .shopping:
-            return "cart.fill"
+            return "car.fill"
         case .tasks:
-            return "checkmark.circle.fill"
+            return "checkmark.circle"
+        case .messages:
+            return "message.fill"
         }
     }
 }

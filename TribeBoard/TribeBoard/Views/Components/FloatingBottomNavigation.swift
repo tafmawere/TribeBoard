@@ -154,36 +154,36 @@ struct FloatingBottomNavigation: View {
 
 // MARK: - Preview
 
-#Preview("Floating Bottom Navigation - Home Selected") {
+#Preview("Floating Bottom Navigation - Dashboard Selected") {
     VStack {
         Spacer()
         
         FloatingBottomNavigation(
-            selectedTab: .constant(.home),
+            selectedTab: .constant(.dashboard),
             onTabSelected: { _ in }
         )
     }
     .background(Color(.systemGroupedBackground))
 }
 
-#Preview("Floating Bottom Navigation - School Run Selected") {
+#Preview("Floating Bottom Navigation - Calendar Selected") {
     VStack {
         Spacer()
         
         FloatingBottomNavigation(
-            selectedTab: .constant(.schoolRun),
+            selectedTab: .constant(.calendar),
             onTabSelected: { _ in }
         )
     }
     .background(Color(.systemGroupedBackground))
 }
 
-#Preview("Floating Bottom Navigation - Shopping Selected") {
+#Preview("Floating Bottom Navigation - Messages Selected") {
     VStack {
         Spacer()
         
         FloatingBottomNavigation(
-            selectedTab: .constant(.shopping),
+            selectedTab: .constant(.messages),
             onTabSelected: { _ in }
         )
     }
@@ -204,7 +204,7 @@ struct FloatingBottomNavigation: View {
 
 #Preview("Floating Bottom Navigation - Interactive") {
     struct InteractivePreview: View {
-        @State private var selectedTab: NavigationTab = .home
+        @State private var selectedTab: NavigationTab = .dashboard
         
         var body: some View {
             VStack {
@@ -235,7 +235,7 @@ struct FloatingBottomNavigation: View {
         Spacer()
         
         FloatingBottomNavigation(
-            selectedTab: .constant(.home),
+            selectedTab: .constant(.dashboard),
             onTabSelected: { _ in }
         )
     }
@@ -269,7 +269,7 @@ struct FloatingBottomNavigation: View {
             .padding()
         
         FloatingBottomNavigation(
-            selectedTab: .constant(.home),
+            selectedTab: .constant(.dashboard),
             onTabSelected: { _ in }
         )
     }
@@ -286,7 +286,7 @@ struct FloatingBottomNavigation: View {
             .padding()
         
         FloatingBottomNavigation(
-            selectedTab: .constant(.schoolRun),
+            selectedTab: .constant(.calendar),
             onTabSelected: { _ in }
         )
     }
@@ -302,7 +302,7 @@ struct FloatingBottomNavigation: View {
             .padding()
         
         FloatingBottomNavigation(
-            selectedTab: .constant(.shopping),
+            selectedTab: .constant(.messages),
             onTabSelected: { _ in }
         )
     }
@@ -317,7 +317,7 @@ struct FloatingBottomNavigation: View {
             .labelMedium()
         
         FloatingBottomNavigation(
-            selectedTab: .constant(.home),
+            selectedTab: .constant(.dashboard),
             onTabSelected: { _ in }
         )
         .frame(width: 320) // iPhone SE width
@@ -326,7 +326,7 @@ struct FloatingBottomNavigation: View {
             .labelMedium()
         
         FloatingBottomNavigation(
-            selectedTab: .constant(.schoolRun),
+            selectedTab: .constant(.calendar),
             onTabSelected: { _ in }
         )
         .frame(width: 393) // iPhone 14 Pro width
@@ -335,7 +335,7 @@ struct FloatingBottomNavigation: View {
             .labelMedium()
         
         FloatingBottomNavigation(
-            selectedTab: .constant(.shopping),
+            selectedTab: .constant(.messages),
             onTabSelected: { _ in }
         )
         .frame(width: 430) // iPhone 14 Pro Max width

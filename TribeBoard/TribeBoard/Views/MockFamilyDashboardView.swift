@@ -325,8 +325,7 @@ struct MockFamilyDashboardView: View {
                     icon: "car",
                     color: .purple,
                     action: {
-                        // Navigate to school run
-                        viewModel.successMessage = "School Run module coming soon!"
+                        viewModel.showSchoolRun()
                     }
                 )
                 

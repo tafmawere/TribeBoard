@@ -33,7 +33,7 @@ class AppState: ObservableObject {
     @Published var navigationPath = NavigationPath()
     
     /// Currently selected navigation tab for bottom navigation
-    @Published var selectedNavigationTab: NavigationTab = .home
+    @Published var selectedNavigationTab: NavigationTab = .dashboard
     
     // MARK: - Mock Service Integration
     
@@ -271,7 +271,7 @@ class AppState: ObservableObject {
         isAuthenticated = false
         currentFlow = .onboarding
         navigationPath = NavigationPath()
-        selectedNavigationTab = .home
+        selectedNavigationTab = .dashboard
         isLoading = false
     }
     
@@ -447,23 +447,28 @@ class AppState: ObservableObject {
         
         // Handle navigation logic based on selected tab
         switch tab {
-        case .home:
-            // Navigate to family dashboard (home)
+        case .dashboard:
+            // Navigate to family dashboard
             currentFlow = .familyDashboard
             resetNavigation()
+            
+        case .calendar:
+            // Navigate to calendar view
+            // The actual navigation will be handled by MainNavigationView
+            break
             
         case .schoolRun:
             // Navigate to school run view
             // The actual navigation will be handled by MainNavigationView
             break
             
-        case .shopping:
-            // Navigate to shopping view
+        case .tasks:
+            // Navigate to tasks view
             // The actual navigation will be handled by MainNavigationView
             break
             
-        case .tasks:
-            // Navigate to tasks view
+        case .messages:
+            // Navigate to messages view
             // The actual navigation will be handled by MainNavigationView
             break
         }
@@ -493,24 +498,29 @@ class AppState: ObservableObject {
         
         // Handle specific navigation logic for each tab
         switch tab {
-        case .home:
+        case .dashboard:
             // Ensure we're in the family dashboard flow
             if currentFlow != .familyDashboard {
                 currentFlow = .familyDashboard
             }
+            
+        case .calendar:
+            // Navigation to CalendarView will be handled by MainNavigationView
+            // based on the selectedNavigationTab state
+            break
             
         case .schoolRun:
             // Navigation to SchoolRunView will be handled by MainNavigationView
             // based on the selectedNavigationTab state
             break
             
-        case .shopping:
-            // Navigation to ShoppingView will be handled by MainNavigationView
+        case .tasks:
+            // Navigation to TasksView will be handled by MainNavigationView
             // based on the selectedNavigationTab state
             break
             
-        case .tasks:
-            // Navigation to TasksView will be handled by MainNavigationView
+        case .messages:
+            // Navigation to MessagingView will be handled by MainNavigationView
             // based on the selectedNavigationTab state
             break
         }
@@ -614,7 +624,7 @@ class AppState: ObservableObject {
         currentMembership = nil
         currentFlow = .onboarding
         navigationPath = NavigationPath()
-        selectedNavigationTab = .home
+        selectedNavigationTab = .dashboard
         errorMessage = nil
         isLoading = false
         

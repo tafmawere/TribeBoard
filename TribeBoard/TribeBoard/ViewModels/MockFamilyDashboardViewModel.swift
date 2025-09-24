@@ -205,6 +205,11 @@ class MockFamilyDashboardViewModel: ObservableObject {
         showSettingsView = true
     }
     
+    /// Show school run view
+    func showSchoolRun() {
+        showSchoolRunView = true
+    }
+    
     /// Clear success message
     func clearSuccessMessage() {
         successMessage = nil
