@@ -36,7 +36,7 @@ final class DataServiceCRUDTests: DatabaseTestBase {
     
     func testFetchFamilyByCodeExisting() throws {
         // Given
-        let testFamily = try createTestFamily(name: "Existing Family", code: "EXIST01")
+        let testFamily = try createTestFamily(name: "Existing Family", code: "EXIST01", createdByUserId: UUID())
         
         // When
         let fetchedFamily = try dataService.fetchFamily(byCode: "EXIST01")
@@ -60,7 +60,7 @@ final class DataServiceCRUDTests: DatabaseTestBase {
     
     func testFetchFamilyByIdExisting() throws {
         // Given
-        let testFamily = try createTestFamily(name: "Existing Family", code: "EXIST02")
+        let testFamily = try createTestFamily(name: "Existing Family", code: "EXIST02", createdByUserId: UUID())
         
         // When
         let fetchedFamily = try dataService.fetchFamily(byId: testFamily.id)
@@ -227,7 +227,7 @@ final class DataServiceCRUDTests: DatabaseTestBase {
     
     func testCreateMembershipWithValidRelationships() throws {
         // Given
-        let family = try createTestFamily(name: "Test Family", code: "MEMBER01")
+        let family = try createTestFamily(name: "Test Family", code: "MEMBER01", createdByUserId: UUID())
         let user = try createTestUser(displayName: "Test User", appleUserIdHash: "member_hash_123")
         let role = Role.kid
         
@@ -259,7 +259,7 @@ final class DataServiceCRUDTests: DatabaseTestBase {
     
     func testCreateMembershipWithParentAdminRole() throws {
         // Given
-        let family = try createTestFamily(name: "Admin Family", code: "ADMIN01")
+        let family = try createTestFamily(name: "Admin Family", code: "ADMIN01", createdByUserId: UUID())
         let user = try createTestUser(displayName: "Admin User", appleUserIdHash: "admin_hash_123")
         let role = Role.parentAdmin
         
@@ -277,7 +277,7 @@ final class DataServiceCRUDTests: DatabaseTestBase {
     
     func testCreateMembershipWithDifferentRoles() throws {
         // Given
-        let family = try createTestFamily(name: "Multi Role Family", code: "MULTI01")
+        let family = try createTestFamily(name: "Multi Role Family", code: "MULTI01", createdByUserId: UUID())
         let roles: [Role] = [.parentAdmin, .adult, .kid, .visitor]
         var createdMemberships: [Membership] = []
         
@@ -305,7 +305,7 @@ final class DataServiceCRUDTests: DatabaseTestBase {
     
     func testFetchMembershipsForFamily() throws {
         // Given
-        let family = try createTestFamily(name: "Family With Members", code: "FWMEM01")
+        let family = try createTestFamily(name: "Family With Members", code: "FWMEM01", createdByUserId: UUID())
         let user1 = try createTestUser(displayName: "User 1", appleUserIdHash: "user1_hash")
         let user2 = try createTestUser(displayName: "User 2", appleUserIdHash: "user2_hash")
         
@@ -335,8 +335,8 @@ final class DataServiceCRUDTests: DatabaseTestBase {
     func testFetchMembershipsForUser() throws {
         // Given
         let user = try createTestUser(displayName: "Multi Family User", appleUserIdHash: "multi_user_hash")
-        let family1 = try createTestFamily(name: "Family 1", code: "FAM001")
-        let family2 = try createTestFamily(name: "Family 2", code: "FAM002")
+        let family1 = try createTestFamily(name: "Family 1", code: "FAM001", createdByUserId: UUID())
+        let family2 = try createTestFamily(name: "Family 2", code: "FAM002", createdByUserId: UUID())
         
         let membership1 = try dataService.createMembership(family: family1, user: user, role: .adult)
         let membership2 = try dataService.createMembership(family: family2, user: user, role: .visitor)
@@ -363,7 +363,7 @@ final class DataServiceCRUDTests: DatabaseTestBase {
     
     func testFetchMembershipsForEmptyFamily() throws {
         // Given
-        let family = try createTestFamily(name: "Empty Family", code: "EMPTY01")
+        let family = try createTestFamily(name: "Empty Family", code: "EMPTY01", createdByUserId: UUID())
         
         // When
         let memberships = try dataService.fetchMemberships(forFamily: family)
@@ -387,7 +387,7 @@ final class DataServiceCRUDTests: DatabaseTestBase {
     
     func testFamilyComputedProperties() throws {
         // Given
-        let family = try createTestFamily(name: "Computed Family", code: "COMP01")
+        let family = try createTestFamily(name: "Computed Family", code: "COMP01", createdByUserId: UUID())
         let user1 = try createTestUser(displayName: "Parent", appleUserIdHash: "parent_hash")
         let user2 = try createTestUser(displayName: "Child", appleUserIdHash: "child_hash")
         let user3 = try createTestUser(displayName: "Removed User", appleUserIdHash: "removed_hash")
@@ -415,8 +415,8 @@ final class DataServiceCRUDTests: DatabaseTestBase {
     func testUserProfileComputedProperties() throws {
         // Given
         let user = try createTestUser(displayName: "Active User", appleUserIdHash: "active_user_hash")
-        let family1 = try createTestFamily(name: "Active Family", code: "ACTIVE1")
-        let family2 = try createTestFamily(name: "Inactive Family", code: "INACTIVE")
+        let family1 = try createTestFamily(name: "Active Family", code: "ACTIVE1", createdByUserId: UUID())
+        let family2 = try createTestFamily(name: "Inactive Family", code: "INACTIVE", createdByUserId: UUID())
         
         let activeMembership = try dataService.createMembership(family: family1, user: user, role: .adult)
         let inactiveMembership = try dataService.createMembership(family: family2, user: user, role: .visitor)
@@ -437,7 +437,7 @@ final class DataServiceCRUDTests: DatabaseTestBase {
     
     func testMembershipComputedProperties() throws {
         // Given
-        let family = try createTestFamily(name: "Property Family", code: "PROP01")
+        let family = try createTestFamily(name: "Property Family", code: "PROP01", createdByUserId: UUID())
         let user = try createTestUser(displayName: "Property User", appleUserIdHash: "prop_user_hash")
         let membership = try dataService.createMembership(family: family, user: user, role: .adult)
         

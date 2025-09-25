@@ -13,7 +13,7 @@ final class RelationshipTests: DatabaseTestBase {
         print("🧪 Testing family deletion cascades to memberships...")
         
         // Create test data
-        let family = try createTestFamily(name: "Test Family", code: "TEST123")
+        let family = try createTestFamily(name: "Test Family", code: "TEST123", createdByUserId: UUID())
         let user1 = try createTestUser(displayName: "User 1", appleUserIdHash: "hash1_1234567890")
         let user2 = try createTestUser(displayName: "User 2", appleUserIdHash: "hash2_1234567890")
         
@@ -86,8 +86,8 @@ final class RelationshipTests: DatabaseTestBase {
         print("🧪 Testing user profile deletion cascades to memberships...")
         
         // Create test data
-        let family1 = try createTestFamily(name: "Family 1", code: "FAM001")
-        let family2 = try createTestFamily(name: "Family 2", code: "FAM002")
+        let family1 = try createTestFamily(name: "Family 1", code: "FAM001", createdByUserId: UUID())
+        let family2 = try createTestFamily(name: "Family 2", code: "FAM002", createdByUserId: UUID())
         let user = try createTestUser(displayName: "Test User", appleUserIdHash: "user_hash_1234567890")
         
         let membership1 = try createTestMembership(family: family1, user: user, role: .adult)
@@ -167,7 +167,7 @@ final class RelationshipTests: DatabaseTestBase {
         print("🧪 Testing membership relationships work correctly...")
         
         // Create test data
-        let family = try createTestFamily(name: "Relationship Family", code: "REL123")
+        let family = try createTestFamily(name: "Relationship Family", code: "REL123", createdByUserId: UUID())
         let user = try createTestUser(displayName: "Relationship User", appleUserIdHash: "rel_hash_1234567890")
         let membership = try createTestMembership(family: family, user: user, role: .adult)
         
@@ -197,7 +197,7 @@ final class RelationshipTests: DatabaseTestBase {
         print("🧪 Testing family and user membership relationships work correctly...")
         
         // Create test data with multiple relationships
-        let family = try createTestFamily(name: "Multi-Member Family", code: "MULTI1")
+        let family = try createTestFamily(name: "Multi-Member Family", code: "MULTI1", createdByUserId: UUID())
         let user1 = try createTestUser(displayName: "Parent User", appleUserIdHash: "parent_hash_1234567890")
         let user2 = try createTestUser(displayName: "Kid User", appleUserIdHash: "kid_hash_1234567890")
         let user3 = try createTestUser(displayName: "Adult User", appleUserIdHash: "adult_hash_1234567890")

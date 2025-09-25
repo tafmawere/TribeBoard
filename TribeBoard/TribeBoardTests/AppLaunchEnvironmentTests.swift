@@ -24,7 +24,7 @@ final class AppLaunchEnvironmentTests: XCTestCase {
     
     // MARK: - Task 6 Requirement Tests
     
-    func testAppLaunchInSimulatorEnvironment() {
+    @MainActor func testAppLaunchInSimulatorEnvironment() {
         // Task 6 Requirement: Verify app launches successfully in iOS Simulator (CloudKit limited)
         
         print("📱 Testing app launch in iOS Simulator environment...")
@@ -59,7 +59,7 @@ final class AppLaunchEnvironmentTests: XCTestCase {
         }
     }
     
-    func testAppLaunchCloudKitAvailableVsUnavailable() {
+    @MainActor func testAppLaunchCloudKitAvailableVsUnavailable() {
         // Task 6 Requirement: Test app launch behavior when CloudKit available vs unavailable
         
         print("☁️ Testing app launch behavior: CloudKit available vs unavailable...")
@@ -116,7 +116,7 @@ final class AppLaunchEnvironmentTests: XCTestCase {
         }
     }
     
-    func testNoCrashesDuringModelContainerInitialization() {
+    @MainActor func testNoCrashesDuringModelContainerInitialization() {
         // Task 6 Requirement: Ensure no crashes occur during ModelContainer initialization
         
         print("🛡️ Testing no crashes during ModelContainer initialization...")
@@ -170,7 +170,7 @@ final class AppLaunchEnvironmentTests: XCTestCase {
         print("✅ No crashes during ModelContainer initialization - all scenarios passed")
     }
     
-    func testAppLaunchStressTest() {
+    @MainActor func testAppLaunchStressTest() {
         // Additional stress test to ensure robustness under various conditions
         
         print("⚡ Testing app launch under stress conditions...")
@@ -208,7 +208,7 @@ final class AppLaunchEnvironmentTests: XCTestCase {
         print("✅ App launch verified under stress conditions")
     }
     
-    func testAppLaunchErrorRecovery() {
+    @MainActor func testAppLaunchErrorRecovery() {
         // Test that app can recover from various error conditions during launch
         
         print("🔄 Testing app launch error recovery...")
@@ -269,7 +269,7 @@ final class AppLaunchEnvironmentTests: XCTestCase {
         print("✅ App launch error recovery verified")
     }
     
-    func testAppLaunchPerformance() {
+    @MainActor func testAppLaunchPerformance() {
         // Test that app launch performance is acceptable
         
         print("⏱️ Testing app launch performance...")
@@ -291,7 +291,7 @@ final class AppLaunchEnvironmentTests: XCTestCase {
         print("✅ App launch performance is acceptable")
     }
     
-    func testAppLaunchDataIntegrity() {
+    @MainActor func testAppLaunchDataIntegrity() {
         // Test that app launch maintains data integrity
         
         print("🔒 Testing app launch data integrity...")
@@ -366,7 +366,7 @@ final class AppLaunchEnvironmentTests: XCTestCase {
         }
     }
     
-    func testAppLaunchEnvironmentCompatibility() {
+    @MainActor func testAppLaunchEnvironmentCompatibility() {
         // Test compatibility across different environment conditions
         
         print("🌍 Testing app launch environment compatibility...")
@@ -415,7 +415,7 @@ final class AppLaunchEnvironmentTests: XCTestCase {
         print("✅ App launch environment compatibility verified")
     }
     
-    func testTask6RequirementsSummary() {
+    @MainActor func testTask6RequirementsSummary() {
         // Comprehensive summary test that verifies all Task 6 requirements
         
         print("📋 Task 6 Requirements Summary Test...")

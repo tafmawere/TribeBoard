@@ -230,10 +230,10 @@ final class IntegrationTests: XCTestCase {
     
     func testCompleteDataValidationFlow() throws {
         // Test family validation
-        let familyValidation = try dataService.validateFamily(name: "Valid Family", code: "VALID1")
+        let familyValidation = try dataService.validateFamily(name: "Valid Family", code: "VALID1", createdByUserId: UUID())
         XCTAssertTrue(familyValidation.isValid)
         
-        let invalidFamilyValidation = try dataService.validateFamily(name: "", code: "12")
+        let invalidFamilyValidation = try dataService.validateFamily(name: "", code: "12", createdByUserId: UUID())
         XCTAssertFalse(invalidFamilyValidation.isValid)
         
         // Test user profile validation
@@ -260,7 +260,7 @@ final class IntegrationTests: XCTestCase {
     
     // MARK: - QR Code Integration Flow
     
-    func testQRCodeIntegrationFlow() {
+    @MainActor func testQRCodeIntegrationFlow() {
         let familyCode = "QR123"
         
         // Step 1: Generate QR code

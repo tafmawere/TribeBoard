@@ -140,7 +140,7 @@ final class LoadTests: DatabaseTestBase {
         print("👥 Testing query performance with 10 members per family...")
         
         // Setup: Create 1 family with 10 members
-        let testFamily = try createTestFamily(name: "10 Member Family", code: "MEM10F")
+        let testFamily = try createTestFamily(name: "10 Member Family", code: "MEM10F", createdByUserId: UUID())
         
         var users: [UserProfile] = []
         var memberships: [Membership] = []
@@ -193,7 +193,7 @@ final class LoadTests: DatabaseTestBase {
         print("👥 Testing query performance with 50 members per family...")
         
         // Setup: Create 1 family with 50 members
-        let testFamily = try createTestFamily(name: "50 Member Family", code: "MEM50F")
+        let testFamily = try createTestFamily(name: "50 Member Family", code: "MEM50F", createdByUserId: UUID())
         
         var users: [UserProfile] = []
         var memberships: [Membership] = []
@@ -315,7 +315,7 @@ final class LoadTests: DatabaseTestBase {
         let userCount = 10
         
         let families = try (1...familyCount).map { i in
-            try createTestFamily(name: "Concurrent Family \(i)", code: "CFAM\(i)")
+            try createTestFamily(name: "Concurrent Family \(i)", code: "CFAM\(i)", createdByUserId: UUID())
         }
         
         let users = try (1...userCount).map { i in

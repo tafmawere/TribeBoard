@@ -99,7 +99,7 @@ final class ModelContainerTests: XCTestCase {
     
     // MARK: - CloudKit Failure Fallback Tests
     
-    func testCreateWithFallbackSuccess() {
+    @MainActor func testCreateWithFallbackSuccess() {
         // Test that createWithFallback returns a working container
         let container = ModelContainerConfiguration.createWithFallback()
         
@@ -133,7 +133,7 @@ final class ModelContainerTests: XCTestCase {
         }
     }
     
-    func testFallbackContainerPersistence() {
+    @MainActor func testFallbackContainerPersistence() {
         // Test that fallback container can handle multiple operations
         let container = ModelContainerConfiguration.createWithFallback()
         let context = container.mainContext
@@ -188,7 +188,7 @@ final class ModelContainerTests: XCTestCase {
     
     // MARK: - Complete Failure Scenario Tests
     
-    func testModelContainerErrorTypes() {
+    @MainActor func testModelContainerErrorTypes() {
         // Test that ModelContainerError enum works correctly
         
         let testError = NSError(domain: "TestDomain", code: 123, userInfo: [NSLocalizedDescriptionKey: "Test error"])
@@ -218,7 +218,7 @@ final class ModelContainerTests: XCTestCase {
         XCTAssertNotNil(allFailedError.recoverySuggestion)
     }
     
-    func testInMemoryContainerFailureHandling() {
+    @MainActor func testInMemoryContainerFailureHandling() {
         // Test what happens when even in-memory container fails
         // This is a theoretical test since in-memory should rarely fail
         
@@ -310,7 +310,7 @@ final class ModelContainerTests: XCTestCase {
     
     // MARK: - Container Configuration Tests
     
-    func testCloudKitContainerIdentifier() {
+    @MainActor func testCloudKitContainerIdentifier() {
         // Test that the CloudKit container identifier is correct
         // This test verifies the configuration without actually creating the container
         
@@ -382,7 +382,7 @@ final class ModelContainerTests: XCTestCase {
     
     // MARK: - App Launch Environment Tests
     
-    func testAppLaunchInSimulatorEnvironment() {
+    @MainActor func testAppLaunchInSimulatorEnvironment() {
         // Test app launch behavior in iOS Simulator (CloudKit limited)
         // This simulates the TribeBoardApp initialization process
         
@@ -420,7 +420,7 @@ final class ModelContainerTests: XCTestCase {
         }
     }
     
-    func testAppLaunchWithCloudKitAvailable() {
+    @MainActor func testAppLaunchWithCloudKitAvailable() {
         // Test app launch behavior when CloudKit is available
         // Note: This test may pass or fail depending on environment
         
@@ -464,7 +464,7 @@ final class ModelContainerTests: XCTestCase {
         }
     }
     
-    func testAppLaunchWithCloudKitUnavailable() {
+    @MainActor func testAppLaunchWithCloudKitUnavailable() {
         // Test app launch behavior when CloudKit is explicitly unavailable
         // This simulates network issues, iCloud signed out, etc.
         
@@ -526,7 +526,7 @@ final class ModelContainerTests: XCTestCase {
         }
     }
     
-    func testAppLaunchNoCrashScenarios() {
+    @MainActor func testAppLaunchNoCrashScenarios() {
         // Test that app launch never crashes during ModelContainer initialization
         // This covers all the crash scenarios that were previously causing issues
         
@@ -568,7 +568,7 @@ final class ModelContainerTests: XCTestCase {
         print("✅ All container creation attempts successful - no crashes detected")
     }
     
-    func testAppLaunchWithDifferentSystemStates() {
+    @MainActor func testAppLaunchWithDifferentSystemStates() {
         // Test app launch under various system conditions
         
         print("🧪 Testing app launch under different system states...")
@@ -611,7 +611,7 @@ final class ModelContainerTests: XCTestCase {
         print("✅ App launch verified under various system states")
     }
     
-    func testModelContainerInitializationRobustness() {
+    @MainActor func testModelContainerInitializationRobustness() {
         // Test the robustness of ModelContainer initialization process
         // This ensures the app can handle various initialization scenarios
         
@@ -652,7 +652,7 @@ final class ModelContainerTests: XCTestCase {
     
     // MARK: - Performance Tests
     
-    func testContainerCreationPerformance() {
+    @MainActor func testContainerCreationPerformance() {
         // Test that container creation is reasonably fast
         measure {
             let container = ModelContainerConfiguration.createWithFallback()
@@ -660,7 +660,7 @@ final class ModelContainerTests: XCTestCase {
         }
     }
     
-    func testMultipleContainerCreation() {
+    @MainActor func testMultipleContainerCreation() {
         // Test creating multiple containers (should work for in-memory)
         var containers: [ModelContainer] = []
         

@@ -5,7 +5,7 @@ struct ScheduleNewRunView: View {
     
     // MARK: - Environment
     
-    @EnvironmentObject private var appState: AppState
+    @SafeEnvironmentObject(fallback: { AppState.createFallback() }) private var appState: AppState
     
     // MARK: - State Management
     

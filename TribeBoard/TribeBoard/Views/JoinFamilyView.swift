@@ -312,24 +312,13 @@ struct ErrorMessageView: View {
 #Preview {
     NavigationStack {
         JoinFamilyView()
-            .environmentObject({
-                let appState = AppState()
-                appState.currentUser = MockDataGenerator.mockAuthenticatedUser()
-                return appState
-            }())
     }
+    .previewEnvironment(.authenticated)
 }
 
 #Preview("With Error") {
     NavigationStack {
         JoinFamilyView()
-            .environmentObject({
-                let appState = AppState()
-                appState.currentUser = MockDataGenerator.mockAuthenticatedUser()
-                return appState
-            }())
-            .onAppear {
-                // This would show an error state in the preview
-            }
     }
+    .previewEnvironmentError()
 }

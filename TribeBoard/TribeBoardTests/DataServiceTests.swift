@@ -35,7 +35,7 @@ final class DataServiceTests: XCTestCase {
         XCTAssertTrue(family.isFullyValid)
     }
     
-    func testCreateFamilyWithInvalidName() {
+    @MainActor func testCreateFamilyWithInvalidName() {
         XCTAssertThrowsError(try dataService.createFamily(
             name: "",
             code: "TEST123",
@@ -49,7 +49,7 @@ final class DataServiceTests: XCTestCase {
         }
     }
     
-    func testCreateFamilyWithInvalidCode() {
+    @MainActor func testCreateFamilyWithInvalidCode() {
         XCTAssertThrowsError(try dataService.createFamily(
             name: "Test Family",
             code: "12", // Too short
@@ -105,7 +105,7 @@ final class DataServiceTests: XCTestCase {
         XCTAssertTrue(userProfile.isFullyValid)
     }
     
-    func testCreateUserProfileWithInvalidName() {
+    @MainActor func testCreateUserProfileWithInvalidName() {
         XCTAssertThrowsError(try dataService.createUserProfile(
             displayName: "",
             appleUserIdHash: "hash123456789"
@@ -275,7 +275,7 @@ final class DataServiceTests: XCTestCase {
         XCTAssertEqual(fetchedFamily?.code, "TEST123")
     }
     
-    func testFetchFamilySafely_InvalidCode() {
+    @MainActor func testFetchFamilySafely_InvalidCode() {
         // Test with empty code
         XCTAssertThrowsError(try dataService.fetchFamily(byCode: "")) { error in
             if case DataServiceError.invalidData(let message) = error {
@@ -468,15 +468,15 @@ final class DataServiceTests: XCTestCase {
     // MARK: - Enhanced Validation Tests
     
     func testFamilyValidation() throws {
-        let validResult = try dataService.validateFamily(name: "Valid Family", code: "VALID1")
+        let validResult = try dataService.validateFamily(name: "Valid Family", code: "VALID1", createdByUserId: UUID())
         XCTAssertTrue(validResult.isValid)
         
-        let invalidResult = try dataService.validateFamily(name: "", code: "12")
+        let invalidResult = try dataService.validateFamily(name: "", code: "12", createdByUserId: UUID())
         XCTAssertFalse(invalidResult.isValid)
         XCTAssertFalse(invalidResult.message.isEmpty)
     }
     
-    func testUserProfileValidation() {
+    @MainActor func testUserProfileValidation() {
         let validResult = dataService.validateUserProfile(displayName: "John Doe", appleUserIdHash: "hash123456789")
         XCTAssertTrue(validResult.isValid)
         
@@ -485,7 +485,7 @@ final class DataServiceTests: XCTestCase {
         XCTAssertFalse(invalidResult.message.isEmpty)
     }
     
-    func testFamilyCodeFormat() {
+    @MainActor func testFamilyCodeFormat() {
         XCTAssertTrue(dataService.isValidFamilyCodeFormat("ABC123"))
         XCTAssertTrue(dataService.isValidFamilyCodeFormat("ABCD1234"))
         XCTAssertFalse(dataService.isValidFamilyCodeFormat("AB12")) // Too short
@@ -494,7 +494,7 @@ final class DataServiceTests: XCTestCase {
         XCTAssertFalse(dataService.isValidFamilyCodeFormat("")) // Empty
     }
     
-    func testEdgeCaseValidation() {
+    @MainActor func testEdgeCaseValidation() {
         // Test whitespace handling
         XCTAssertThrowsError(try dataService.createFamily(
             name: "   ",

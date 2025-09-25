@@ -4,9 +4,9 @@ import SwiftUI
 
 final class NavigationItemTests: XCTestCase {
     
-    func testNavigationItemInitialization() {
+    @MainActor func testNavigationItemInitialization() {
         // Given
-        let tab = NavigationTab.home
+        let tab = NavigationTab.dashboard
         let isActive = true
         var tapCalled = false
         let onTap = { tapCalled = true }
@@ -27,7 +27,7 @@ final class NavigationItemTests: XCTestCase {
         XCTAssertTrue(tapCalled)
     }
     
-    func testNavigationTabProperties() {
+    @MainActor func testNavigationTabProperties() {
         // Test all navigation tabs have required properties
         for tab in NavigationTab.allCases {
             XCTAssertFalse(tab.displayName.isEmpty, "Display name should not be empty for \(tab)")
@@ -36,39 +36,39 @@ final class NavigationItemTests: XCTestCase {
         }
     }
     
-    func testNavigationTabDisplayNames() {
+    @MainActor func testNavigationTabDisplayNames() {
         // Test specific display names
-        XCTAssertEqual(NavigationTab.home.displayName, "Home")
+        XCTAssertEqual(NavigationTab.dashboard.displayName, "Dashboard")
         XCTAssertEqual(NavigationTab.schoolRun.displayName, "School Run")
-        XCTAssertEqual(NavigationTab.shopping.displayName, "Shopping")
+        XCTAssertEqual(NavigationTab.messages.displayName, "Messages")
         XCTAssertEqual(NavigationTab.tasks.displayName, "Tasks")
     }
     
-    func testNavigationTabIcons() {
+    @MainActor func testNavigationTabIcons() {
         // Test that icons are valid SF Symbols
-        XCTAssertEqual(NavigationTab.home.icon, "house")
-        XCTAssertEqual(NavigationTab.home.activeIcon, "house.fill")
+        XCTAssertEqual(NavigationTab.dashboard.icon, "house")
+        XCTAssertEqual(NavigationTab.dashboard.activeIcon, "house.fill")
         
         XCTAssertEqual(NavigationTab.schoolRun.icon, "bus")
         XCTAssertEqual(NavigationTab.schoolRun.activeIcon, "bus.fill")
         
-        XCTAssertEqual(NavigationTab.shopping.icon, "cart")
-        XCTAssertEqual(NavigationTab.shopping.activeIcon, "cart.fill")
+        XCTAssertEqual(NavigationTab.messages.icon, "message")
+        XCTAssertEqual(NavigationTab.messages.activeIcon, "message.fill")
         
         XCTAssertEqual(NavigationTab.tasks.icon, "checkmark.circle")
         XCTAssertEqual(NavigationTab.tasks.activeIcon, "checkmark.circle.fill")
     }
     
-    func testNavigationItemAccessibilityLabels() {
+    @MainActor func testNavigationItemAccessibilityLabels() {
         // Test accessibility labels for active state
-        let activeItem = NavigationItem(tab: .home, isActive: true, onTap: {})
+        let activeItem = NavigationItem(tab: .dashboard, isActive: true, onTap: {})
         let expectedActiveLabel = "Home, selected"
         // Note: In a real test, we would need to access the accessibility properties
         // This is a conceptual test showing what should be verified
         
         // Test accessibility labels for inactive state
-        let inactiveItem = NavigationItem(tab: .home, isActive: false, onTap: {})
-        let expectedInactiveLabel = "Home"
+        let inactiveItem = NavigationItem(tab: .dashboard, isActive: false, onTap: {})
+        let expectedInactiveLabel = "Dashboard"
         // Note: In a real test, we would need to access the accessibility properties
         
         // These assertions would need proper SwiftUI testing framework

@@ -6,7 +6,7 @@ class FamilyCreationErrorTests: XCTestCase {
     
     // MARK: - FamilyCreationError Tests
     
-    func testFamilyCreationErrorUserFriendlyMessages() {
+    @MainActor func testFamilyCreationErrorUserFriendlyMessages() {
         let validationError = FamilyCreationError.validationFailed("Name too short")
         XCTAssertEqual(validationError.userFriendlyMessage, "Please check your input: Name too short")
         
@@ -17,7 +17,7 @@ class FamilyCreationErrorTests: XCTestCase {
         XCTAssertEqual(authError.userFriendlyMessage, "Please sign in to create a family.")
     }
     
-    func testFamilyCreationErrorRetryability() {
+    @MainActor func testFamilyCreationErrorRetryability() {
         // Retryable errors
         XCTAssertTrue(FamilyCreationError.networkUnavailable.isRetryable)
         XCTAssertTrue(FamilyCreationError.codeCollisionDetected.isRetryable)
@@ -29,20 +29,20 @@ class FamilyCreationErrorTests: XCTestCase {
         XCTAssertFalse(FamilyCreationError.validationFailed("test").isRetryable)
     }
     
-    func testFamilyCreationErrorCategories() {
+    @MainActor func testFamilyCreationErrorCategories() {
         XCTAssertEqual(FamilyCreationError.validationFailed("test").category, .validation)
         XCTAssertEqual(FamilyCreationError.networkUnavailable.category, .network)
         XCTAssertEqual(FamilyCreationError.userNotAuthenticated.category, .authentication)
         XCTAssertEqual(FamilyCreationError.cloudKitUnavailable.category, .cloudKit)
     }
     
-    func testFamilyCreationErrorPriorities() {
+    @MainActor func testFamilyCreationErrorPriorities() {
         XCTAssertEqual(FamilyCreationError.userNotAuthenticated.priority, .high)
         XCTAssertEqual(FamilyCreationError.validationFailed("test").priority, .medium)
         XCTAssertEqual(FamilyCreationError.networkUnavailable.priority, .low)
     }
     
-    func testFamilyCreationErrorRecoveryStrategies() {
+    @MainActor func testFamilyCreationErrorRecoveryStrategies() {
         let networkError = FamilyCreationError.networkUnavailable
         if case .automaticRetry(let delay, let maxAttempts) = networkError.recoveryStrategy {
             XCTAssertEqual(delay, 2.0)
@@ -58,7 +58,7 @@ class FamilyCreationErrorTests: XCTestCase {
         XCTAssertEqual(validationError.recoveryStrategy, .userIntervention)
     }
     
-    func testServerErrorRetryability() {
+    @MainActor func testServerErrorRetryability() {
         let serverError500 = FamilyCreationError.serverError(500)
         XCTAssertTrue(serverError500.isRetryable)
         
@@ -68,13 +68,13 @@ class FamilyCreationErrorTests: XCTestCase {
     
     // MARK: - FamilyCodeGenerationError Tests
     
-    func testFamilyCodeGenerationErrorRetryability() {
+    @MainActor func testFamilyCodeGenerationErrorRetryability() {
         XCTAssertTrue(FamilyCodeGenerationError.uniquenessCheckFailed.isRetryable)
         XCTAssertFalse(FamilyCodeGenerationError.maxAttemptsExceeded.isRetryable)
         XCTAssertFalse(FamilyCodeGenerationError.formatValidationFailed("test").isRetryable)
     }
     
-    func testFamilyCodeGenerationErrorRecoveryStrategies() {
+    @MainActor func testFamilyCodeGenerationErrorRecoveryStrategies() {
         let uniquenessError = FamilyCodeGenerationError.uniquenessCheckFailed
         if case .automaticRetry(let delay, let maxAttempts) = uniquenessError.recoveryStrategy {
             XCTAssertEqual(delay, 1.0)
@@ -89,7 +89,7 @@ class FamilyCreationErrorTests: XCTestCase {
     
     // MARK: - FamilyCreationState Tests
     
-    func testFamilyCreationStateProperties() {
+    @MainActor func testFamilyCreationStateProperties() {
         XCTAssertFalse(FamilyCreationState.idle.isActive)
         XCTAssertTrue(FamilyCreationState.validating.isActive)
         XCTAssertTrue(FamilyCreationState.generatingCode.isLoading)
@@ -97,7 +97,7 @@ class FamilyCreationErrorTests: XCTestCase {
         XCTAssertTrue(FamilyCreationState.failed(.networkUnavailable).isFailed)
     }
     
-    func testFamilyCreationStateProgress() {
+    @MainActor func testFamilyCreationStateProgress() {
         XCTAssertEqual(FamilyCreationState.idle.progress, 0.0)
         XCTAssertEqual(FamilyCreationState.validating.progress, 0.2)
         XCTAssertEqual(FamilyCreationState.generatingCode.progress, 0.4)
@@ -107,7 +107,7 @@ class FamilyCreationErrorTests: XCTestCase {
         XCTAssertEqual(FamilyCreationState.failed(.networkUnavailable).progress, 0.0)
     }
     
-    func testFamilyCreationStateTransitions() {
+    @MainActor func testFamilyCreationStateTransitions() {
         // Valid transitions
         XCTAssertTrue(FamilyCreationState.idle.canTransition(to: .validating))
         XCTAssertTrue(FamilyCreationState.validating.canTransition(to: .generatingCode))
@@ -124,7 +124,7 @@ class FamilyCreationErrorTests: XCTestCase {
         XCTAssertTrue(FamilyCreationState.generatingCode.canTransition(to: .failed(.maxRetriesExceeded)))
     }
     
-    func testFamilyCreationStateUserDescriptions() {
+    @MainActor func testFamilyCreationStateUserDescriptions() {
         XCTAssertEqual(FamilyCreationState.idle.userDescription, "Ready to create family")
         XCTAssertEqual(FamilyCreationState.validating.userDescription, "Validating family information...")
         XCTAssertEqual(FamilyCreationState.completed.userDescription, "Family created successfully!")
@@ -133,7 +133,7 @@ class FamilyCreationErrorTests: XCTestCase {
         XCTAssertTrue(failedState.userDescription.contains("Creation failed"))
     }
     
-    func testFamilyCreationStateRetryCapability() {
+    @MainActor func testFamilyCreationStateRetryCapability() {
         let retryableFailedState = FamilyCreationState.failed(.networkUnavailable)
         XCTAssertTrue(retryableFailedState.allowsRetry)
         
@@ -146,7 +146,7 @@ class FamilyCreationErrorTests: XCTestCase {
     
     // MARK: - FamilyCreationStateManager Tests
     
-    func testStateManagerInitialization() {
+    @MainActor func testStateManagerInitialization() {
         let stateManager = FamilyCreationStateManager()
         XCTAssertEqual(stateManager.currentState, .idle)
         XCTAssertFalse(stateManager.isActive)
@@ -155,7 +155,7 @@ class FamilyCreationErrorTests: XCTestCase {
         XCTAssertEqual(stateManager.progress, 0.0)
     }
     
-    func testStateManagerTransitions() {
+    @MainActor func testStateManagerTransitions() {
         let stateManager = FamilyCreationStateManager()
         
         // Valid transition
@@ -173,7 +173,7 @@ class FamilyCreationErrorTests: XCTestCase {
         XCTAssertFalse(stateManager.isActive)
     }
     
-    func testStateManagerFailure() {
+    @MainActor func testStateManagerFailure() {
         let stateManager = FamilyCreationStateManager()
         
         stateManager.transition(to: .validating)
@@ -183,7 +183,7 @@ class FamilyCreationErrorTests: XCTestCase {
         XCTAssertEqual(stateManager.currentError, .networkUnavailable)
     }
     
-    func testStateManagerReset() {
+    @MainActor func testStateManagerReset() {
         let stateManager = FamilyCreationStateManager()
         
         stateManager.transition(to: .validating)
@@ -195,7 +195,7 @@ class FamilyCreationErrorTests: XCTestCase {
         XCTAssertEqual(stateManager.getStateHistory().first, .idle)
     }
     
-    func testStateManagerRetry() {
+    @MainActor func testStateManagerRetry() {
         let stateManager = FamilyCreationStateManager()
         
         // Fail with retryable error
@@ -210,7 +210,7 @@ class FamilyCreationErrorTests: XCTestCase {
     
     // MARK: - ErrorHandlingUtilities Tests
     
-    func testErrorCategorization() {
+    @MainActor func testErrorCategorization() {
         let dataServiceError = DataServiceError.validationFailed(["test"])
         let categorizedError = ErrorHandlingUtilities.categorizeError(dataServiceError)
         
@@ -221,7 +221,7 @@ class FamilyCreationErrorTests: XCTestCase {
         }
     }
     
-    func testErrorContextCreation() {
+    @MainActor func testErrorContextCreation() {
         let error = FamilyCreationError.networkUnavailable
         let context = ErrorContext(error: error, retryCount: 2)
         
@@ -231,7 +231,7 @@ class FamilyCreationErrorTests: XCTestCase {
         XCTAssertTrue(context.isRetryable)
     }
     
-    func testRecoveryStrategyDetermination() {
+    @MainActor func testRecoveryStrategyDetermination() {
         let error = FamilyCreationError.networkUnavailable
         let context = ErrorContext(error: error)
         let recoveryAction = ErrorHandlingUtilities.determineRecoveryStrategy(for: error, context: context)
@@ -247,7 +247,7 @@ class FamilyCreationErrorTests: XCTestCase {
     
     // MARK: - Enhanced Error Recovery Strategy Tests
     
-    func testErrorRecoveryStrategyExecution() {
+    @MainActor func testErrorRecoveryStrategyExecution() {
         let networkError = FamilyCreationError.networkUnavailable
         let strategy = networkError.recoveryStrategy
         
@@ -268,7 +268,7 @@ class FamilyCreationErrorTests: XCTestCase {
         XCTAssertEqual(noRecoveryError.recoveryStrategy, .noRecovery)
     }
     
-    func testNestedErrorRecoveryStrategies() {
+    @MainActor func testNestedErrorRecoveryStrategies() {
         let localError = DataServiceError.validationFailed(["test"])
         let familyError = FamilyCreationError.localCreationFailed(localError)
         
@@ -290,7 +290,7 @@ class FamilyCreationErrorTests: XCTestCase {
         }
     }
     
-    func testErrorPriorityEscalation() {
+    @MainActor func testErrorPriorityEscalation() {
         // Test that error priorities are correctly assigned
         let highPriorityErrors: [FamilyCreationError] = [
             .userNotAuthenticated,
@@ -326,7 +326,7 @@ class FamilyCreationErrorTests: XCTestCase {
     
     // MARK: - Error Context and Analytics Tests
     
-    func testErrorContextCreation() {
+    @MainActor func testErrorContextCreation() {
         let error = FamilyCreationError.networkUnavailable
         let context = ErrorContext(error: error, retryCount: 2)
         
@@ -338,7 +338,7 @@ class FamilyCreationErrorTests: XCTestCase {
         XCTAssertEqual(context.recoveryStrategy, .automaticRetry(delay: 2.0, maxAttempts: 3))
     }
     
-    func testErrorContextWithAdditionalInfo() {
+    @MainActor func testErrorContextWithAdditionalInfo() {
         let error = FamilyCreationError.validationFailed("Name too short")
         let additionalInfo = ["field": "familyName", "value": "A", "minLength": "2"]
         let context = ErrorContext(error: error, additionalInfo: additionalInfo)
@@ -348,7 +348,7 @@ class FamilyCreationErrorTests: XCTestCase {
         XCTAssertEqual(context.additionalInfo?["minLength"] as? String, "2")
     }
     
-    func testErrorAnalyticsRecording() {
+    @MainActor func testErrorAnalyticsRecording() {
         let error = FamilyCreationError.codeGenerationFailed(.maxAttemptsExceeded)
         let state = FamilyCreationState.generatingCode
         
@@ -368,7 +368,7 @@ class FamilyCreationErrorTests: XCTestCase {
     
     // MARK: - Edge Case Error Tests
     
-    func testErrorEquality() {
+    @MainActor func testErrorEquality() {
         // Test error equality for different error types
         let error1 = FamilyCreationError.validationFailed("test")
         let error2 = FamilyCreationError.validationFailed("test")
@@ -389,7 +389,7 @@ class FamilyCreationErrorTests: XCTestCase {
         XCTAssertNotEqual(serverError1, serverError3)
     }
     
-    func testErrorChaining() {
+    @MainActor func testErrorChaining() {
         let originalError = NSError(domain: "TestDomain", code: 123, userInfo: [NSLocalizedDescriptionKey: "Original error"])
         let wrappedError = FamilyCreationError.unknownError(originalError)
         
@@ -399,7 +399,7 @@ class FamilyCreationErrorTests: XCTestCase {
         XCTAssertEqual(wrappedError.priority, .medium)
     }
     
-    func testComplexErrorScenarios() {
+    @MainActor func testComplexErrorScenarios() {
         // Test complex nested error scenarios
         let dataServiceError = DataServiceError.constraintViolation("Duplicate family code")
         let familyError = FamilyCreationError.localCreationFailed(dataServiceError)
@@ -420,7 +420,7 @@ class FamilyCreationErrorTests: XCTestCase {
     
     // MARK: - State Machine Edge Cases
     
-    func testStateTransitionValidation() {
+    @MainActor func testStateTransitionValidation() {
         let stateManager = FamilyCreationStateManager()
         
         // Test invalid transitions are rejected
@@ -443,7 +443,7 @@ class FamilyCreationErrorTests: XCTestCase {
         XCTAssertEqual(stateManager.currentState, .idle)
     }
     
-    func testStateHistoryTracking() {
+    @MainActor func testStateHistoryTracking() {
         let stateManager = FamilyCreationStateManager()
         
         stateManager.transition(to: .validating)
@@ -457,7 +457,7 @@ class FamilyCreationErrorTests: XCTestCase {
         XCTAssertEqual(history.last, .idle)
     }
     
-    func testConcurrentStateTransitions() {
+    @MainActor func testConcurrentStateTransitions() {
         let stateManager = FamilyCreationStateManager()
         let expectation = XCTestExpectation(description: "Concurrent transitions")
         
@@ -479,7 +479,7 @@ class FamilyCreationErrorTests: XCTestCase {
     
     // MARK: - Integration Tests
     
-    func testErrorToStateTransition() {
+    @MainActor func testErrorToStateTransition() {
         let stateManager = FamilyCreationStateManager()
         
         // Test different error scenarios
@@ -501,7 +501,7 @@ class FamilyCreationErrorTests: XCTestCase {
         }
     }
     
-    func testCompleteErrorHandlingFlow() {
+    @MainActor func testCompleteErrorHandlingFlow() {
         let stateManager = FamilyCreationStateManager()
         
         // Start creation process
@@ -528,7 +528,7 @@ class FamilyCreationErrorTests: XCTestCase {
         XCTAssertEqual(stateManager.progress, 1.0)
     }
     
-    func testErrorRecoveryWithBackoff() {
+    @MainActor func testErrorRecoveryWithBackoff() {
         let stateManager = FamilyCreationStateManager()
         
         // Test exponential backoff behavior
@@ -549,7 +549,7 @@ class FamilyCreationErrorTests: XCTestCase {
         XCTAssertGreaterThan(elapsedTime, 0.0)
     }
     
-    func testErrorHandlingWithNotifications() {
+    @MainActor func testErrorHandlingWithNotifications() {
         let stateManager = FamilyCreationStateManager()
         let expectation = XCTestExpectation(description: "State change notification")
         

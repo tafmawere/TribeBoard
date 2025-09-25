@@ -7,7 +7,7 @@ final class ModelTests: XCTestCase {
     
     // MARK: - Family Model Tests
     
-    func testFamilyValidation() {
+    @MainActor func testFamilyValidation() {
         let validFamily = Family(
             name: "Valid Family",
             code: "VALID1",
@@ -19,7 +19,7 @@ final class ModelTests: XCTestCase {
         XCTAssertTrue(validFamily.isFullyValid)
     }
     
-    func testFamilyNameValidation() {
+    @MainActor func testFamilyNameValidation() {
         let shortNameFamily = Family(
             name: "A",
             code: "VALID1",
@@ -42,7 +42,7 @@ final class ModelTests: XCTestCase {
         XCTAssertFalse(emptyNameFamily.isNameValid)
     }
     
-    func testFamilyCodeValidation() {
+    @MainActor func testFamilyCodeValidation() {
         let shortCodeFamily = Family(
             name: "Valid Family",
             code: "ABC12",
@@ -74,7 +74,7 @@ final class ModelTests: XCTestCase {
     
     // MARK: - UserProfile Model Tests
     
-    func testUserProfileValidation() {
+    @MainActor func testUserProfileValidation() {
         let validUser = UserProfile(
             displayName: "John Doe",
             appleUserIdHash: "hash123456789"
@@ -85,7 +85,7 @@ final class ModelTests: XCTestCase {
         XCTAssertTrue(validUser.isFullyValid)
     }
     
-    func testUserProfileDisplayNameValidation() {
+    @MainActor func testUserProfileDisplayNameValidation() {
         let emptyNameUser = UserProfile(
             displayName: "",
             appleUserIdHash: "hash123456789"
@@ -105,7 +105,7 @@ final class ModelTests: XCTestCase {
         XCTAssertFalse(whitespaceNameUser.isDisplayNameValid)
     }
     
-    func testUserProfileAppleIdHashValidation() {
+    @MainActor func testUserProfileAppleIdHashValidation() {
         let emptyHashUser = UserProfile(
             displayName: "John Doe",
             appleUserIdHash: ""
@@ -121,7 +121,7 @@ final class ModelTests: XCTestCase {
     
     // MARK: - Membership Model Tests
     
-    func testMembershipValidation() {
+    @MainActor func testMembershipValidation() {
         let user = UserProfile(
             displayName: "John Doe",
             appleUserIdHash: "hash123456789"
@@ -145,7 +145,7 @@ final class ModelTests: XCTestCase {
         XCTAssertFalse(membership.isParentAdmin)
     }
     
-    func testMembershipRoleProperties() {
+    @MainActor func testMembershipRoleProperties() {
         let user = UserProfile(
             displayName: "John Doe",
             appleUserIdHash: "hash123456789"
@@ -168,7 +168,7 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(parentAdminMembership.familyName, "Test Family")
     }
     
-    func testMembershipRoleChange() {
+    @MainActor func testMembershipRoleChange() {
         let user = UserProfile(
             displayName: "John Doe",
             appleUserIdHash: "hash123456789"
@@ -193,7 +193,7 @@ final class ModelTests: XCTestCase {
         XCTAssertTrue(membership.needsSync)
     }
     
-    func testMembershipCanChangeRole() {
+    @MainActor func testMembershipCanChangeRole() {
         let user1 = UserProfile(
             displayName: "User 1",
             appleUserIdHash: "hash1"
@@ -235,7 +235,7 @@ final class ModelTests: XCTestCase {
         XCTAssertFalse(adultMembership.canChangeRole(to: .adult, in: family))
     }
     
-    func testMembershipStatusChanges() {
+    @MainActor func testMembershipStatusChanges() {
         let user = UserProfile(
             displayName: "John Doe",
             appleUserIdHash: "hash123456789"
@@ -270,14 +270,14 @@ final class ModelTests: XCTestCase {
     
     // MARK: - Role Enum Tests
     
-    func testRoleDisplayNames() {
+    @MainActor func testRoleDisplayNames() {
         XCTAssertEqual(Role.parentAdmin.displayName, "Parent Admin")
         XCTAssertEqual(Role.adult.displayName, "Adult")
         XCTAssertEqual(Role.kid.displayName, "Kid")
         XCTAssertEqual(Role.visitor.displayName, "Visitor")
     }
     
-    func testRoleDescriptions() {
+    @MainActor func testRoleDescriptions() {
         XCTAssertFalse(Role.parentAdmin.description.isEmpty)
         XCTAssertFalse(Role.adult.description.isEmpty)
         XCTAssertFalse(Role.kid.description.isEmpty)
@@ -286,7 +286,7 @@ final class ModelTests: XCTestCase {
     
     // MARK: - MembershipStatus Enum Tests
     
-    func testMembershipStatusDisplayNames() {
+    @MainActor func testMembershipStatusDisplayNames() {
         XCTAssertEqual(MembershipStatus.active.displayName, "Active")
         XCTAssertEqual(MembershipStatus.invited.displayName, "Invited")
         XCTAssertEqual(MembershipStatus.removed.displayName, "Removed")
@@ -294,7 +294,7 @@ final class ModelTests: XCTestCase {
     
     // MARK: - Family Relationship Tests
     
-    func testFamilyActiveMembers() {
+    @MainActor func testFamilyActiveMembers() {
         let user1 = UserProfile(
             displayName: "User 1",
             appleUserIdHash: "hash1"
@@ -330,7 +330,7 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(family.activeMembers.first?.user?.id, user1.id)
     }
     
-    func testFamilyParentAdmin() {
+    @MainActor func testFamilyParentAdmin() {
         let user1 = UserProfile(
             displayName: "User 1",
             appleUserIdHash: "hash1"

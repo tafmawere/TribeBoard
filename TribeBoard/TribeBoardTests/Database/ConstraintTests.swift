@@ -13,7 +13,7 @@ final class ConstraintTests: DatabaseTestBase {
         print("🧪 Testing only one parent admin per family constraint...")
         
         // Create test data
-        let family = try createTestFamily(name: "Admin Test Family", code: "ADMIN1")
+        let family = try createTestFamily(name: "Admin Test Family", code: "ADMIN1", createdByUserId: UUID())
         let user1 = try createTestUser(displayName: "First Admin", appleUserIdHash: "admin1_hash_1234567890")
         let user2 = try createTestUser(displayName: "Second Admin", appleUserIdHash: "admin2_hash_1234567890")
         
@@ -48,7 +48,7 @@ final class ConstraintTests: DatabaseTestBase {
         print("🧪 Testing parent admin uniqueness during role changes...")
         
         // Create family with existing parent admin
-        let family = try createTestFamily(name: "Role Change Family", code: "ROLE01")
+        let family = try createTestFamily(name: "Role Change Family", code: "ROLE01", createdByUserId: UUID())
         let parentUser = try createTestUser(displayName: "Existing Parent", appleUserIdHash: "parent_hash_1234567890")
         let adultUser = try createTestUser(displayName: "Adult User", appleUserIdHash: "adult_hash_1234567890")
         
@@ -94,8 +94,8 @@ final class ConstraintTests: DatabaseTestBase {
         print("🧪 Testing parent admin constraint across multiple families...")
         
         // Create multiple families
-        let family1 = try createTestFamily(name: "Family 1", code: "FAM001")
-        let family2 = try createTestFamily(name: "Family 2", code: "FAM002")
+        let family1 = try createTestFamily(name: "Family 1", code: "FAM001", createdByUserId: UUID())
+        let family2 = try createTestFamily(name: "Family 2", code: "FAM002", createdByUserId: UUID())
         
         // Create users
         let user1 = try createTestUser(displayName: "Multi-Family User", appleUserIdHash: "multi_hash_1234567890")
@@ -132,7 +132,7 @@ final class ConstraintTests: DatabaseTestBase {
         print("🧪 Testing user cannot have multiple active memberships in same family...")
         
         // Create test data
-        let family = try createTestFamily(name: "Duplicate Test Family", code: "DUP001")
+        let family = try createTestFamily(name: "Duplicate Test Family", code: "DUP001", createdByUserId: UUID())
         let user = try createTestUser(displayName: "Duplicate User", appleUserIdHash: "dup_hash_1234567890")
         
         // Create first membership
@@ -172,7 +172,7 @@ final class ConstraintTests: DatabaseTestBase {
         print("🧪 Testing duplicate membership constraint with different statuses...")
         
         // Create test data
-        let family = try createTestFamily(name: "Status Test Family", code: "STAT01")
+        let family = try createTestFamily(name: "Status Test Family", code: "STAT01", createdByUserId: UUID())
         let user = try createTestUser(displayName: "Status User", appleUserIdHash: "status_hash_1234567890")
         
         // Create active membership
@@ -279,7 +279,7 @@ final class ConstraintTests: DatabaseTestBase {
         print("🧪 Testing role change validation edge cases...")
         
         // Create test data
-        let family = try createTestFamily(name: "Edge Case Family", code: "EDGE01")
+        let family = try createTestFamily(name: "Edge Case Family", code: "EDGE01", createdByUserId: UUID())
         let user = try createTestUser(displayName: "Edge User", appleUserIdHash: "edge_hash_1234567890")
         let membership = try createTestMembership(family: family, user: user, role: .adult)
         
@@ -317,7 +317,7 @@ final class ConstraintTests: DatabaseTestBase {
         print("🧪 Testing membership status changes maintain referential integrity...")
         
         // Create test data
-        let family = try createTestFamily(name: "Status Integrity Family", code: "INTEG1")
+        let family = try createTestFamily(name: "Status Integrity Family", code: "INTEG1", createdByUserId: UUID())
         let user = try createTestUser(displayName: "Status User", appleUserIdHash: "status_hash_1234567890")
         let membership = try createTestMembership(family: family, user: user, role: .parentAdmin)
         
@@ -364,8 +364,8 @@ final class ConstraintTests: DatabaseTestBase {
         print("🧪 Testing status changes with multiple memberships...")
         
         // Create test data with multiple families
-        let family1 = try createTestFamily(name: "Family 1", code: "MULTI1")
-        let family2 = try createTestFamily(name: "Family 2", code: "MULTI2")
+        let family1 = try createTestFamily(name: "Family 1", code: "MULTI1", createdByUserId: UUID())
+        let family2 = try createTestFamily(name: "Family 2", code: "MULTI2", createdByUserId: UUID())
         let user = try createTestUser(displayName: "Multi User", appleUserIdHash: "multi_hash_1234567890")
         
         let membership1 = try createTestMembership(family: family1, user: user, role: .parentAdmin)

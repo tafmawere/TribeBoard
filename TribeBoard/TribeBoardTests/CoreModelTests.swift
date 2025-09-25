@@ -127,7 +127,7 @@ final class CoreModelTests: XCTestCase {
     
     // MARK: - Validation Tests
     
-    func testFamilyValidation() {
+    @MainActor func testFamilyValidation() {
         // Valid family
         let validFamily = Family(
             name: "Valid Family",
@@ -153,7 +153,7 @@ final class CoreModelTests: XCTestCase {
         XCTAssertFalse(invalidCodeFamily.isFullyValid)
     }
     
-    func testUserProfileValidation() {
+    @MainActor func testUserProfileValidation() {
         // Valid user
         let validUser = UserProfile(
             displayName: "John Doe",
@@ -207,7 +207,7 @@ final class CoreModelTests: XCTestCase {
     
     // MARK: - Role and Status Tests
     
-    func testRoleEnumValues() {
+    @MainActor func testRoleEnumValues() {
         XCTAssertEqual(Role.parentAdmin.displayName, "Parent Admin")
         XCTAssertEqual(Role.adult.displayName, "Adult")
         XCTAssertEqual(Role.kid.displayName, "Kid")
@@ -219,7 +219,7 @@ final class CoreModelTests: XCTestCase {
         XCTAssertFalse(Role.visitor.description.isEmpty)
     }
     
-    func testMembershipStatusValues() {
+    @MainActor func testMembershipStatusValues() {
         XCTAssertEqual(MembershipStatus.active.displayName, "Active")
         XCTAssertEqual(MembershipStatus.invited.displayName, "Invited")
         XCTAssertEqual(MembershipStatus.removed.displayName, "Removed")

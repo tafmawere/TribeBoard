@@ -3,7 +3,7 @@ import SwiftUI
 /// NavigationView with List displaying all scheduled runs for browsing
 struct ScheduledRunsListView: View {
     @StateObject private var runManager = ScheduledSchoolRunManager()
-    @EnvironmentObject private var appState: AppState
+    @SafeEnvironmentObject(fallback: { AppState.createFallback() }) private var appState: AppState
     
     // Accessibility environment values
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -15,14 +15,14 @@ struct ScheduledRunsListView: View {
             if runManager.allRunsSorted.isEmpty {
                 EmptyStateView.noSchoolRuns(onAddRun: {
                     HapticManager.shared.lightImpact()
-                    appState.navigationPath.append(SchoolRunRoute.scheduleNew)
+                    safeNavigate(to: .scheduleNew)
                 })
             } else {
                 List {
                     ForEach(runManager.allRunsSorted) { run in
                         Button(action: {
                             HapticManager.shared.lightImpact()
-                            appState.navigationPath.append(SchoolRunRoute.runDetail(run))
+                            safeNavigate(to: .runDetail(run))
                         }) {
                             RunListRowView(run: run)
                         }
@@ -51,7 +51,7 @@ struct ScheduledRunsListView: View {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button(action: {
                     HapticManager.shared.lightImpact()
-                    appState.navigationPath.append(SchoolRunRoute.scheduleNew)
+                    safeNavigate(to: .scheduleNew)
                 }) {
                     Image(systemName: "plus")
                         .font(.title3)
@@ -65,6 +65,90 @@ struct ScheduledRunsListView: View {
         .accessibilityLabel("Scheduled runs list")
         .accessibilityHint("Browse all your scheduled school runs")
         .withToast()
+        .onAppear {
+            validateEnvironmentState()
+        }
+    }
+    
+    // MARK: - Safe Navigation Methods
+    
+    /// Safely navigate to a school run route with fallback error handling
+    /// - Parameter route: The route to navigate to
+    private func safeNavigate(to route: SchoolRunRoute) {
+        // Check if we're using a fallback AppState
+        if $appState.isUsingFallback {
+            handleFallbackNavigation(to: route)
+            return
+        }
+        
+        // Attempt normal navigation
+        do {
+            appState.navigationPath.append(route)
+        } catch {
+            handleNavigationError(error, route: route)
+        }
+    }
+    
+    /// Handle navigation when using fallback AppState
+    /// - Parameter route: The route that was requested
+    private func handleFallbackNavigation(to route: SchoolRunRoute) {
+        // Log the fallback navigation attempt
+        print("⚠️ ScheduledRunsListView: Navigation attempted with fallback AppState for route: \(route)")
+        
+        // For fallback scenarios, we can't navigate but we should inform the user
+        // In a real app, you might show a toast or alert
+        // For now, we'll just log and potentially show a message
+        
+        switch route {
+        case .scheduleNew:
+            print("📝 User attempted to schedule new run - fallback mode active")
+            // Could show a toast: "Please restart the app to schedule new runs"
+        case .runDetail(let run):
+            print("👁️ User attempted to view run details for: \(run.name) - fallback mode active")
+            // Could show a toast: "Please restart the app to view run details"
+        default:
+            print("🔄 Navigation attempted in fallback mode for: \(route)")
+        }
+    }
+    
+    /// Handle navigation errors with user-friendly feedback
+    /// - Parameters:
+    ///   - error: The navigation error that occurred
+    ///   - route: The route that failed to navigate
+    private func handleNavigationError(_ error: Error, route: SchoolRunRoute) {
+        print("❌ ScheduledRunsListView: Navigation error for route \(route): \(error.localizedDescription)")
+        
+        // In a production app, you might:
+        // 1. Show a toast notification
+        // 2. Log to analytics
+        // 3. Attempt recovery
+        // 4. Provide user feedback
+        
+        // For now, we'll attempt a fallback navigation
+        handleFallbackNavigation(to: route)
+    }
+    
+    /// Validate the current environment state and log any issues
+    private func validateEnvironmentState() {
+        let environmentInfo = $appState
+        
+        if environmentInfo.isUsingFallback {
+            print("⚠️ ScheduledRunsListView: Using fallback AppState - some functionality may be limited")
+            
+            // Log validation details
+            let validationResult = environmentInfo.validationResult
+            if !validationResult.isValid {
+                print("❌ Environment validation failed:")
+                if let error = validationResult.error {
+                    print("   Error: \(error.localizedDescription)")
+                }
+                validationResult.recommendations.forEach { recommendation in
+                    print("   💡 Recommendation: \(recommendation)")
+                }
+            }
+        } else {
+            print("✅ ScheduledRunsListView: Using proper environment AppState")
+        }
     }
 }
 
@@ -253,49 +337,75 @@ struct RunListRowView: View {
 // MARK: - Preview
 
 #Preview("Scheduled Runs - With Data") {
-    SchoolRunPreviewProvider.previewWithSampleData {
-        NavigationStack {
-            ScheduledRunsListView()
-        }
+    NavigationStack {
+        ScheduledRunsListView()
     }
+    .previewEnvironment()
 }
 
 #Preview("Scheduled Runs - Empty State") {
-    SchoolRunPreviewProvider.previewWithSampleData {
-        NavigationStack {
-            ScheduledRunsListView()
-                .onAppear {
-                    // This would show empty state if no runs exist
-                }
-        }
+    NavigationStack {
+        ScheduledRunsListView()
     }
+    .previewEnvironment()
+}
+
+#Preview("Scheduled Runs - Parent Admin Role") {
+    NavigationStack {
+        ScheduledRunsListView()
+    }
+    .previewEnvironment(role: .parentAdmin)
+}
+
+#Preview("Scheduled Runs - Kid Role") {
+    NavigationStack {
+        ScheduledRunsListView()
+    }
+    .previewEnvironment(role: .kid)
+}
+
+#Preview("Scheduled Runs - Without Environment Object (Fallback)") {
+    NavigationStack {
+        ScheduledRunsListView()
+    }
+    // Intentionally not providing environment object to test fallback behavior
 }
 
 #Preview("Scheduled Runs - Dark Mode") {
-    SchoolRunPreviewProvider.previewWithSampleData {
-        NavigationStack {
-            ScheduledRunsListView()
-        }
+    NavigationStack {
+        ScheduledRunsListView()
     }
+    .previewEnvironment()
     .preferredColorScheme(.dark)
 }
 
 #Preview("Scheduled Runs - Large Text") {
-    SchoolRunPreviewProvider.previewWithSampleData {
-        NavigationStack {
-            ScheduledRunsListView()
-        }
+    NavigationStack {
+        ScheduledRunsListView()
     }
+    .previewEnvironment()
     .environment(\.dynamicTypeSize, .accessibility1)
 }
 
 #Preview("Scheduled Runs - High Contrast") {
-    SchoolRunPreviewProvider.previewWithSampleData {
-        NavigationStack {
-            ScheduledRunsListView()
-        }
+    NavigationStack {
+        ScheduledRunsListView()
     }
+    .previewEnvironment()
+}
 
+#Preview("Scheduled Runs - Loading State") {
+    NavigationStack {
+        ScheduledRunsListView()
+    }
+    .previewEnvironmentLoading()
+}
+
+#Preview("Scheduled Runs - Error State") {
+    NavigationStack {
+        ScheduledRunsListView()
+    }
+    .previewEnvironmentError()
 }
 
 #Preview("Run List Row - Various States") {
@@ -317,6 +427,7 @@ struct RunListRowView: View {
     }
     .screenPadding()
     .background(Color(.systemGroupedBackground))
+    .previewEnvironment()
 }
 
 #Preview("Run List Row - Dark Mode") {
@@ -326,6 +437,7 @@ struct RunListRowView: View {
     }
     .screenPadding()
     .background(Color(.systemGroupedBackground))
+    .previewEnvironment()
     .preferredColorScheme(.dark)
 }
 
@@ -335,6 +447,7 @@ struct RunListRowView: View {
     }
     .screenPadding()
     .background(Color(.systemGroupedBackground))
+    .previewEnvironment()
     .environment(\.dynamicTypeSize, .accessibility2)
 }
 
@@ -342,4 +455,5 @@ struct RunListRowView: View {
     EmptyStateView.noSchoolRuns(onAddRun: {})
         .screenPadding()
         .background(Color(.systemGroupedBackground))
+        .previewEnvironment()
 }

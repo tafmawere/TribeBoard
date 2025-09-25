@@ -42,7 +42,7 @@ final class FamilyDashboardViewModelTests: XCTestCase {
     
     // MARK: - Initialization Tests
     
-    func testInitialization() {
+    @MainActor func testInitialization() {
         XCTAssertEqual(viewModel.members.count, 0)
         XCTAssertEqual(viewModel.currentUserRole, .parentAdmin)
         XCTAssertFalse(viewModel.isLoading)
@@ -224,14 +224,14 @@ final class FamilyDashboardViewModelTests: XCTestCase {
     
     // MARK: - Permission Tests
     
-    func testCanChangeRole_ParentAdmin() {
+    @MainActor func testCanChangeRole_ParentAdmin() {
         // Parent Admin should be able to change any role
         let member = createTestMembership(role: .adult, displayName: "Test Member")
         
         XCTAssertTrue(viewModel.canChangeRole(for: member))
     }
     
-    func testCanChangeRole_NonAdmin() {
+    @MainActor func testCanChangeRole_NonAdmin() {
         // Setup non-admin user
         let nonAdminMembership = Membership(family: testFamily, user: testUser, role: .adult)
         let nonAdminViewModel = FamilyDashboardViewModel(
@@ -246,13 +246,13 @@ final class FamilyDashboardViewModelTests: XCTestCase {
         XCTAssertFalse(nonAdminViewModel.canChangeRole(for: member))
     }
     
-    func testCanRemoveMember_ParentAdmin() {
+    @MainActor func testCanRemoveMember_ParentAdmin() {
         let member = createTestMembership(role: .adult, displayName: "Test Member")
         
         XCTAssertTrue(viewModel.canRemoveMember(member))
     }
     
-    func testCanRemoveMember_NonAdmin() {
+    @MainActor func testCanRemoveMember_NonAdmin() {
         // Setup non-admin user
         let nonAdminMembership = Membership(family: testFamily, user: testUser, role: .adult)
         let nonAdminViewModel = FamilyDashboardViewModel(
@@ -267,13 +267,13 @@ final class FamilyDashboardViewModelTests: XCTestCase {
         XCTAssertFalse(nonAdminViewModel.canRemoveMember(member))
     }
     
-    func testCanRemoveMember_Self() {
+    @MainActor func testCanRemoveMember_Self() {
         XCTAssertFalse(viewModel.canRemoveMember(testMembership))
     }
     
     // MARK: - UI State Tests
     
-    func testShowRoleChangeSheet() {
+    @MainActor func testShowRoleChangeSheet() {
         let member = createTestMembership(role: .adult, displayName: "Test Member")
         
         viewModel.showRoleChangeSheet(for: member)
@@ -282,7 +282,7 @@ final class FamilyDashboardViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.memberToChangeRole?.id, member.id)
     }
     
-    func testHideRoleChangeSheet() {
+    @MainActor func testHideRoleChangeSheet() {
         let member = createTestMembership(role: .adult, displayName: "Test Member")
         viewModel.memberToChangeRole = member
         viewModel.showingRoleChangeSheet = true
@@ -315,7 +315,7 @@ final class FamilyDashboardViewModelTests: XCTestCase {
     
     // MARK: - Error Handling Tests
     
-    func testClearError() {
+    @MainActor func testClearError() {
         viewModel.errorMessage = "Test error"
         XCTAssertNotNil(viewModel.errorMessage)
         

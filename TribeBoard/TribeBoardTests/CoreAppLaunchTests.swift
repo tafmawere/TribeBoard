@@ -21,7 +21,7 @@ final class CoreAppLaunchTests: XCTestCase {
     
     // MARK: - Core App Launch Tests
     
-    func testModelContainerInitializationOnly() {
+    @MainActor func testModelContainerInitializationOnly() {
         // Test ONLY the ModelContainer initialization that happens in TribeBoardApp.init()
         // This is the core requirement - no crashes during ModelContainer initialization
         
@@ -40,7 +40,7 @@ final class CoreAppLaunchTests: XCTestCase {
         print("✅ ModelContainer initialization successful - no crashes")
     }
     
-    func testSimulatorEnvironmentCompatibility() {
+    @MainActor func testSimulatorEnvironmentCompatibility() {
         // Test that the app can initialize in iOS Simulator environment
         // Simulator has CloudKit limitations, so this tests the fallback
         
@@ -75,7 +75,7 @@ final class CoreAppLaunchTests: XCTestCase {
         print("✅ Simulator environment compatibility verified")
     }
     
-    func testCloudKitFallbackBehavior() {
+    @MainActor func testCloudKitFallbackBehavior() {
         // Test the CloudKit fallback behavior that prevents crashes
         
         print("☁️ Testing CloudKit fallback behavior...")
@@ -119,7 +119,7 @@ final class CoreAppLaunchTests: XCTestCase {
         print("✅ CloudKit fallback behavior verified")
     }
     
-    func testNoCrashGuarantee() {
+    @MainActor func testNoCrashGuarantee() {
         // Test the critical requirement: no crashes during ModelContainer initialization
         
         print("🛡️ Testing no-crash guarantee...")
@@ -159,7 +159,7 @@ final class CoreAppLaunchTests: XCTestCase {
         print("✅ No-crash guarantee verified - all 10 initialization attempts successful")
     }
     
-    func testAppLaunchRequirements() {
+    @MainActor func testAppLaunchRequirements() {
         // Test all the specific requirements from the task
         
         print("📋 Testing app launch requirements...")
@@ -179,7 +179,7 @@ final class CoreAppLaunchTests: XCTestCase {
         print("✅ All app launch requirements verified")
     }
     
-    func testPerformanceRequirement() {
+    @MainActor func testPerformanceRequirement() {
         // Test that app launch performance is acceptable
         
         print("⏱️ Testing app launch performance...")
@@ -201,7 +201,7 @@ final class CoreAppLaunchTests: XCTestCase {
         print("✅ App launch performance is acceptable")
     }
     
-    func testDataIntegrityDuringLaunch() {
+    @MainActor func testDataIntegrityDuringLaunch() {
         // Test that data integrity is maintained during app launch
         
         print("🔒 Testing data integrity during launch...")
@@ -259,7 +259,7 @@ final class CoreAppLaunchTests: XCTestCase {
         print("✅ Data integrity maintained during launch")
     }
     
-    func testTaskSummary() {
+    @MainActor func testTaskSummary() {
         // Provide a summary of what has been tested
         
         print("📊 Task 6 Implementation Summary:")

@@ -79,7 +79,7 @@ final class MemoryTests: DatabaseTestBase {
         print("🧠 Testing memory usage for single membership creation...")
         
         // Setup: Create family and user first
-        let testFamily = try createTestFamily(name: "Memory Family", code: "MEMFAM")
+        let testFamily = try createTestFamily(name: "Memory Family", code: "MEMFAM", createdByUserId: UUID())
         let testUser = try createTestUser(displayName: "Memory User")
         
         let memoryMetrics = try PerformanceTestUtilities.validateMemoryUsage(

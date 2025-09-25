@@ -246,9 +246,9 @@ final class CloudKitErrorHandlingTests: DatabaseTestBase {
     func testBatchSave_PartialFailure() async throws {
         // Given
         let families = [
-            try createTestFamily(name: "Family 1", code: "FAM001"),
-            try createTestFamily(name: "Family 2", code: "FAM002"),
-            try createTestFamily(name: "Family 3", code: "FAM003")
+            try createTestFamily(name: "Family 1", code: "FAM001", createdByUserId: UUID()),
+            try createTestFamily(name: "Family 2", code: "FAM002", createdByUserId: UUID()),
+            try createTestFamily(name: "Family 3", code: "FAM003", createdByUserId: UUID())
         ]
         
         // Configure mock to fail after first record
@@ -272,8 +272,8 @@ final class CloudKitErrorHandlingTests: DatabaseTestBase {
     func testBatchSave_CompleteFailure() async throws {
         // Given
         let families = [
-            try createTestFamily(name: "Family 1", code: "FAM001"),
-            try createTestFamily(name: "Family 2", code: "FAM002")
+            try createTestFamily(name: "Family 1", code: "FAM001", createdByUserId: UUID()),
+            try createTestFamily(name: "Family 2", code: "FAM002", createdByUserId: UUID())
         ]
         
         mockCloudKitService.simulateNetworkError()
@@ -339,8 +339,8 @@ final class CloudKitErrorHandlingTests: DatabaseTestBase {
     
     func testConcurrentOperations_ErrorIsolation() async throws {
         // Given
-        let family1 = try createTestFamily(name: "Family 1", code: "FAM001")
-        let family2 = try createTestFamily(name: "Family 2", code: "FAM002")
+        let family1 = try createTestFamily(name: "Family 1", code: "FAM001", createdByUserId: UUID())
+        let family2 = try createTestFamily(name: "Family 2", code: "FAM002", createdByUserId: UUID())
         
         // Configure mock to fail only specific operations
         mockCloudKitService.shouldFailOperations = false

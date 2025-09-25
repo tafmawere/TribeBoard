@@ -6,7 +6,7 @@ class ErrorHandlingUtilitiesTests: XCTestCase {
     
     // MARK: - ErrorContext Tests
     
-    func testErrorContextInitialization() {
+    @MainActor func testErrorContextInitialization() {
         let error = FamilyCreationError.networkUnavailable
         let context = ErrorContext(error: error)
         
@@ -18,7 +18,7 @@ class ErrorHandlingUtilitiesTests: XCTestCase {
         XCTAssertNil(context.additionalInfo)
     }
     
-    func testErrorContextWithRetryCount() {
+    @MainActor func testErrorContextWithRetryCount() {
         let error = FamilyCreationError.codeCollisionDetected
         let context = ErrorContext(error: error, retryCount: 3)
         
@@ -27,7 +27,7 @@ class ErrorHandlingUtilitiesTests: XCTestCase {
         XCTAssertTrue(context.isRetryable)
     }
     
-    func testErrorContextWithAdditionalInfo() {
+    @MainActor func testErrorContextWithAdditionalInfo() {
         let error = FamilyCreationError.validationFailed("Name too short")
         let additionalInfo = [
             "field": "familyName",
@@ -41,7 +41,7 @@ class ErrorHandlingUtilitiesTests: XCTestCase {
         XCTAssertEqual(context.additionalInfo?["minLength"] as? String, "2")
     }
     
-    func testErrorContextRecoveryStrategy() {
+    @MainActor func testErrorContextRecoveryStrategy() {
         let networkError = FamilyCreationError.networkUnavailable
         let context = ErrorContext(error: networkError)
         
@@ -55,7 +55,7 @@ class ErrorHandlingUtilitiesTests: XCTestCase {
     
     // MARK: - ErrorHandlingUtilities Tests
     
-    func testErrorCategorization() {
+    @MainActor func testErrorCategorization() {
         // Test DataService error categorization
         let dataServiceError = DataServiceError.validationFailed(["test"])
         let categorizedError = ErrorHandlingUtilities.categorizeError(dataServiceError)
@@ -87,7 +87,7 @@ class ErrorHandlingUtilitiesTests: XCTestCase {
         }
     }
     
-    func testRecoveryStrategyDetermination() {
+    @MainActor func testRecoveryStrategyDetermination() {
         // Test automatic retry strategy
         let networkError = FamilyCreationError.networkUnavailable
         let context = ErrorContext(error: networkError)
@@ -131,7 +131,7 @@ class ErrorHandlingUtilitiesTests: XCTestCase {
         XCTAssertEqual(noRecoveryAction, .noRecovery)
     }
     
-    func testErrorLogging() {
+    @MainActor func testErrorLogging() {
         let error = FamilyCreationError.codeGenerationFailed(.maxAttemptsExceeded)
         let context = ErrorContext(error: error, retryCount: 2)
         let additionalInfo = ["operation": "createFamily", "familyName": "Test Family"]
@@ -143,7 +143,7 @@ class ErrorHandlingUtilitiesTests: XCTestCase {
         XCTAssertTrue(true)
     }
     
-    func testErrorMetricsCollection() {
+    @MainActor func testErrorMetricsCollection() {
         let error = FamilyCreationError.networkUnavailable
         let context = ErrorContext(error: error, retryCount: 1)
         
@@ -157,7 +157,7 @@ class ErrorHandlingUtilitiesTests: XCTestCase {
         XCTAssertNotNil(metrics.timestamp)
     }
     
-    func testErrorRecoveryExecution() {
+    @MainActor func testErrorRecoveryExecution() {
         let error = FamilyCreationError.codeCollisionDetected
         let context = ErrorContext(error: error)
         
@@ -178,7 +178,7 @@ class ErrorHandlingUtilitiesTests: XCTestCase {
     
     // MARK: - Error Priority and Escalation Tests
     
-    func testErrorPriorityEscalation() {
+    @MainActor func testErrorPriorityEscalation() {
         let lowPriorityError = FamilyCreationError.networkUnavailable
         let mediumPriorityError = FamilyCreationError.validationFailed("test")
         let highPriorityError = FamilyCreationError.userNotAuthenticated
@@ -197,7 +197,7 @@ class ErrorHandlingUtilitiesTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(escalatedPriority.rawValue, lowPriorityError.priority.rawValue)
     }
     
-    func testErrorThrottling() {
+    @MainActor func testErrorThrottling() {
         let error = FamilyCreationError.networkUnavailable
         
         // Test that error throttling works
@@ -213,7 +213,7 @@ class ErrorHandlingUtilitiesTests: XCTestCase {
     
     // MARK: - Integration Tests
     
-    func testCompleteErrorHandlingFlow() {
+    @MainActor func testCompleteErrorHandlingFlow() {
         let originalError = DataServiceError.constraintViolation("Duplicate family code")
         
         // Step 1: Categorize the error
@@ -253,7 +253,7 @@ class ErrorHandlingUtilitiesTests: XCTestCase {
         XCTAssertEqual(metrics.errorCategory, "local_database")
     }
     
-    func testErrorHandlingPerformance() {
+    @MainActor func testErrorHandlingPerformance() {
         let error = FamilyCreationError.networkUnavailable
         let context = ErrorContext(error: error)
         

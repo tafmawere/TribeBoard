@@ -232,14 +232,34 @@ struct SchoolRunPreviewProvider {
     @MainActor
     static func setupPreviewEnvironment() -> some View {
         EmptyView()
-            .environmentObject(AppState())
+            .previewEnvironment()
     }
     
-    /// Creates a preview with sample data
+    /// Creates a preview with sample data using the new preview environment system
     @MainActor
     static func previewWithSampleData<Content: View>(@ViewBuilder content: () -> Content) -> some View {
         content()
-            .environmentObject(AppState())
+            .previewEnvironment()
+    }
+    
+    /// Creates a preview with specific environment type
+    @MainActor
+    static func previewWithEnvironment<Content: View>(
+        _ environmentType: PreviewEnvironmentType,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        content()
+            .previewEnvironment(environmentType)
+    }
+    
+    /// Creates a preview with specific user role
+    @MainActor
+    static func previewWithRole<Content: View>(
+        _ role: Role,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        content()
+            .previewEnvironment(role: role)
     }
 }
 

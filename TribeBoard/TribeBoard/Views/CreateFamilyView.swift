@@ -335,24 +335,13 @@ struct CustomTextFieldStyle: TextFieldStyle {
 #Preview {
     NavigationStack {
         CreateFamilyView()
-            .environmentObject({
-                let appState = AppState()
-                appState.currentUser = MockDataGenerator.mockAuthenticatedUser()
-                return appState
-            }())
     }
+    .previewEnvironment(.authenticated)
 }
 
 #Preview("Loading State") {
     NavigationStack {
         CreateFamilyView()
-            .environmentObject({
-                let appState = AppState()
-                appState.currentUser = MockDataGenerator.mockAuthenticatedUser()
-                return appState
-            }())
-            .onAppear {
-                // Simulate loading state for preview
-            }
     }
+    .previewEnvironmentLoading()
 }

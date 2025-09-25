@@ -26,7 +26,7 @@ final class CloudKitConflictResolutionTests: DatabaseTestBase {
     
     func testFamilyConflictResolution_LocalRecordNewer() async throws {
         // Given
-        let family = try createTestFamily(name: "Local Family", code: "LOCAL1")
+        let family = try createTestFamily(name: "Local Family", code: "LOCAL1", createdByUserId: UUID())
         let localModificationDate = Date()
         family.lastSyncDate = localModificationDate
         
@@ -51,7 +51,7 @@ final class CloudKitConflictResolutionTests: DatabaseTestBase {
     
     func testFamilyConflictResolution_ServerRecordNewer() async throws {
         // Given
-        let family = try createTestFamily(name: "Local Family", code: "LOCAL1")
+        let family = try createTestFamily(name: "Local Family", code: "LOCAL1", createdByUserId: UUID())
         let localModificationDate = Date().addingTimeInterval(-3600) // 1 hour ago
         family.lastSyncDate = localModificationDate
         
@@ -76,7 +76,7 @@ final class CloudKitConflictResolutionTests: DatabaseTestBase {
     
     func testFamilyConflictResolution_SimultaneousUpdate() async throws {
         // Given
-        let family = try createTestFamily(name: "Local Family", code: "LOCAL1")
+        let family = try createTestFamily(name: "Local Family", code: "LOCAL1", createdByUserId: UUID())
         let serverRecord = CKRecord(recordType: CKRecordType.family, recordID: CKRecord.ID(recordName: family.id.uuidString))
         serverRecord[CKFieldName.familyName] = "Server Family"
         serverRecord[CKFieldName.familyCode] = "SERVER1"
@@ -215,7 +215,7 @@ final class CloudKitConflictResolutionTests: DatabaseTestBase {
     
     func testConflictResolution_MaintainsDataIntegrity() async throws {
         // Given
-        let family = try createTestFamily(name: "Original Family", code: "ORIG123")
+        let family = try createTestFamily(name: "Original Family", code: "ORIG123", createdByUserId: UUID())
         let originalId = family.id
         let originalCreatedAt = family.createdAt
         let originalCreatedByUserId = family.createdByUserId
@@ -249,7 +249,7 @@ final class CloudKitConflictResolutionTests: DatabaseTestBase {
     
     func testConflictResolution_HandlesNilModificationDates() async throws {
         // Given
-        let family = try createTestFamily(name: "Local Family", code: "LOCAL1")
+        let family = try createTestFamily(name: "Local Family", code: "LOCAL1", createdByUserId: UUID())
         family.lastSyncDate = nil // No previous sync
         
         // Create server record with nil modification date
@@ -301,7 +301,7 @@ final class CloudKitConflictResolutionTests: DatabaseTestBase {
     
     func testConflictResolution_IdenticalRecords() async throws {
         // Given
-        let family = try createTestFamily(name: "Same Family", code: "SAME123")
+        let family = try createTestFamily(name: "Same Family", code: "SAME123", createdByUserId: UUID())
         let modificationDate = Date()
         family.lastSyncDate = modificationDate
         
@@ -326,7 +326,7 @@ final class CloudKitConflictResolutionTests: DatabaseTestBase {
     
     func testConflictResolution_InvalidServerRecord() async throws {
         // Given
-        let family = try createTestFamily(name: "Local Family", code: "LOCAL1")
+        let family = try createTestFamily(name: "Local Family", code: "LOCAL1", createdByUserId: UUID())
         
         // Create invalid server record (missing required fields)
         let serverRecord = CKRecord(recordType: CKRecordType.family, recordID: CKRecord.ID(recordName: family.id.uuidString))

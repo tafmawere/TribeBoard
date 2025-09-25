@@ -20,7 +20,7 @@ final class DatabaseInfrastructureTests: DatabaseTestBase {
     
     func testCreateTestFamily() throws {
         // Test creating a test family
-        let family = try createTestFamily(name: "Infrastructure Test Family", code: "INFRA01")
+        let family = try createTestFamily(name: "Infrastructure Test Family", code: "INFRA01", createdByUserId: UUID())
         
         XCTAssertEqual(family.name, "Infrastructure Test Family")
         XCTAssertEqual(family.code, "INFRA01")
@@ -60,15 +60,15 @@ final class DatabaseInfrastructureTests: DatabaseTestBase {
     
     // MARK: - TestDataFactory Tests
     
-    func testValidFamilyCreation() {
-        let family = TestDataFactory.createValidFamily(name: "Factory Test Family", code: "FACT123")
+    @MainActor func testValidFamilyCreation() {
+        let family = TestDataFactory.createValidFamily(name: "Factory Test Family", code: "FACT123", createdByUserId: UUID())
         
         XCTAssertEqual(family.name, "Factory Test Family")
         XCTAssertEqual(family.code, "FACT123")
         XCTAssertTrue(family.isFullyValid)
     }
     
-    func testInvalidFamilyCreation() {
+    @MainActor func testInvalidFamilyCreation() {
         let invalidNameFamily = TestDataFactory.createInvalidFamily(invalidField: .name)
         let invalidCodeFamily = TestDataFactory.createInvalidFamily(invalidField: .code)
         
@@ -76,7 +76,7 @@ final class DatabaseInfrastructureTests: DatabaseTestBase {
         XCTAssertFalse(invalidCodeFamily.isCodeValid)
     }
     
-    func testValidUserCreation() {
+    @MainActor func testValidUserCreation() {
         let user = TestDataFactory.createValidUserProfile(displayName: "Factory Test User", appleUserIdHash: "factory_test_hash_123456789")
         
         XCTAssertEqual(user.displayName, "Factory Test User")
@@ -84,7 +84,7 @@ final class DatabaseInfrastructureTests: DatabaseTestBase {
         XCTAssertTrue(user.isFullyValid)
     }
     
-    func testInvalidUserCreation() {
+    @MainActor func testInvalidUserCreation() {
         let invalidNameUser = TestDataFactory.createInvalidUserProfile(invalidField: .displayName)
         let invalidHashUser = TestDataFactory.createInvalidUserProfile(invalidField: .appleUserIdHash)
         
@@ -92,7 +92,7 @@ final class DatabaseInfrastructureTests: DatabaseTestBase {
         XCTAssertFalse(invalidHashUser.isAppleUserIdHashValid)
     }
     
-    func testBulkDataCreation() {
+    @MainActor func testBulkDataCreation() {
         let families = TestDataFactory.createBulkFamilies(count: 5)
         let users = TestDataFactory.createBulkUsers(count: 5)
         
@@ -110,7 +110,7 @@ final class DatabaseInfrastructureTests: DatabaseTestBase {
         XCTAssertEqual(hashes.count, uniqueHashes.count, "All user hashes should be unique")
     }
     
-    func testFamilyWithMembersCreation() {
+    @MainActor func testFamilyWithMembersCreation() {
         let (family, users, memberships) = TestDataFactory.createFamilyWithMembers(memberCount: 3)
         
         XCTAssertEqual(users.count, 3)
@@ -192,7 +192,7 @@ final class DatabaseInfrastructureTests: DatabaseTestBase {
         XCTAssertLessThanOrEqual(metrics.memoryIncrease, 10_485_760)
     }
     
-    func testPerformanceBenchmarks() {
+    @MainActor func testPerformanceBenchmarks() {
         // Test that benchmarks are properly defined
         let createFamilyBenchmark = DatabasePerformanceBenchmarks.createFamily
         XCTAssertEqual(createFamilyBenchmark.operationName, "Create Family")
@@ -207,7 +207,7 @@ final class DatabaseInfrastructureTests: DatabaseTestBase {
         XCTAssertGreaterThan(allBenchmarks.count, 0, "Should have predefined benchmarks")
     }
     
-    func testScalabilityBenchmarks() {
+    @MainActor func testScalabilityBenchmarks() {
         let scalabilityBenchmarks = ScalabilityBenchmarks.all
         XCTAssertGreaterThan(scalabilityBenchmarks.count, 0, "Should have scalability benchmarks")
         

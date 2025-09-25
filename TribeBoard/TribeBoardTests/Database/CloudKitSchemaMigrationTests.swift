@@ -34,7 +34,7 @@ final class CloudKitSchemaMigrationTests: DatabaseTestBase {
         print("🧪 Testing handling of new fields added to server schema...")
         
         // Create local test data
-        let family = try createTestFamily(name: "Schema Test Family", code: "SCH001")
+        let family = try createTestFamily(name: "Schema Test Family", code: "SCH001", createdByUserId: UUID())
         
         // Simulate server record with new fields that don't exist locally
         let serverRecord = CKRecord(recordType: CKRecordType.family, recordID: CKRecord.ID(recordName: family.id.uuidString))
@@ -219,7 +219,7 @@ final class CloudKitSchemaMigrationTests: DatabaseTestBase {
         print("🧪 Testing recovery mechanisms when migration fails...")
         
         // Create test data
-        let family = try createTestFamily(name: "Recovery Family", code: "REC001")
+        let family = try createTestFamily(name: "Recovery Family", code: "REC001", createdByUserId: UUID())
         let user = try createTestUser(displayName: "Recovery User")
         let membership = try createTestMembership(family: family, user: user, role: .parentAdmin)
         
@@ -265,9 +265,9 @@ final class CloudKitSchemaMigrationTests: DatabaseTestBase {
         print("🧪 Testing partial migration recovery scenarios...")
         
         // Create multiple records for batch migration
-        let family1 = try createTestFamily(name: "Partial Family 1", code: "PAR001")
-        let family2 = try createTestFamily(name: "Partial Family 2", code: "PAR002")
-        let family3 = try createTestFamily(name: "Partial Family 3", code: "PAR003")
+        let family1 = try createTestFamily(name: "Partial Family 1", code: "PAR001", createdByUserId: UUID())
+        let family2 = try createTestFamily(name: "Partial Family 2", code: "PAR002", createdByUserId: UUID())
+        let family3 = try createTestFamily(name: "Partial Family 3", code: "PAR003", createdByUserId: UUID())
         
         let families = [family1, family2, family3]
         
@@ -327,7 +327,7 @@ final class CloudKitSchemaMigrationTests: DatabaseTestBase {
         print("🧪 Testing data validation before migration...")
         
         // Create valid test data
-        let validFamily = try createTestFamily(name: "Valid Family", code: "VAL001")
+        let validFamily = try createTestFamily(name: "Valid Family", code: "VAL001", createdByUserId: UUID())
         XCTAssertTrue(validFamily.isFullyValid)
         
         // Create invalid test data
@@ -406,7 +406,7 @@ final class CloudKitSchemaMigrationTests: DatabaseTestBase {
         print("🧪 Testing comprehensive data integrity validation during migration...")
         
         // Create complex test data with relationships
-        let family = try createTestFamily(name: "Integrity Family", code: "INT001")
+        let family = try createTestFamily(name: "Integrity Family", code: "INT001", createdByUserId: UUID())
         let user1 = try createTestUser(displayName: "User 1")
         let user2 = try createTestUser(displayName: "User 2", appleUserIdHash: "hash_user2")
         
@@ -473,7 +473,7 @@ final class CloudKitSchemaMigrationTests: DatabaseTestBase {
         print("🧪 Testing synchronization of schema changes from server...")
         
         // Create local data
-        let family = try createTestFamily(name: "Sync Family", code: "SYNC01")
+        let family = try createTestFamily(name: "Sync Family", code: "SYNC01", createdByUserId: UUID())
         
         // Simulate server record with schema changes (new fields, modified fields)
         let serverRecord = CKRecord(recordType: CKRecordType.family, recordID: CKRecord.ID(recordName: family.id.uuidString))

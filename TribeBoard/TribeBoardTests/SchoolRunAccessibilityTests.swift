@@ -22,7 +22,7 @@ class SchoolRunAccessibilityTests: XCTestCase {
     
     // MARK: - Dynamic Type Tests
     
-    func testDynamicTypeScaling() {
+    @MainActor func testDynamicTypeScaling() {
         // Test that all text elements scale properly with dynamic type
         let testCases = SchoolRunAccessibilityTesting.testDynamicTypeScaling()
         
@@ -36,7 +36,7 @@ class SchoolRunAccessibilityTests: XCTestCase {
         }
     }
     
-    func testRunSummaryCardDynamicType() {
+    @MainActor func testRunSummaryCardDynamicType() {
         // Test RunSummaryCard with different dynamic type sizes
         let card = RunSummaryCard(run: sampleRun)
         
@@ -53,7 +53,7 @@ class SchoolRunAccessibilityTests: XCTestCase {
         XCTAssertNotNil(mediumTypeCard)
     }
     
-    func testStopConfigurationRowDynamicType() {
+    @MainActor func testStopConfigurationRowDynamicType() {
         // Test StopConfigurationRow with different dynamic type sizes
         let stop = MockSchoolRunDataProvider.createEmptyStop()
         let row = StopConfigurationRow(
@@ -70,7 +70,7 @@ class SchoolRunAccessibilityTests: XCTestCase {
     
     // MARK: - High Contrast Tests
     
-    func testHighContrastMode() {
+    @MainActor func testHighContrastMode() {
         // Test that all components support high contrast mode
         let testCases = SchoolRunAccessibilityTesting.testHighContrastMode()
         
@@ -86,7 +86,7 @@ class SchoolRunAccessibilityTests: XCTestCase {
         }
     }
     
-    func testRunSummaryCardHighContrast() {
+    @MainActor func testRunSummaryCardHighContrast() {
         // Test RunSummaryCard in high contrast mode
         let card = RunSummaryCard(run: sampleRun)
         
@@ -97,7 +97,7 @@ class SchoolRunAccessibilityTests: XCTestCase {
         XCTAssertNotNil(normalContrastCard)
     }
     
-    func testProgressIndicatorHighContrast() {
+    @MainActor func testProgressIndicatorHighContrast() {
         // Test ProgressIndicator in high contrast mode
         let indicator = ProgressIndicator(current: 3, total: 6)
         
@@ -107,7 +107,7 @@ class SchoolRunAccessibilityTests: XCTestCase {
     
     // MARK: - VoiceOver Tests
     
-    func testVoiceOverNavigation() {
+    @MainActor func testVoiceOverNavigation() {
         // Test VoiceOver navigation through all screens
         let testCases = SchoolRunAccessibilityTesting.testVoiceOverNavigation()
         
@@ -127,7 +127,7 @@ class SchoolRunAccessibilityTests: XCTestCase {
         }
     }
     
-    func testDashboardAccessibilityLabels() {
+    @MainActor func testDashboardAccessibilityLabels() {
         // Test that dashboard elements have proper accessibility labels
         let dashboard = SchoolRunDashboardView()
         
@@ -136,7 +136,7 @@ class SchoolRunAccessibilityTests: XCTestCase {
         XCTAssertNotNil(dashboard)
     }
     
-    func testScheduleNewRunAccessibilityLabels() {
+    @MainActor func testScheduleNewRunAccessibilityLabels() {
         // Test that schedule new run form has proper accessibility labels
         let scheduleView = ScheduleNewRunView()
         
@@ -144,7 +144,7 @@ class SchoolRunAccessibilityTests: XCTestCase {
         XCTAssertNotNil(scheduleView)
     }
     
-    func testRunExecutionAccessibilityLabels() {
+    @MainActor func testRunExecutionAccessibilityLabels() {
         // Test that run execution view has proper accessibility labels
         let executionView = RunExecutionView(run: sampleRun)
         
@@ -154,7 +154,7 @@ class SchoolRunAccessibilityTests: XCTestCase {
     
     // MARK: - Reduced Motion Tests
     
-    func testReducedMotionSupport() {
+    @MainActor func testReducedMotionSupport() {
         // Test that all animations respect reduced motion preference
         let testCases = SchoolRunAccessibilityTesting.testReducedMotion()
         
@@ -164,7 +164,7 @@ class SchoolRunAccessibilityTests: XCTestCase {
         }
     }
     
-    func testCurrentStopCardReducedMotion() {
+    @MainActor func testCurrentStopCardReducedMotion() {
         // Test CurrentStopCard with reduced motion
         let stop = sampleRun.stops[0]
         let card = CurrentStopCard(stopNumber: 1, totalStops: 6, stop: stop, isActive: true)
@@ -176,7 +176,7 @@ class SchoolRunAccessibilityTests: XCTestCase {
         XCTAssertNotNil(normalMotionCard)
     }
     
-    func testProgressIndicatorReducedMotion() {
+    @MainActor func testProgressIndicatorReducedMotion() {
         // Test ProgressIndicator with reduced motion
         let indicator = ProgressIndicator(current: 2, total: 5)
         
@@ -186,7 +186,7 @@ class SchoolRunAccessibilityTests: XCTestCase {
     
     // MARK: - Touch Target Tests
     
-    func testTouchTargetSizes() {
+    @MainActor func testTouchTargetSizes() {
         // Test that all interactive elements meet minimum touch target size
         let testCases = SchoolRunAccessibilityTesting.testTouchTargets()
         
@@ -207,7 +207,7 @@ class SchoolRunAccessibilityTests: XCTestCase {
     
     // MARK: - Accessibility Identifier Tests
     
-    func testAccessibilityIdentifiers() {
+    @MainActor func testAccessibilityIdentifiers() {
         // Test that all components have proper accessibility identifiers
         let identifiers = SchoolRunAccessibilityTesting.AccessibilityIdentifiers.self
         
@@ -235,7 +235,7 @@ class SchoolRunAccessibilityTests: XCTestCase {
     
     // MARK: - Accessibility Labels and Hints Tests
     
-    func testAccessibilityLabels() {
+    @MainActor func testAccessibilityLabels() {
         // Test that all accessibility labels are meaningful
         let labels = SchoolRunAccessibilityTesting.AccessibilityLabels.self
         
@@ -258,7 +258,7 @@ class SchoolRunAccessibilityTests: XCTestCase {
         XCTAssertFalse(labels.stopType.isEmpty)
     }
     
-    func testAccessibilityHints() {
+    @MainActor func testAccessibilityHints() {
         // Test that all accessibility hints are helpful
         let hints = SchoolRunAccessibilityTesting.AccessibilityHints.self
         
@@ -282,7 +282,7 @@ class SchoolRunAccessibilityTests: XCTestCase {
     
     // MARK: - Comprehensive Accessibility Audit
     
-    func testComprehensiveAccessibilityAudit() {
+    @MainActor func testComprehensiveAccessibilityAudit() {
         // Run complete accessibility audit
         let auditReport = SchoolRunAccessibilityAudit.runAudit()
         
@@ -304,7 +304,7 @@ class SchoolRunAccessibilityTests: XCTestCase {
     
     // MARK: - Performance Tests
     
-    func testAccessibilityPerformance() {
+    @MainActor func testAccessibilityPerformance() {
         // Test that accessibility enhancements don't significantly impact performance
         measure {
             let dashboard = SchoolRunDashboardView()
@@ -331,7 +331,7 @@ class SchoolRunAccessibilityTests: XCTestCase {
     
     // MARK: - Integration Tests
     
-    func testAccessibilityIntegration() {
+    @MainActor func testAccessibilityIntegration() {
         // Test that accessibility works across the entire School Run flow
         
         // 1. Dashboard accessibility
@@ -340,18 +340,22 @@ class SchoolRunAccessibilityTests: XCTestCase {
         
         // 2. Schedule new run accessibility
         let scheduleView = ScheduleNewRunView()
+            .environmentObject(AppState())
         XCTAssertNotNil(scheduleView)
         
         // 3. Scheduled runs list accessibility
         let listView = ScheduledRunsListView()
+            .environmentObject(AppState())
         XCTAssertNotNil(listView)
         
         // 4. Run detail accessibility
         let detailView = RunDetailView(run: sampleRun)
+            .environmentObject(AppState())
         XCTAssertNotNil(detailView)
         
         // 5. Run execution accessibility
         let executionView = RunExecutionView(run: sampleRun)
+            .environmentObject(AppState())
         XCTAssertNotNil(executionView)
         
         // All views should be creatable with accessibility environments

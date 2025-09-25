@@ -21,7 +21,7 @@ final class AppLaunchManualTests: XCTestCase {
     
     // MARK: - Core ModelContainer Tests
     
-    func testModelContainerCreationInSimulator() {
+    @MainActor func testModelContainerCreationInSimulator() {
         // Test that ModelContainer can be created in iOS Simulator environment
         // This is the core functionality that TribeBoardApp relies on
         
@@ -39,7 +39,7 @@ final class AppLaunchManualTests: XCTestCase {
         print("✅ ModelContainer creation verified in simulator environment")
     }
     
-    func testModelContainerFallbackBehavior() {
+    @MainActor func testModelContainerFallbackBehavior() {
         // Test that the fallback mechanism works correctly
         // This ensures the app won't crash if CloudKit is unavailable
         
@@ -73,7 +73,7 @@ final class AppLaunchManualTests: XCTestCase {
         print("✅ ModelContainer fallback behavior verified")
     }
     
-    func testAppInitializationSequence() {
+    @MainActor func testAppInitializationSequence() {
         // Test the exact sequence that happens in TribeBoardApp.init()
         
         print("🚀 Testing app initialization sequence...")
@@ -107,7 +107,7 @@ final class AppLaunchManualTests: XCTestCase {
         print("✅ App initialization sequence verified")
     }
     
-    func testCloudKitAvailabilityHandling() {
+    @MainActor func testCloudKitAvailabilityHandling() {
         // Test how the app handles CloudKit availability vs unavailability
         
         print("☁️ Testing CloudKit availability handling...")
@@ -164,7 +164,7 @@ final class AppLaunchManualTests: XCTestCase {
         }
     }
     
-    func testNoCrashGuarantee() {
+    @MainActor func testNoCrashGuarantee() {
         // Test that ModelContainer creation never crashes
         // This is the critical requirement from the task
         
@@ -198,7 +198,7 @@ final class AppLaunchManualTests: XCTestCase {
         print("✅ No-crash guarantee verified")
     }
     
-    func testDataIntegrityAcrossEnvironments() {
+    @MainActor func testDataIntegrityAcrossEnvironments() {
         // Test that data integrity is maintained across different scenarios
         
         print("🔒 Testing data integrity across environments...")
@@ -273,7 +273,7 @@ final class AppLaunchManualTests: XCTestCase {
         }
     }
     
-    func testPerformanceInDifferentEnvironments() {
+    @MainActor func testPerformanceInDifferentEnvironments() {
         // Test that ModelContainer creation performance is acceptable
         
         print("⏱️ Testing performance in different environments...")
@@ -297,7 +297,7 @@ final class AppLaunchManualTests: XCTestCase {
     
     // MARK: - Manual Verification Summary
     
-    func testManualVerificationSummary() {
+    @MainActor func testManualVerificationSummary() {
         // Provide a summary of what has been verified
         
         print("📋 Manual Verification Summary:")

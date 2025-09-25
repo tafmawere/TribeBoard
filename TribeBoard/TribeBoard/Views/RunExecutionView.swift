@@ -10,7 +10,7 @@ struct RunExecutionView: View {
     @State private var showingPauseAlert = false
     @State private var showingCompleteStopAlert = false
     @State private var showingCompleteRunAlert = false
-    @EnvironmentObject private var appState: AppState
+    @SafeEnvironmentObject(fallback: { AppState.createFallback() }) private var appState: AppState
     
     var body: some View {
         mainContent
@@ -340,27 +340,18 @@ private struct ExecutionControls: View {
 // MARK: - Preview
 
 #Preview("Run Execution - Start") {
-    SchoolRunPreviewProvider.previewWithSampleData {
-        RunExecutionView(run: SchoolRunPreviewProvider.executionRunStart)
-    }
+    RunExecutionView(run: SchoolRunPreviewProvider.executionRunStart)
+        .previewEnvironment()
 }
 
 #Preview("Run Execution - Mid Progress") {
-    SchoolRunPreviewProvider.previewWithSampleData {
-        RunExecutionView(run: SchoolRunPreviewProvider.executionRunMidway)
-            .onAppear {
-                // Simulate mid-progress state - would set currentStopIndex = 2
-            }
-    }
+    RunExecutionView(run: SchoolRunPreviewProvider.executionRunMidway)
+        .previewEnvironment()
 }
 
 #Preview("Run Execution - Near End") {
-    SchoolRunPreviewProvider.previewWithSampleData {
-        RunExecutionView(run: SchoolRunPreviewProvider.executionRunNearEnd)
-            .onAppear {
-                // Simulate near-end state - would set currentStopIndex = 3
-            }
-    }
+    RunExecutionView(run: SchoolRunPreviewProvider.executionRunNearEnd)
+        .previewEnvironment()
 }
 
 #Preview("Run Execution - Dark Mode") {

@@ -76,7 +76,7 @@ final class CloudKitServiceTests: XCTestCase {
     
     // MARK: - Error Handling Tests
     
-    func testCloudKitErrorDescriptions() {
+    @MainActor func testCloudKitErrorDescriptions() {
         let errors: [CloudKitError] = [
             .containerNotFound,
             .networkUnavailable,
@@ -97,7 +97,7 @@ final class CloudKitServiceTests: XCTestCase {
     
     // MARK: - Retry Logic Tests
     
-    func testRetryableErrors() {
+    @MainActor func testRetryableErrors() {
         _ = CloudKitService()
         
         // Test retryable errors
@@ -245,7 +245,7 @@ final class CloudKitServiceTests: XCTestCase {
     
     // MARK: - CloudKitSyncable Extension Tests
     
-    func testMarkAsSynced() {
+    @MainActor func testMarkAsSynced() {
         var family = Family(
             name: "Test Family",
             code: "TEST123",
@@ -368,7 +368,7 @@ final class CloudKitServiceTests: XCTestCase {
         XCTAssertTrue(isAvailable == true || isAvailable == false)
     }
     
-    func testNetworkConnectivityCheck() {
+    @MainActor func testNetworkConnectivityCheck() {
         let isConnected = cloudKitService.checkNetworkConnectivity()
         
         // Should return a valid boolean
@@ -394,7 +394,7 @@ final class CloudKitServiceTests: XCTestCase {
         XCTAssertLessThan(elapsedTime, 5.0)
     }
     
-    func testPredicateValidation() {
+    @MainActor func testPredicateValidation() {
         // Test predicate validation to prevent crashes
         let validPredicate = NSPredicate(format: "familyCode == %@", "TEST123")
         let invalidPredicate = NSPredicate(format: "SUBQUERY(test, $x, $x.value > 0).@count > 0")
@@ -577,7 +577,7 @@ final class CloudKitServiceTests: XCTestCase {
     
     // MARK: - Performance Tests
     
-    func testBatchSavePerformance() {
+    @MainActor func testBatchSavePerformance() {
         // Test that batch operations are more efficient than individual saves
         measure {
             // Create multiple test records

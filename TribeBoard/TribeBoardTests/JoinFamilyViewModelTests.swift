@@ -42,7 +42,7 @@ final class JoinFamilyViewModelTests: XCTestCase {
     
     // MARK: - Initialization Tests
     
-    func testInitialization() {
+    @MainActor func testInitialization() {
         XCTAssertEqual(viewModel.familyCode, "")
         XCTAssertFalse(viewModel.isSearching)
         XCTAssertFalse(viewModel.isJoining)
@@ -54,25 +54,25 @@ final class JoinFamilyViewModelTests: XCTestCase {
     
     // MARK: - Family Code Validation Tests
     
-    func testFamilyCodeValidation_Valid() {
+    @MainActor func testFamilyCodeValidation_Valid() {
         viewModel.familyCode = "TEST123"
         XCTAssertTrue(viewModel.isValidFamilyCode)
         XCTAssertNil(viewModel.familyCodeError)
     }
     
-    func testFamilyCodeValidation_Empty() {
+    @MainActor func testFamilyCodeValidation_Empty() {
         viewModel.familyCode = ""
         XCTAssertFalse(viewModel.isValidFamilyCode)
         XCTAssertNotNil(viewModel.familyCodeError)
     }
     
-    func testFamilyCodeValidation_TooShort() {
+    @MainActor func testFamilyCodeValidation_TooShort() {
         viewModel.familyCode = "ABC12"
         XCTAssertFalse(viewModel.isValidFamilyCode)
         XCTAssertNotNil(viewModel.familyCodeError)
     }
     
-    func testFamilyCodeValidation_InvalidCharacters() {
+    @MainActor func testFamilyCodeValidation_InvalidCharacters() {
         viewModel.familyCode = "ABC-123"
         XCTAssertFalse(viewModel.isValidFamilyCode)
         XCTAssertNotNil(viewModel.familyCodeError)
@@ -289,7 +289,7 @@ final class JoinFamilyViewModelTests: XCTestCase {
     
     // MARK: - Error Handling Tests
     
-    func testClearError() {
+    @MainActor func testClearError() {
         viewModel.errorMessage = "Test error"
         XCTAssertNotNil(viewModel.errorMessage)
         
@@ -297,7 +297,7 @@ final class JoinFamilyViewModelTests: XCTestCase {
         XCTAssertNil(viewModel.errorMessage)
     }
     
-    func testCancelJoin() {
+    @MainActor func testCancelJoin() {
         viewModel.foundFamily = testFamily
         viewModel.showConfirmation = true
         
@@ -310,7 +310,7 @@ final class JoinFamilyViewModelTests: XCTestCase {
     
     // MARK: - App State Integration Tests
     
-    func testSetAppState() {
+    @MainActor func testSetAppState() {
         let mockAppState = MockAppState()
         viewModel.setAppState(mockAppState)
         

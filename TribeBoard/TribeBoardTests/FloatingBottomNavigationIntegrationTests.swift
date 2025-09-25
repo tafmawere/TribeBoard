@@ -47,7 +47,7 @@ final class FloatingBottomNavigationIntegrationTests: XCTestCase {
         appState.currentFlow = .familyDashboard
         
         // Ensure we start with home tab selected
-        appState.selectedNavigationTab = .home
+        appState.selectedNavigationTab = .dashboard
     }
     
     /// Simulate tab selection with proper timing
@@ -62,7 +62,7 @@ final class FloatingBottomNavigationIntegrationTests: XCTestCase {
     
     func testNavigationBetweenAllMainSections() async {
         // Test navigation from home to all other sections
-        XCTAssertEqual(appState.selectedNavigationTab, .home)
+        XCTAssertEqual(appState.selectedNavigationTab, .dashboard)
         
         // Navigate to School Run
         await simulateTabSelection(.schoolRun)
@@ -70,8 +70,8 @@ final class FloatingBottomNavigationIntegrationTests: XCTestCase {
         XCTAssertTrue(appState.navigationPath.isEmpty, "Navigation path should be reset when switching tabs")
         
         // Navigate to Shopping
-        await simulateTabSelection(.shopping)
-        XCTAssertEqual(appState.selectedNavigationTab, .shopping)
+        await simulateTabSelection(.messages)
+        XCTAssertEqual(appState.selectedNavigationTab, .messages)
         XCTAssertTrue(appState.navigationPath.isEmpty, "Navigation path should be reset when switching tabs")
         
         // Navigate to Tasks
@@ -80,15 +80,15 @@ final class FloatingBottomNavigationIntegrationTests: XCTestCase {
         XCTAssertTrue(appState.navigationPath.isEmpty, "Navigation path should be reset when switching tabs")
         
         // Navigate back to Home
-        await simulateTabSelection(.home)
-        XCTAssertEqual(appState.selectedNavigationTab, .home)
+        await simulateTabSelection(.dashboard)
+        XCTAssertEqual(appState.selectedNavigationTab, .dashboard)
         XCTAssertEqual(appState.currentFlow, .familyDashboard, "Home tab should ensure family dashboard flow")
         XCTAssertTrue(appState.navigationPath.isEmpty, "Navigation path should be reset when switching tabs")
     }
     
     func testNavigationSequenceWithAllTabs() async {
         // Test a complete navigation sequence through all tabs
-        let navigationSequence: [NavigationTab] = [.schoolRun, .shopping, .tasks, .home, .tasks, .schoolRun, .home]
+        let navigationSequence: [NavigationTab] = [.schoolRun, .messages, .tasks, .dashboard, .tasks, .schoolRun, .dashboard]
         
         for (index, tab) in navigationSequence.enumerated() {
             await simulateTabSelection(tab)
@@ -97,7 +97,7 @@ final class FloatingBottomNavigationIntegrationTests: XCTestCase {
             XCTAssertTrue(appState.navigationPath.isEmpty, "Navigation path should be empty at sequence step \(index)")
             
             // Verify flow state for home tab
-            if tab == .home {
+            if tab == .dashboard {
                 XCTAssertEqual(appState.currentFlow, .familyDashboard, "Home tab should maintain family dashboard flow at step \(index)")
             }
         }
@@ -105,7 +105,7 @@ final class FloatingBottomNavigationIntegrationTests: XCTestCase {
     
     func testNavigationWithRapidTabSwitching() async {
         // Test rapid tab switching to ensure state consistency
-        let rapidSequence: [NavigationTab] = [.schoolRun, .home, .tasks, .shopping, .home, .schoolRun]
+        let rapidSequence: [NavigationTab] = [.schoolRun, .dashboard, .tasks, .messages, .dashboard, .schoolRun]
         
         for tab in rapidSequence {
             appState.handleTabSelection(tab)
@@ -126,7 +126,7 @@ final class FloatingBottomNavigationIntegrationTests: XCTestCase {
         // Test that navigation state stays synchronized with current view
         
         // Start at home
-        XCTAssertEqual(appState.selectedNavigationTab, .home)
+        XCTAssertEqual(appState.selectedNavigationTab, .dashboard)
         XCTAssertEqual(appState.currentFlow, .familyDashboard)
         
         // Navigate to tasks and verify synchronization
@@ -139,13 +139,13 @@ final class FloatingBottomNavigationIntegrationTests: XCTestCase {
         appState.navigationPath.append("task-edit")
         XCTAssertFalse(appState.navigationPath.isEmpty)
         
-        await simulateTabSelection(.shopping)
-        XCTAssertEqual(appState.selectedNavigationTab, .shopping)
+        await simulateTabSelection(.messages)
+        XCTAssertEqual(appState.selectedNavigationTab, .messages)
         XCTAssertTrue(appState.navigationPath.isEmpty, "Navigation path should be reset when switching tabs")
         
         // Verify state remains consistent after multiple operations
-        await simulateTabSelection(.home)
-        XCTAssertEqual(appState.selectedNavigationTab, .home)
+        await simulateTabSelection(.dashboard)
+        XCTAssertEqual(appState.selectedNavigationTab, .dashboard)
         XCTAssertEqual(appState.currentFlow, .familyDashboard)
         XCTAssertTrue(appState.navigationPath.isEmpty)
     }
@@ -191,8 +191,8 @@ final class FloatingBottomNavigationIntegrationTests: XCTestCase {
         XCTAssertEqual(appState.selectedNavigationTab, .tasks, "Tab selection should persist with navigation path")
         
         // Switch tabs - should reset navigation path
-        await simulateTabSelection(.shopping)
-        XCTAssertEqual(appState.selectedNavigationTab, .shopping)
+        await simulateTabSelection(.messages)
+        XCTAssertEqual(appState.selectedNavigationTab, .messages)
         XCTAssertTrue(appState.navigationPath.isEmpty, "Navigation path should be reset when switching tabs")
         
         // Add path again and use resetNavigation
@@ -201,7 +201,7 @@ final class FloatingBottomNavigationIntegrationTests: XCTestCase {
         
         appState.resetNavigation()
         XCTAssertTrue(appState.navigationPath.isEmpty, "resetNavigation should clear navigation path")
-        XCTAssertEqual(appState.selectedNavigationTab, .shopping, "resetNavigation should not change selected tab")
+        XCTAssertEqual(appState.selectedNavigationTab, .messages, "resetNavigation should not change selected tab")
     }
     
     // MARK: - Navigation Visibility Logic Tests
@@ -296,7 +296,7 @@ final class FloatingBottomNavigationIntegrationTests: XCTestCase {
         
         // Start with empty navigation path
         XCTAssertTrue(appState.navigationPath.isEmpty)
-        XCTAssertEqual(appState.selectedNavigationTab, .home)
+        XCTAssertEqual(appState.selectedNavigationTab, .dashboard)
         
         // Add navigation path items
         appState.navigationPath.append("detail1")
@@ -329,7 +329,7 @@ final class FloatingBottomNavigationIntegrationTests: XCTestCase {
         appState.currentFlow = .familySelection
         // Navigation path might be preserved during flow changes, but tab selection should reset it
         
-        await simulateTabSelection(.home)
+        await simulateTabSelection(.dashboard)
         XCTAssertTrue(appState.navigationPath.isEmpty, "Tab selection should reset path regardless of flow")
         XCTAssertEqual(appState.currentFlow, .familyDashboard, "Home tab should set family dashboard flow")
     }
@@ -338,16 +338,16 @@ final class FloatingBottomNavigationIntegrationTests: XCTestCase {
         // Test explicit navigation reset coordination
         
         // Set up navigation state
-        await simulateTabSelection(.shopping)
+        await simulateTabSelection(.messages)
         appState.navigationPath.append("shopping-list")
         appState.navigationPath.append("item-detail")
         XCTAssertEqual(appState.navigationPath.count, 2)
-        XCTAssertEqual(appState.selectedNavigationTab, .shopping)
+        XCTAssertEqual(appState.selectedNavigationTab, .messages)
         
         // Reset navigation
         appState.resetNavigation()
         XCTAssertTrue(appState.navigationPath.isEmpty, "resetNavigation should clear NavigationStack path")
-        XCTAssertEqual(appState.selectedNavigationTab, .shopping, "resetNavigation should preserve selected tab")
+        XCTAssertEqual(appState.selectedNavigationTab, .messages, "resetNavigation should preserve selected tab")
         
         // Verify navigation still works after reset
         await simulateTabSelection(.tasks)
@@ -361,7 +361,7 @@ final class FloatingBottomNavigationIntegrationTests: XCTestCase {
         // Test a complete user navigation journey
         
         // 1. Start at home
-        XCTAssertEqual(appState.selectedNavigationTab, .home)
+        XCTAssertEqual(appState.selectedNavigationTab, .dashboard)
         XCTAssertTrue(appState.shouldShowBottomNavigation)
         
         // 2. Navigate to tasks, drill down into details
@@ -377,12 +377,12 @@ final class FloatingBottomNavigationIntegrationTests: XCTestCase {
         XCTAssertTrue(appState.navigationPath.isEmpty)
         
         // 4. Navigate to shopping
-        await simulateTabSelection(.shopping)
-        XCTAssertEqual(appState.selectedNavigationTab, .shopping)
+        await simulateTabSelection(.messages)
+        XCTAssertEqual(appState.selectedNavigationTab, .messages)
         
         // 5. Go back to home
-        await simulateTabSelection(.home)
-        XCTAssertEqual(appState.selectedNavigationTab, .home)
+        await simulateTabSelection(.dashboard)
+        XCTAssertEqual(appState.selectedNavigationTab, .dashboard)
         XCTAssertEqual(appState.currentFlow, .familyDashboard)
         
         // 6. Verify final state
@@ -405,18 +405,18 @@ final class FloatingBottomNavigationIntegrationTests: XCTestCase {
         XCTAssertEqual(appState.selectedNavigationTab, .tasks, "Tab selection should persist during error")
         
         // Navigation should still work during error
-        await simulateTabSelection(.shopping)
-        XCTAssertEqual(appState.selectedNavigationTab, .shopping)
+        await simulateTabSelection(.messages)
+        XCTAssertEqual(appState.selectedNavigationTab, .messages)
         XCTAssertNotNil(appState.errorMessage, "Error should persist during navigation")
         
         // Clear error
         appState.clearError()
         XCTAssertNil(appState.errorMessage)
-        XCTAssertEqual(appState.selectedNavigationTab, .shopping, "Tab selection should persist after error cleared")
+        XCTAssertEqual(appState.selectedNavigationTab, .messages, "Tab selection should persist after error cleared")
         
         // Navigation should continue to work normally
-        await simulateTabSelection(.home)
-        XCTAssertEqual(appState.selectedNavigationTab, .home)
+        await simulateTabSelection(.dashboard)
+        XCTAssertEqual(appState.selectedNavigationTab, .dashboard)
     }
     
     func testNavigationWithLoadingStates() async {
@@ -452,8 +452,8 @@ final class FloatingBottomNavigationIntegrationTests: XCTestCase {
         XCTAssertFalse(appState.shouldShowBottomNavigation, "Should not show navigation without family")
         
         // Tab selection should still work (for when navigation becomes visible again)
-        await simulateTabSelection(.shopping)
-        XCTAssertEqual(appState.selectedNavigationTab, .shopping)
+        await simulateTabSelection(.messages)
+        XCTAssertEqual(appState.selectedNavigationTab, .messages)
         
         // Restore family
         let mockData = MockDataGenerator.mockFamilyWithMembers()
@@ -461,7 +461,7 @@ final class FloatingBottomNavigationIntegrationTests: XCTestCase {
         appState.currentMembership = mockData.memberships[0]
         appState.currentFlow = .familyDashboard
         XCTAssertTrue(appState.shouldShowBottomNavigation, "Should show navigation when family restored")
-        XCTAssertEqual(appState.selectedNavigationTab, .shopping, "Tab selection should be preserved")
+        XCTAssertEqual(appState.selectedNavigationTab, .messages, "Tab selection should be preserved")
     }
     
     func testNavigationIdempotency() async {
@@ -482,10 +482,10 @@ final class FloatingBottomNavigationIntegrationTests: XCTestCase {
         XCTAssertEqual(appState.selectedNavigationTab, .tasks)
         
         // Mixed operations
-        await simulateTabSelection(.home)
+        await simulateTabSelection(.dashboard)
         appState.resetNavigation()
-        await simulateTabSelection(.home)
-        XCTAssertEqual(appState.selectedNavigationTab, .home)
+        await simulateTabSelection(.dashboard)
+        XCTAssertEqual(appState.selectedNavigationTab, .dashboard)
         XCTAssertEqual(appState.currentFlow, .familyDashboard)
     }
     
@@ -571,7 +571,7 @@ final class FloatingBottomNavigationIntegrationTests: XCTestCase {
         
         // Reset to initial state
         appState.resetToInitialState()
-        XCTAssertEqual(appState.selectedNavigationTab, .home, "Should reset to home tab")
+        XCTAssertEqual(appState.selectedNavigationTab, .dashboard, "Should reset to home tab")
         XCTAssertEqual(appState.currentFlow, .onboarding, "Should reset to onboarding flow")
         XCTAssertFalse(appState.shouldShowBottomNavigation, "Should not show navigation after reset")
     }

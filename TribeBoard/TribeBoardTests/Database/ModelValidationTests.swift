@@ -383,9 +383,9 @@ final class ModelValidationTests: DatabaseTestBase {
     func testUserProfileActiveMemberships_OnlyActiveMembers() throws {
         // Create user and families
         let user = try createTestUser()
-        let family1 = try createTestFamily(name: "Family 1", code: "FAM001")
-        let family2 = try createTestFamily(name: "Family 2", code: "FAM002")
-        let family3 = try createTestFamily(name: "Family 3", code: "FAM003")
+        let family1 = try createTestFamily(name: "Family 1", code: "FAM001", createdByUserId: UUID())
+        let family2 = try createTestFamily(name: "Family 2", code: "FAM002", createdByUserId: UUID())
+        let family3 = try createTestFamily(name: "Family 3", code: "FAM003", createdByUserId: UUID())
         
         // Create memberships with different statuses
         let activeMembership1 = Membership(family: family1, user: user, role: .adult)
@@ -440,8 +440,8 @@ final class ModelValidationTests: DatabaseTestBase {
     func testUserProfileCurrentFamilyMembership_ReturnsFirstActive() throws {
         // Create user and families
         let user = try createTestUser()
-        let family1 = try createTestFamily(name: "Family 1", code: "FAM001")
-        let family2 = try createTestFamily(name: "Family 2", code: "FAM002")
+        let family1 = try createTestFamily(name: "Family 1", code: "FAM001", createdByUserId: UUID())
+        let family2 = try createTestFamily(name: "Family 2", code: "FAM002", createdByUserId: UUID())
         
         // Create active memberships (first one should be returned)
         let membership1 = Membership(family: family1, user: user, role: .adult)

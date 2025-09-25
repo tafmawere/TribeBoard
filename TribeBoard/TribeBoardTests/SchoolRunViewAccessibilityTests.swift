@@ -180,7 +180,7 @@ class SchoolRunViewAccessibilityTests: XCTestCase {
     
     func testLocationIconTouchTargets() throws {
         // Test location icons have proper touch targets
-        let locationIcon = LocationIcon(emoji: "🏠", label: "Home")
+        let locationIcon = LocationIcon(emoji: "🏠", label: "Dashboard")
         
         XCTAssertTrue(true, "Location icons should have adequate touch targets")
     }

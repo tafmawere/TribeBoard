@@ -6,33 +6,33 @@ final class NavigationComponentsUnitTests: XCTestCase {
     
     // MARK: - NavigationTab Enum Tests
     
-    func testNavigationTabAllCases() {
+    @MainActor func testNavigationTabAllCases() {
         let allCases = NavigationTab.allCases
         XCTAssertEqual(allCases.count, 4)
-        XCTAssertTrue(allCases.contains(.home))
+        XCTAssertTrue(allCases.contains(.dashboard))
         XCTAssertTrue(allCases.contains(.schoolRun))
-        XCTAssertTrue(allCases.contains(.shopping))
+        XCTAssertTrue(allCases.contains(.messages))
         XCTAssertTrue(allCases.contains(.tasks))
     }
     
-    func testNavigationTabRawValues() {
-        XCTAssertEqual(NavigationTab.home.rawValue, "home")
+    @MainActor func testNavigationTabRawValues() {
+        XCTAssertEqual(NavigationTab.dashboard.rawValue, "home")
         XCTAssertEqual(NavigationTab.schoolRun.rawValue, "school_run")
-        XCTAssertEqual(NavigationTab.shopping.rawValue, "shopping")
+        XCTAssertEqual(NavigationTab.messages.rawValue, "shopping")
         XCTAssertEqual(NavigationTab.tasks.rawValue, "tasks")
     }
     
-    func testNavigationTabIdentifiable() {
-        XCTAssertEqual(NavigationTab.home.id, "home")
+    @MainActor func testNavigationTabIdentifiable() {
+        XCTAssertEqual(NavigationTab.dashboard.id, "home")
         XCTAssertEqual(NavigationTab.schoolRun.id, "school_run")
-        XCTAssertEqual(NavigationTab.shopping.id, "shopping")
+        XCTAssertEqual(NavigationTab.messages.id, "shopping")
         XCTAssertEqual(NavigationTab.tasks.id, "tasks")
     }
     
-    func testNavigationTabDisplayNames() {
-        XCTAssertEqual(NavigationTab.home.displayName, "Home")
+    @MainActor func testNavigationTabDisplayNames() {
+        XCTAssertEqual(NavigationTab.dashboard.displayName, "Dashboard")
         XCTAssertEqual(NavigationTab.schoolRun.displayName, "School Run")
-        XCTAssertEqual(NavigationTab.shopping.displayName, "Shopping")
+        XCTAssertEqual(NavigationTab.messages.displayName, "Messages")
         XCTAssertEqual(NavigationTab.tasks.displayName, "Tasks")
         
         // Ensure all display names are non-empty
@@ -41,17 +41,17 @@ final class NavigationComponentsUnitTests: XCTestCase {
         }
     }
     
-    func testNavigationTabIcons() {
+    @MainActor func testNavigationTabIcons() {
         // Test inactive icons
-        XCTAssertEqual(NavigationTab.home.icon, "house")
-        XCTAssertEqual(NavigationTab.schoolRun.icon, "bus")
-        XCTAssertEqual(NavigationTab.shopping.icon, "cart")
+        XCTAssertEqual(NavigationTab.dashboard.icon, "house")
+        XCTAssertEqual(NavigationTab.schoolRun.icon, "car")
+        XCTAssertEqual(NavigationTab.messages.icon, "message")
         XCTAssertEqual(NavigationTab.tasks.icon, "checkmark.circle")
         
         // Test active icons
-        XCTAssertEqual(NavigationTab.home.activeIcon, "house.fill")
+        XCTAssertEqual(NavigationTab.dashboard.activeIcon, "house.fill")
         XCTAssertEqual(NavigationTab.schoolRun.activeIcon, "bus.fill")
-        XCTAssertEqual(NavigationTab.shopping.activeIcon, "cart.fill")
+        XCTAssertEqual(NavigationTab.messages.activeIcon, "message.fill")
         XCTAssertEqual(NavigationTab.tasks.activeIcon, "checkmark.circle.fill")
         
         // Ensure all icons are non-empty
@@ -61,7 +61,7 @@ final class NavigationComponentsUnitTests: XCTestCase {
         }
     }
     
-    func testNavigationTabIconConsistency() {
+    @MainActor func testNavigationTabIconConsistency() {
         // Ensure active icons are filled versions of inactive icons
         for tab in NavigationTab.allCases {
             let inactiveIcon = tab.icon
@@ -77,8 +77,8 @@ final class NavigationComponentsUnitTests: XCTestCase {
     
     // MARK: - NavigationItem Component Tests
     
-    func testNavigationItemInitialization() {
-        let tab = NavigationTab.home
+    @MainActor func testNavigationItemInitialization() {
+        let tab = NavigationTab.dashboard
         let isActive = true
         var tapCalled = false
         let onTap = { tapCalled = true }
@@ -97,7 +97,7 @@ final class NavigationComponentsUnitTests: XCTestCase {
         XCTAssertTrue(tapCalled)
     }
     
-    func testNavigationItemTapCallback() {
+    @MainActor func testNavigationItemTapCallback() {
         var tappedTab: NavigationTab?
         let onTap = { tappedTab = .schoolRun }
         
@@ -111,7 +111,7 @@ final class NavigationComponentsUnitTests: XCTestCase {
         XCTAssertEqual(tappedTab, .schoolRun)
     }
     
-    func testNavigationItemActiveStateChanges() {
+    @MainActor func testNavigationItemActiveStateChanges() {
         var tapCount = 0
         let onTap = { tapCount += 1 }
         
@@ -138,8 +138,8 @@ final class NavigationComponentsUnitTests: XCTestCase {
     
     // MARK: - FloatingBottomNavigation Component Tests
     
-    func testFloatingBottomNavigationInitialization() {
-        let selectedTab = NavigationTab.home
+    @MainActor func testFloatingBottomNavigationInitialization() {
+        let selectedTab = NavigationTab.dashboard
         var tappedTab: NavigationTab?
         let onTabSelected = { (tab: NavigationTab) in tappedTab = tab }
         
@@ -149,12 +149,12 @@ final class NavigationComponentsUnitTests: XCTestCase {
         )
         
         // Test that callback works
-        onTabSelected(.shopping)
-        XCTAssertEqual(tappedTab, .shopping)
+        onTabSelected(.messages)
+        XCTAssertEqual(tappedTab, .messages)
     }
     
-    func testFloatingBottomNavigationTabSelection() {
-        var selectedTab = NavigationTab.home
+    @MainActor func testFloatingBottomNavigationTabSelection() {
+        var selectedTab = NavigationTab.dashboard
         var callbackTab: NavigationTab?
         
         let onTabSelected = { (tab: NavigationTab) in 
@@ -179,9 +179,9 @@ final class NavigationComponentsUnitTests: XCTestCase {
         XCTAssertEqual(selectedTab, .tasks)
     }
     
-    func testFloatingBottomNavigationAllTabsPresent() {
+    @MainActor func testFloatingBottomNavigationAllTabsPresent() {
         let _ = FloatingBottomNavigation(
-            selectedTab: .constant(.home),
+            selectedTab: .constant(.dashboard),
             onTabSelected: { _ in }
         )
         
@@ -204,7 +204,7 @@ final class NavigationComponentsUnitTests: XCTestCase {
     
     // MARK: - Integration Tests
     
-    func testNavigationComponentsIntegration() {
+    @MainActor func testNavigationComponentsIntegration() {
         // Test that NavigationTab enum works with NavigationItem
         let tab = NavigationTab.schoolRun
         var tappedTab: NavigationTab?
@@ -217,7 +217,7 @@ final class NavigationComponentsUnitTests: XCTestCase {
         
         // Test properties are accessible
         XCTAssertEqual(navigationItem.tab.displayName, "School Run")
-        XCTAssertEqual(navigationItem.tab.icon, "bus")
+        XCTAssertEqual(navigationItem.tab.icon, "car")
         XCTAssertEqual(navigationItem.tab.activeIcon, "bus.fill")
         
         // Test tap functionality
@@ -227,10 +227,10 @@ final class NavigationComponentsUnitTests: XCTestCase {
     
     // MARK: - Edge Cases and Error Handling
     
-    func testNavigationTabCaseIterable() {
+    @MainActor func testNavigationTabCaseIterable() {
         // Ensure all cases are covered and none are missing
         let allCases = NavigationTab.allCases
-        let expectedCases: [NavigationTab] = [.home, .schoolRun, .shopping, .tasks]
+        let expectedCases: [NavigationTab] = [.dashboard, .schoolRun, .messages, .tasks]
         
         XCTAssertEqual(allCases.count, expectedCases.count)
         
@@ -239,7 +239,7 @@ final class NavigationComponentsUnitTests: XCTestCase {
         }
     }
     
-    func testNavigationItemWithAllTabs() {
+    @MainActor func testNavigationItemWithAllTabs() {
         // Test NavigationItem works with all tab types
         for tab in NavigationTab.allCases {
             var tapCalled = false
@@ -261,7 +261,7 @@ final class NavigationComponentsUnitTests: XCTestCase {
     
     // MARK: - Performance Tests
     
-    func testNavigationTabEnumPerformance() {
+    @MainActor func testNavigationTabEnumPerformance() {
         // Test that enum operations are performant
         measure {
             for _ in 0..<1000 {
@@ -278,7 +278,7 @@ final class NavigationComponentsUnitTests: XCTestCase {
     
     // MARK: - Accessibility Tests
     
-    func testNavigationTabAccessibilityProperties() {
+    @MainActor func testNavigationTabAccessibilityProperties() {
         // Test that all tabs have appropriate accessibility properties
         for tab in NavigationTab.allCases {
             let displayName = tab.displayName
@@ -293,7 +293,7 @@ final class NavigationComponentsUnitTests: XCTestCase {
         }
     }
     
-    func testNavigationItemAccessibilityIntegration() {
+    @MainActor func testNavigationItemAccessibilityIntegration() {
         // Test that NavigationItem properly uses tab accessibility properties
         let tab = NavigationTab.schoolRun
         
@@ -316,9 +316,9 @@ final class NavigationComponentsUnitTests: XCTestCase {
     
     // MARK: - Component State Tests
     
-    func testNavigationItemStateConsistency() {
+    @MainActor func testNavigationItemStateConsistency() {
         // Test that NavigationItem maintains consistent state
-        let tab = NavigationTab.home
+        let tab = NavigationTab.dashboard
         
         let activeItem = NavigationItem(tab: tab, isActive: true, onTap: {})
         let inactiveItem = NavigationItem(tab: tab, isActive: false, onTap: {})
@@ -328,9 +328,9 @@ final class NavigationComponentsUnitTests: XCTestCase {
         XCTAssertEqual(activeItem.tab, inactiveItem.tab)
     }
     
-    func testFloatingBottomNavigationBindingConsistency() {
+    @MainActor func testFloatingBottomNavigationBindingConsistency() {
         // Test that binding updates work correctly
-        var selectedTab = NavigationTab.home
+        var selectedTab = NavigationTab.dashboard
         var callbackCount = 0
         
         let onTabSelected = { (tab: NavigationTab) in
@@ -357,14 +357,14 @@ final class NavigationComponentsUnitTests: XCTestCase {
         XCTAssertEqual(selectedTab, .tasks)
         XCTAssertEqual(callbackCount, 2)
         
-        onTabSelected(.shopping)
-        XCTAssertEqual(selectedTab, .shopping)
+        onTabSelected(.messages)
+        XCTAssertEqual(selectedTab, .messages)
         XCTAssertEqual(callbackCount, 3)
     }
     
     // MARK: - Validation Tests
     
-    func testNavigationTabValidation() {
+    @MainActor func testNavigationTabValidation() {
         // Test that all navigation tabs have valid properties
         for tab in NavigationTab.allCases {
             // Display name validation
@@ -383,12 +383,12 @@ final class NavigationComponentsUnitTests: XCTestCase {
         }
     }
     
-    func testNavigationItemCallbackValidation() {
+    @MainActor func testNavigationItemCallbackValidation() {
         // Test that callbacks are properly executed
         var callbackExecuted = false
         var callbackParameter: NavigationTab?
         
-        let tab = NavigationTab.shopping
+        let tab = NavigationTab.messages
         let navigationItem = NavigationItem(
             tab: tab,
             isActive: false,

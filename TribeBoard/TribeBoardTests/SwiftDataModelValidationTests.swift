@@ -47,7 +47,7 @@ final class SwiftDataModelValidationTests: XCTestCase {
         
         XCTAssertEqual(family.name, "Test Family")
         XCTAssertEqual(family.code, "TEST123")
-        XCTAssertTrue(family.memberships.isEmpty)
+        XCTAssertTrue(family.memberships?.isEmpty ?? true)
         XCTAssertTrue(family.needsSync)
     }
     
@@ -60,7 +60,7 @@ final class SwiftDataModelValidationTests: XCTestCase {
         
         XCTAssertEqual(user.displayName, "Test User")
         XCTAssertEqual(user.appleUserIdHash, "test_hash_123")
-        XCTAssertTrue(user.memberships.isEmpty)
+        XCTAssertTrue(user.memberships?.isEmpty ?? true)
         XCTAssertTrue(user.needsSync)
     }
     

@@ -337,7 +337,7 @@ final class PrototypeNavigationFlowTests: XCTestCase {
             
             for schoolRun in mockData.schoolRuns {
                 XCTAssertFalse(schoolRun.route.isEmpty)
-                XCTAssertNotNil(schoolRun.pickupTime)
+                XCTAssertNotNil(schoolRun.homeTime)
             }
         }
     }

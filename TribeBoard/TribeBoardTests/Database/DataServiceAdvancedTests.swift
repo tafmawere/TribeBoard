@@ -110,7 +110,7 @@ final class DataServiceAdvancedTests: DatabaseTestBase {
     
     func testUpdateMembershipRoleValidChanges() throws {
         // Given
-        let family = try createTestFamily(name: "Role Update Family", code: "ROLE01")
+        let family = try createTestFamily(name: "Role Update Family", code: "ROLE01", createdByUserId: UUID())
         let user = try createTestUser(displayName: "Role User", appleUserIdHash: "role_user_hash")
         let membership = try dataService.createMembership(family: family, user: user, role: .kid)
         
@@ -144,7 +144,7 @@ final class DataServiceAdvancedTests: DatabaseTestBase {
     
     func testUpdateMembershipRoleToParentAdminWhenNoneExists() throws {
         // Given
-        let family = try createTestFamily(name: "Admin Promotion Family", code: "ADMIN01")
+        let family = try createTestFamily(name: "Admin Promotion Family", code: "ADMIN01", createdByUserId: UUID())
         let user = try createTestUser(displayName: "Future Admin", appleUserIdHash: "future_admin_hash")
         let membership = try dataService.createMembership(family: family, user: user, role: .adult)
         
@@ -162,7 +162,7 @@ final class DataServiceAdvancedTests: DatabaseTestBase {
     
     func testUpdateMembershipRoleFromParentAdminToOther() throws {
         // Given
-        let family = try createTestFamily(name: "Admin Demotion Family", code: "DEMOTE1")
+        let family = try createTestFamily(name: "Admin Demotion Family", code: "DEMOTE1", createdByUserId: UUID())
         let admin = try createTestUser(displayName: "Current Admin", appleUserIdHash: "current_admin_hash")
         let adminMembership = try dataService.createMembership(family: family, user: admin, role: .parentAdmin)
         
@@ -181,7 +181,7 @@ final class DataServiceAdvancedTests: DatabaseTestBase {
     
     func testUpdateMembershipRoleInvalidChanges() throws {
         // Given
-        let family = try createTestFamily(name: "Invalid Change Family", code: "INVALID")
+        let family = try createTestFamily(name: "Invalid Change Family", code: "INVALID", createdByUserId: UUID())
         let admin = try createTestUser(displayName: "Admin", appleUserIdHash: "admin_hash")
         let member = try createTestUser(displayName: "Member", appleUserIdHash: "member_hash")
         
@@ -210,7 +210,7 @@ final class DataServiceAdvancedTests: DatabaseTestBase {
     
     func testUpdateMembershipRoleToSameRole() throws {
         // Given
-        let family = try createTestFamily(name: "Same Role Family", code: "SAME01")
+        let family = try createTestFamily(name: "Same Role Family", code: "SAME01", createdByUserId: UUID())
         let user = try createTestUser(displayName: "User", appleUserIdHash: "user_hash")
         let membership = try dataService.createMembership(family: family, user: user, role: .adult)
         
@@ -240,7 +240,7 @@ final class DataServiceAdvancedTests: DatabaseTestBase {
     
     func testRemoveMembershipSoftDelete() throws {
         // Given
-        let family = try createTestFamily(name: "Removal Family", code: "REMOVE1")
+        let family = try createTestFamily(name: "Removal Family", code: "REMOVE1", createdByUserId: UUID())
         let user = try createTestUser(displayName: "Leaving User", appleUserIdHash: "leaving_user_hash")
         let membership = try dataService.createMembership(family: family, user: user, role: .kid)
         
@@ -268,7 +268,7 @@ final class DataServiceAdvancedTests: DatabaseTestBase {
     
     func testRemoveParentAdminMembership() throws {
         // Given
-        let family = try createTestFamily(name: "Admin Removal Family", code: "ADMREM1")
+        let family = try createTestFamily(name: "Admin Removal Family", code: "ADMREM1", createdByUserId: UUID())
         let admin = try createTestUser(displayName: "Leaving Admin", appleUserIdHash: "leaving_admin_hash")
         let adminMembership = try dataService.createMembership(family: family, user: admin, role: .parentAdmin)
         
@@ -289,7 +289,7 @@ final class DataServiceAdvancedTests: DatabaseTestBase {
     
     func testRemoveMembershipFromFamilyWithMultipleMembers() throws {
         // Given
-        let family = try createTestFamily(name: "Multi Member Family", code: "MULTI01")
+        let family = try createTestFamily(name: "Multi Member Family", code: "MULTI01", createdByUserId: UUID())
         let admin = try createTestUser(displayName: "Admin", appleUserIdHash: "admin_hash")
         let member1 = try createTestUser(displayName: "Member 1", appleUserIdHash: "member1_hash")
         let member2 = try createTestUser(displayName: "Member 2", appleUserIdHash: "member2_hash")
@@ -322,7 +322,7 @@ final class DataServiceAdvancedTests: DatabaseTestBase {
     
     func testRemoveAlreadyRemovedMembership() throws {
         // Given
-        let family = try createTestFamily(name: "Already Removed Family", code: "ALRREM1")
+        let family = try createTestFamily(name: "Already Removed Family", code: "ALRREM1", createdByUserId: UUID())
         let user = try createTestUser(displayName: "User", appleUserIdHash: "user_hash")
         let membership = try dataService.createMembership(family: family, user: user, role: .kid)
         
@@ -345,7 +345,7 @@ final class DataServiceAdvancedTests: DatabaseTestBase {
     
     func testFetchActiveMembershipsWithMixedStatuses() throws {
         // Given
-        let family = try createTestFamily(name: "Mixed Status Family", code: "MIXED01")
+        let family = try createTestFamily(name: "Mixed Status Family", code: "MIXED01", createdByUserId: UUID())
         let user1 = try createTestUser(displayName: "Active User", appleUserIdHash: "active_hash")
         let user2 = try createTestUser(displayName: "Removed User", appleUserIdHash: "removed_hash")
         let user3 = try createTestUser(displayName: "Another Active User", appleUserIdHash: "active2_hash")
@@ -376,7 +376,7 @@ final class DataServiceAdvancedTests: DatabaseTestBase {
     
     func testFetchActiveMembershipsEmptyFamily() throws {
         // Given
-        let family = try createTestFamily(name: "Empty Family", code: "EMPTY01")
+        let family = try createTestFamily(name: "Empty Family", code: "EMPTY01", createdByUserId: UUID())
         
         // When
         let activeMemberships = try dataService.fetchActiveMemberships(forFamily: family)
@@ -387,7 +387,7 @@ final class DataServiceAdvancedTests: DatabaseTestBase {
     
     func testFetchActiveMembershipsAllRemoved() throws {
         // Given
-        let family = try createTestFamily(name: "All Removed Family", code: "ALLREM1")
+        let family = try createTestFamily(name: "All Removed Family", code: "ALLREM1", createdByUserId: UUID())
         let user1 = try createTestUser(displayName: "User 1", appleUserIdHash: "user1_hash")
         let user2 = try createTestUser(displayName: "User 2", appleUserIdHash: "user2_hash")
         
@@ -416,7 +416,7 @@ final class DataServiceAdvancedTests: DatabaseTestBase {
     
     func testCompleteUserJoinAndLeaveWorkflow() throws {
         // Given
-        let family = try createTestFamily(name: "Workflow Family", code: "WORK01")
+        let family = try createTestFamily(name: "Workflow Family", code: "WORK01", createdByUserId: UUID())
         let user = try createTestUser(displayName: "Workflow User", appleUserIdHash: "workflow_hash")
         
         // When - user joins as kid
@@ -452,7 +452,7 @@ final class DataServiceAdvancedTests: DatabaseTestBase {
     
     func testFamilyAdminTransitionWorkflow() throws {
         // Given
-        let family = try createTestFamily(name: "Admin Transition Family", code: "TRANS01")
+        let family = try createTestFamily(name: "Admin Transition Family", code: "TRANS01", createdByUserId: UUID())
         let oldAdmin = try createTestUser(displayName: "Old Admin", appleUserIdHash: "old_admin_hash")
         let newAdmin = try createTestUser(displayName: "New Admin", appleUserIdHash: "new_admin_hash")
         
@@ -483,7 +483,7 @@ final class DataServiceAdvancedTests: DatabaseTestBase {
     
     func testAdvancedOperationsWithInvalidMembership() throws {
         // Given
-        let family = try createTestFamily(name: "Invalid Membership Family", code: "INVALID")
+        let family = try createTestFamily(name: "Invalid Membership Family", code: "INVALID", createdByUserId: UUID())
         let user = try createTestUser(displayName: "User", appleUserIdHash: "user_hash")
         let membership = try dataService.createMembership(family: family, user: user, role: .kid)
         
@@ -508,7 +508,7 @@ final class DataServiceAdvancedTests: DatabaseTestBase {
     
     func testConcurrentMembershipOperations() throws {
         // Given
-        let family = try createTestFamily(name: "Concurrent Family", code: "CONCUR1")
+        let family = try createTestFamily(name: "Concurrent Family", code: "CONCUR1", createdByUserId: UUID())
         let user1 = try createTestUser(displayName: "User 1", appleUserIdHash: "user1_hash")
         let user2 = try createTestUser(displayName: "User 2", appleUserIdHash: "user2_hash")
         

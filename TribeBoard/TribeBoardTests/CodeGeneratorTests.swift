@@ -30,14 +30,14 @@ final class CodeGeneratorTests: XCTestCase {
     
     // MARK: - Random Code Generation Tests
     
-    func testGenerateRandomCode_DefaultLength() {
+    @MainActor func testGenerateRandomCode_DefaultLength() {
         let code = codeGenerator.generateRandomCode()
         
         XCTAssertEqual(code.count, 6, "Default code length should be 6")
         XCTAssertTrue(codeGenerator.isValidCodeFormat(code), "Generated code should be valid format")
     }
     
-    func testGenerateRandomCode_CustomLength() {
+    @MainActor func testGenerateRandomCode_CustomLength() {
         let customGenerator = CodeGenerator(codeLength: 8)
         let code = customGenerator.generateRandomCode()
         
@@ -45,7 +45,7 @@ final class CodeGeneratorTests: XCTestCase {
         XCTAssertTrue(customGenerator.isValidCodeFormat(code), "Generated code should be valid format")
     }
     
-    func testGenerateRandomCode_OnlyAllowedCharacters() {
+    @MainActor func testGenerateRandomCode_OnlyAllowedCharacters() {
         let code = codeGenerator.generateRandomCode()
         let allowedCharacters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
         
@@ -54,7 +54,7 @@ final class CodeGeneratorTests: XCTestCase {
         }
     }
     
-    func testGenerateRandomCode_Uniqueness() {
+    @MainActor func testGenerateRandomCode_Uniqueness() {
         let codes = Set((0..<100).map { _ in codeGenerator.generateRandomCode() })
         
         // With 36^6 possible combinations, 100 codes should be unique
@@ -63,7 +63,7 @@ final class CodeGeneratorTests: XCTestCase {
     
     // MARK: - Code Format Validation Tests
     
-    func testIsValidCodeFormat_ValidCodes() {
+    @MainActor func testIsValidCodeFormat_ValidCodes() {
         let validCodes = ["ABC123", "HELLO1", "TEST123", "FAMILY01"]
         
         for code in validCodes {
@@ -71,7 +71,7 @@ final class CodeGeneratorTests: XCTestCase {
         }
     }
     
-    func testIsValidCodeFormat_InvalidLength() {
+    @MainActor func testIsValidCodeFormat_InvalidLength() {
         let shortCode = "ABC12"  // 5 characters
         let longCode = "ABCDEFGHI"  // 9 characters
         
@@ -79,7 +79,7 @@ final class CodeGeneratorTests: XCTestCase {
         XCTAssertFalse(codeGenerator.isValidCodeFormat(longCode), "Long code should be invalid")
     }
     
-    func testIsValidCodeFormat_InvalidCharacters() {
+    @MainActor func testIsValidCodeFormat_InvalidCharacters() {
         let invalidCodes = ["ABC-123", "HELLO!", "test@123", "FAMILY 1"]
         
         for code in invalidCodes {
@@ -87,7 +87,7 @@ final class CodeGeneratorTests: XCTestCase {
         }
     }
     
-    func testIsValidCodeFormat_LowercaseHandling() {
+    @MainActor func testIsValidCodeFormat_LowercaseHandling() {
         let lowercaseCode = "abc123"
         
         XCTAssertTrue(codeGenerator.isValidCodeFormat(lowercaseCode), "Lowercase code should be valid (handled internally)")
@@ -346,7 +346,7 @@ final class CodeGeneratorTests: XCTestCase {
     
     // MARK: - Enhanced Format Validation Tests
     
-    func testValidateCodeFormat_DetailedValidation() {
+    @MainActor func testValidateCodeFormat_DetailedValidation() {
         // Test enhanced validation method
         XCTAssertTrue(codeGenerator.validateCodeFormat("ABC123"), "Valid code should pass")
         XCTAssertFalse(codeGenerator.validateCodeFormat(""), "Empty code should fail")
@@ -357,7 +357,7 @@ final class CodeGeneratorTests: XCTestCase {
     
     // MARK: - Configuration Tests
     
-    func testCodeGenerationConfig_DefaultValues() {
+    @MainActor func testCodeGenerationConfig_DefaultValues() {
         let defaultConfig = CodeGenerationConfig.default
         
         XCTAssertEqual(defaultConfig.maxRetries, 10)
@@ -368,7 +368,7 @@ final class CodeGeneratorTests: XCTestCase {
         XCTAssertTrue(defaultConfig.enableRemoteFallback)
     }
     
-    func testCodeGenerator_CustomConfig() {
+    @MainActor func testCodeGenerator_CustomConfig() {
         let customConfig = CodeGenerationConfig(
             maxRetries: 3,
             baseDelay: 0.5,
@@ -384,7 +384,7 @@ final class CodeGeneratorTests: XCTestCase {
     
     // MARK: - Error Handling Tests
     
-    func testFamilyCodeGenerationError_Properties() {
+    @MainActor func testFamilyCodeGenerationError_Properties() {
         let errors: [FamilyCodeGenerationError] = [
             .uniquenessCheckFailed,
             .localCheckFailed(DataServiceError.invalidData("test")),
@@ -563,7 +563,7 @@ final class CodeGeneratorTests: XCTestCase {
         await fulfillment(of: [expectation], timeout: 1.0)
     }
     
-    func testErrorHandling_DetailedErrorInformation() {
+    @MainActor func testErrorHandling_DetailedErrorInformation() {
         let errors: [(FamilyCodeGenerationError, String)] = [
             (.uniquenessCheckFailed, "uniqueness"),
             (.localCheckFailed(DataServiceError.invalidData("test")), "local"),
@@ -585,7 +585,7 @@ final class CodeGeneratorTests: XCTestCase {
         }
     }
     
-    func testErrorHandling_RecoveryStrategyConsistency() {
+    @MainActor func testErrorHandling_RecoveryStrategyConsistency() {
         let retryableErrors: [FamilyCodeGenerationError] = [
             .uniquenessCheckFailed,
             .localCheckFailed(DataServiceError.invalidData("test")),
@@ -701,7 +701,7 @@ final class CodeGeneratorTests: XCTestCase {
     
     // MARK: - Edge Cases
     
-    func testCodeGenerator_BoundaryLengths() {
+    @MainActor func testCodeGenerator_BoundaryLengths() {
         let minGenerator = CodeGenerator(codeLength: 5) // Should clamp to 6
         let maxGenerator = CodeGenerator(codeLength: 10) // Should clamp to 8
         
@@ -709,7 +709,7 @@ final class CodeGeneratorTests: XCTestCase {
         XCTAssertEqual(maxGenerator.generateRandomCode().count, 8, "Should clamp maximum to 8")
     }
     
-    func testCodeGenerator_EmptyStringValidation() {
+    @MainActor func testCodeGenerator_EmptyStringValidation() {
         XCTAssertFalse(codeGenerator.isValidCodeFormat(""), "Empty string should be invalid")
     }
     
@@ -736,7 +736,7 @@ final class CodeGeneratorTests: XCTestCase {
         await fulfillment(of: [expectation], timeout: 1.0)
     }
     
-    func testCodeGenerator_SpecialCharacterHandling() {
+    @MainActor func testCodeGenerator_SpecialCharacterHandling() {
         let specialCodes = ["ABC@123", "TEST#456", "FAM$789", "CODE%012"]
         
         for code in specialCodes {
@@ -744,7 +744,7 @@ final class CodeGeneratorTests: XCTestCase {
         }
     }
     
-    func testCodeGenerator_CaseInsensitivity() {
+    @MainActor func testCodeGenerator_CaseInsensitivity() {
         let mixedCaseCodes = ["AbC123", "tEsT456", "FaMiLy"]
         
         for code in mixedCaseCodes {
@@ -754,7 +754,7 @@ final class CodeGeneratorTests: XCTestCase {
         }
     }
     
-    func testCodeGenerator_NumericOnlyCodes() {
+    @MainActor func testCodeGenerator_NumericOnlyCodes() {
         let numericCodes = ["123456", "789012", "555555"]
         
         for code in numericCodes {
@@ -762,7 +762,7 @@ final class CodeGeneratorTests: XCTestCase {
         }
     }
     
-    func testCodeGenerator_AlphaOnlyCodes() {
+    @MainActor func testCodeGenerator_AlphaOnlyCodes() {
         let alphaCodes = ["ABCDEF", "FAMILY", "TESTING"]
         
         for code in alphaCodes {

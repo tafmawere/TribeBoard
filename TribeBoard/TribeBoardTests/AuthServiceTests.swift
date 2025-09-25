@@ -36,7 +36,7 @@ final class AuthServiceTests: XCTestCase {
     
     // MARK: - Initialization Tests
     
-    func testAuthServiceInitialization() {
+    @MainActor func testAuthServiceInitialization() {
         XCTAssertNotNil(authService)
         XCTAssertFalse(authService.isAuthenticated)
         XCTAssertNil(authService.currentUser)
@@ -45,7 +45,7 @@ final class AuthServiceTests: XCTestCase {
     
     // MARK: - Authentication State Tests
     
-    func testCheckAuthenticationStatusWhenNotAuthenticated() {
+    @MainActor func testCheckAuthenticationStatusWhenNotAuthenticated() {
         let isAuthenticated = authService.checkAuthenticationStatus()
         XCTAssertFalse(isAuthenticated)
     }
@@ -68,7 +68,7 @@ final class AuthServiceTests: XCTestCase {
         XCTAssertTrue(isAuthenticated)
     }
     
-    func testGetCurrentUserWhenNotAuthenticated() {
+    @MainActor func testGetCurrentUserWhenNotAuthenticated() {
         let currentUser = authService.getCurrentUser()
         XCTAssertNil(currentUser)
     }
@@ -146,7 +146,7 @@ final class AuthServiceTests: XCTestCase {
     
     // MARK: - User Profile Creation Tests
     
-    func testCreateUserIdHash() {
+    @MainActor func testCreateUserIdHash() {
         // Use reflection to test private method
         let authService = self.authService!
         let userIdentifier = "test_user_123"
@@ -161,7 +161,7 @@ final class AuthServiceTests: XCTestCase {
         XCTAssertFalse(hash2.isEmpty)
     }
     
-    func testExtractDisplayNameFromCredential() {
+    @MainActor func testExtractDisplayNameFromCredential() {
         // We can't easily test the private method directly, but we can test
         // the behavior through integration tests or by making it internal for testing
         
@@ -180,7 +180,7 @@ final class AuthServiceTests: XCTestCase {
     
     // MARK: - Error Handling Tests
     
-    func testAuthErrorDescriptions() {
+    @MainActor func testAuthErrorDescriptions() {
         let errors: [AuthError] = [
             .authorizationFailed,
             .userCancelled,

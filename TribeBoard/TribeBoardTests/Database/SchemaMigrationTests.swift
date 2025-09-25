@@ -25,7 +25,7 @@ final class SchemaMigrationTests: DatabaseTestBase {
         print("🧪 Testing adding optional properties preserves existing data...")
         
         // Create test data with current schema
-        let family = try createTestFamily(name: "Migration Test Family", code: "MIG001")
+        let family = try createTestFamily(name: "Migration Test Family", code: "MIG001", createdByUserId: UUID())
         let user = try createTestUser(displayName: "Migration User")
         let membership = try createTestMembership(family: family, user: user, role: .parentAdmin)
         
@@ -69,7 +69,7 @@ final class SchemaMigrationTests: DatabaseTestBase {
         print("🧪 Testing adding required properties with default values...")
         
         // Create test data
-        let family = try createTestFamily(name: "Default Test Family", code: "DEF001")
+        let family = try createTestFamily(name: "Default Test Family", code: "DEF001", createdByUserId: UUID())
         let originalCreatedAt = family.createdAt
         
         // Verify that new required properties with defaults are handled
@@ -100,7 +100,7 @@ final class SchemaMigrationTests: DatabaseTestBase {
         print("🧪 Testing adding computed properties doesn't affect storage...")
         
         // Create test data with relationships
-        let family = try createTestFamily(name: "Computed Test Family", code: "COMP01")
+        let family = try createTestFamily(name: "Computed Test Family", code: "COMP01", createdByUserId: UUID())
         let user1 = try createTestUser(displayName: "User 1")
         let user2 = try createTestUser(displayName: "User 2", appleUserIdHash: "hash_user2")
         
@@ -139,7 +139,7 @@ final class SchemaMigrationTests: DatabaseTestBase {
         print("🧪 Testing removing optional properties maintains functionality...")
         
         // Create test data
-        let family = try createTestFamily(name: "Remove Test Family", code: "REM001")
+        let family = try createTestFamily(name: "Remove Test Family", code: "REM001", createdByUserId: UUID())
         let user = try createTestUser(displayName: "Remove User")
         
         // Test that core functionality works even if optional properties are removed
@@ -173,8 +173,8 @@ final class SchemaMigrationTests: DatabaseTestBase {
         print("🧪 Testing removing unused properties doesn't break queries...")
         
         // Create test data
-        let family1 = try createTestFamily(name: "Query Test 1", code: "QRY001")
-        let family2 = try createTestFamily(name: "Query Test 2", code: "QRY002")
+        let family1 = try createTestFamily(name: "Query Test 1", code: "QRY001", createdByUserId: UUID())
+        let family2 = try createTestFamily(name: "Query Test 2", code: "QRY002", createdByUserId: UUID())
         let user = try createTestUser(displayName: "Query User")
         
         // Test various query patterns that should continue working
@@ -210,7 +210,7 @@ final class SchemaMigrationTests: DatabaseTestBase {
         print("🧪 Testing changing relationship delete rules preserves integrity...")
         
         // Create test data with relationships
-        let family = try createTestFamily(name: "Relationship Test", code: "REL001")
+        let family = try createTestFamily(name: "Relationship Test", code: "REL001", createdByUserId: UUID())
         let user1 = try createTestUser(displayName: "User 1")
         let user2 = try createTestUser(displayName: "User 2", appleUserIdHash: "hash_user2")
         
@@ -242,7 +242,7 @@ final class SchemaMigrationTests: DatabaseTestBase {
         print("🧪 Testing changing relationship inverse configurations maintains consistency...")
         
         // Create test data
-        let family = try createTestFamily(name: "Inverse Test", code: "INV001")
+        let family = try createTestFamily(name: "Inverse Test", code: "INV001", createdByUserId: UUID())
         let user = try createTestUser(displayName: "Inverse User")
         let membership = try createTestMembership(family: family, user: user, role: .kid)
         
@@ -277,7 +277,7 @@ final class SchemaMigrationTests: DatabaseTestBase {
         // Our current models already have optional relationships for CloudKit compatibility
         // Test that validation properly handles missing relationships
         
-        let family = try createTestFamily(name: "Required Test", code: "REQ001")
+        let family = try createTestFamily(name: "Required Test", code: "REQ001", createdByUserId: UUID())
         let user = try createTestUser(displayName: "Required User")
         
         // Create membership with proper relationships
@@ -304,8 +304,8 @@ final class SchemaMigrationTests: DatabaseTestBase {
         print("🧪 Testing complex migration with multiple changes...")
         
         // Create comprehensive test data
-        let family1 = try createTestFamily(name: "Complex Family 1", code: "COMP01")
-        let family2 = try createTestFamily(name: "Complex Family 2", code: "COMP02")
+        let family1 = try createTestFamily(name: "Complex Family 1", code: "COMP01", createdByUserId: UUID())
+        let family2 = try createTestFamily(name: "Complex Family 2", code: "COMP02", createdByUserId: UUID())
         
         let user1 = try createTestUser(displayName: "Complex User 1")
         let user2 = try createTestUser(displayName: "Complex User 2", appleUserIdHash: "complex_hash_2")
@@ -356,7 +356,7 @@ final class SchemaMigrationTests: DatabaseTestBase {
         print("🧪 Testing data integrity validation before and after migration...")
         
         // Create test data with known integrity constraints
-        let family = try createTestFamily(name: "Integrity Family", code: "INT001")
+        let family = try createTestFamily(name: "Integrity Family", code: "INT001", createdByUserId: UUID())
         let user1 = try createTestUser(displayName: "Integrity User 1")
         let user2 = try createTestUser(displayName: "Integrity User 2", appleUserIdHash: "integrity_hash_2")
         
@@ -427,7 +427,7 @@ final class SchemaMigrationTests: DatabaseTestBase {
         print("🧪 Testing migration failure handling and rollback...")
         
         // Create initial valid state
-        let family = try createTestFamily(name: "Rollback Family", code: "ROLL01")
+        let family = try createTestFamily(name: "Rollback Family", code: "ROLL01", createdByUserId: UUID())
         let user = try createTestUser(displayName: "Rollback User")
         let membership = try createTestMembership(family: family, user: user, role: .parentAdmin)
         
@@ -485,8 +485,8 @@ final class SchemaMigrationTests: DatabaseTestBase {
         print("🧪 Testing partial migration scenarios and recovery...")
         
         // Create test data representing a partially migrated state
-        let family1 = try createTestFamily(name: "Partial Family 1", code: "PART01")
-        let family2 = try createTestFamily(name: "Partial Family 2", code: "PART02")
+        let family1 = try createTestFamily(name: "Partial Family 1", code: "PART01", createdByUserId: UUID())
+        let family2 = try createTestFamily(name: "Partial Family 2", code: "PART02", createdByUserId: UUID())
         
         // Simulate partial migration: some records have new fields, others don't
         family1.ckRecordID = "migrated_record_1"

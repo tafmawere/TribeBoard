@@ -113,7 +113,7 @@ final class DataServiceConstraintTests: DatabaseTestBase {
     
     func testCreateSecondParentAdminInSameFamilyFails() throws {
         // Given
-        let family = try createTestFamily(name: "Admin Family", code: "ADMIN01")
+        let family = try createTestFamily(name: "Admin Family", code: "ADMIN01", createdByUserId: UUID())
         let firstAdmin = try createTestUser(displayName: "First Admin", appleUserIdHash: "first_admin_hash")
         let secondAdmin = try createTestUser(displayName: "Second Admin", appleUserIdHash: "second_admin_hash")
         
@@ -146,8 +146,8 @@ final class DataServiceConstraintTests: DatabaseTestBase {
     
     func testParentAdminUniquenessDifferentFamilies() throws {
         // Given
-        let family1 = try createTestFamily(name: "Family 1", code: "FAM001")
-        let family2 = try createTestFamily(name: "Family 2", code: "FAM002")
+        let family1 = try createTestFamily(name: "Family 1", code: "FAM001", createdByUserId: UUID())
+        let family2 = try createTestFamily(name: "Family 2", code: "FAM002", createdByUserId: UUID())
         let admin1 = try createTestUser(displayName: "Admin 1", appleUserIdHash: "admin1_hash")
         let admin2 = try createTestUser(displayName: "Admin 2", appleUserIdHash: "admin2_hash")
         
@@ -168,8 +168,8 @@ final class DataServiceConstraintTests: DatabaseTestBase {
     
     func testSameUserAsParentAdminInDifferentFamilies() throws {
         // Given
-        let family1 = try createTestFamily(name: "Family 1", code: "MULTI01")
-        let family2 = try createTestFamily(name: "Family 2", code: "MULTI02")
+        let family1 = try createTestFamily(name: "Family 1", code: "MULTI01", createdByUserId: UUID())
+        let family2 = try createTestFamily(name: "Family 2", code: "MULTI02", createdByUserId: UUID())
         let admin = try createTestUser(displayName: "Multi Admin", appleUserIdHash: "multi_admin_hash")
         
         // When - same user becomes parent admin in different families
@@ -193,7 +193,7 @@ final class DataServiceConstraintTests: DatabaseTestBase {
     
     func testCreateNonParentAdminRolesWithExistingParentAdmin() throws {
         // Given
-        let family = try createTestFamily(name: "Mixed Role Family", code: "MIXED01")
+        let family = try createTestFamily(name: "Mixed Role Family", code: "MIXED01", createdByUserId: UUID())
         let admin = try createTestUser(displayName: "Admin", appleUserIdHash: "admin_hash")
         let adult = try createTestUser(displayName: "Adult", appleUserIdHash: "adult_hash")
         let kid = try createTestUser(displayName: "Kid", appleUserIdHash: "kid_hash")
@@ -224,7 +224,7 @@ final class DataServiceConstraintTests: DatabaseTestBase {
     
     func testUserCannotJoinSameFamilyTwice() throws {
         // Given
-        let family = try createTestFamily(name: "Single Join Family", code: "SINGLE1")
+        let family = try createTestFamily(name: "Single Join Family", code: "SINGLE1", createdByUserId: UUID())
         let user = try createTestUser(displayName: "Single User", appleUserIdHash: "single_user_hash")
         
         // Create first membership successfully
@@ -255,7 +255,7 @@ final class DataServiceConstraintTests: DatabaseTestBase {
     
     func testUserCanJoinAfterLeavingFamily() throws {
         // Given
-        let family = try createTestFamily(name: "Rejoin Family", code: "REJOIN1")
+        let family = try createTestFamily(name: "Rejoin Family", code: "REJOIN1", createdByUserId: UUID())
         let user = try createTestUser(displayName: "Rejoin User", appleUserIdHash: "rejoin_user_hash")
         
         // Create initial membership
@@ -285,9 +285,9 @@ final class DataServiceConstraintTests: DatabaseTestBase {
     
     func testUserCanJoinMultipleDifferentFamilies() throws {
         // Given
-        let family1 = try createTestFamily(name: "Family 1", code: "MULTI1")
-        let family2 = try createTestFamily(name: "Family 2", code: "MULTI2")
-        let family3 = try createTestFamily(name: "Family 3", code: "MULTI3")
+        let family1 = try createTestFamily(name: "Family 1", code: "MULTI1", createdByUserId: UUID())
+        let family2 = try createTestFamily(name: "Family 2", code: "MULTI2", createdByUserId: UUID())
+        let family3 = try createTestFamily(name: "Family 3", code: "MULTI3", createdByUserId: UUID())
         let user = try createTestUser(displayName: "Multi Family User", appleUserIdHash: "multi_family_hash")
         
         // When - user joins multiple families
@@ -314,7 +314,7 @@ final class DataServiceConstraintTests: DatabaseTestBase {
     
     func testCannotChangeToParentAdminWhenOneExists() throws {
         // Given
-        let family = try createTestFamily(name: "Role Change Family", code: "ROLE01")
+        let family = try createTestFamily(name: "Role Change Family", code: "ROLE01", createdByUserId: UUID())
         let admin = try createTestUser(displayName: "Admin", appleUserIdHash: "admin_hash")
         let member = try createTestUser(displayName: "Member", appleUserIdHash: "member_hash")
         
@@ -347,7 +347,7 @@ final class DataServiceConstraintTests: DatabaseTestBase {
     
     func testCanChangeToParentAdminWhenNoneExists() throws {
         // Given
-        let family = try createTestFamily(name: "No Admin Family", code: "NOADMIN")
+        let family = try createTestFamily(name: "No Admin Family", code: "NOADMIN", createdByUserId: UUID())
         let member = try createTestUser(displayName: "Member", appleUserIdHash: "member_hash")
         
         // Create regular member
@@ -366,7 +366,7 @@ final class DataServiceConstraintTests: DatabaseTestBase {
     
     func testCanChangeFromParentAdminToOtherRole() throws {
         // Given
-        let family = try createTestFamily(name: "Admin Change Family", code: "ADMINCH")
+        let family = try createTestFamily(name: "Admin Change Family", code: "ADMINCH", createdByUserId: UUID())
         let admin = try createTestUser(displayName: "Admin", appleUserIdHash: "admin_hash")
         
         // Create parent admin
@@ -385,7 +385,7 @@ final class DataServiceConstraintTests: DatabaseTestBase {
     
     func testCanChangeToSameRole() throws {
         // Given
-        let family = try createTestFamily(name: "Same Role Family", code: "SAME01")
+        let family = try createTestFamily(name: "Same Role Family", code: "SAME01", createdByUserId: UUID())
         let member = try createTestUser(displayName: "Member", appleUserIdHash: "member_hash")
         
         // Create member
@@ -413,7 +413,7 @@ final class DataServiceConstraintTests: DatabaseTestBase {
     
     func testValidRoleChanges() throws {
         // Given
-        let family = try createTestFamily(name: "Valid Change Family", code: "VALID01")
+        let family = try createTestFamily(name: "Valid Change Family", code: "VALID01", createdByUserId: UUID())
         let member = try createTestUser(displayName: "Member", appleUserIdHash: "member_hash")
         
         // Create member as kid
@@ -439,7 +439,7 @@ final class DataServiceConstraintTests: DatabaseTestBase {
     
     func testConstraintInteractionParentAdminAndDuplicateMembership() throws {
         // Given
-        let family = try createTestFamily(name: "Interaction Family", code: "INTER01")
+        let family = try createTestFamily(name: "Interaction Family", code: "INTER01", createdByUserId: UUID())
         let admin = try createTestUser(displayName: "Admin", appleUserIdHash: "admin_hash")
         
         // Create parent admin
@@ -468,7 +468,7 @@ final class DataServiceConstraintTests: DatabaseTestBase {
         // Test that constraints are validated in the expected order
         // This helps ensure consistent error reporting
         
-        let family = try createTestFamily(name: "Order Family", code: "ORDER01")
+        let family = try createTestFamily(name: "Order Family", code: "ORDER01", createdByUserId: UUID())
         let user = try createTestUser(displayName: "User", appleUserIdHash: "user_hash")
         
         // Create initial membership
@@ -494,7 +494,7 @@ final class DataServiceConstraintTests: DatabaseTestBase {
     
     func testConstraintCheckingPerformance() throws {
         // Test that constraint checking doesn't significantly impact performance
-        let family = try createTestFamily(name: "Performance Family", code: "PERF01")
+        let family = try createTestFamily(name: "Performance Family", code: "PERF01", createdByUserId: UUID())
         let user = try createTestUser(displayName: "Performance User", appleUserIdHash: "perf_hash")
         
         measure {

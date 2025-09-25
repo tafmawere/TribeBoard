@@ -26,7 +26,7 @@ final class OnboardingViewModelTests: XCTestCase {
     
     // MARK: - Initialization Tests
     
-    func testInitialization() {
+    @MainActor func testInitialization() {
         XCTAssertFalse(viewModel.isLoading)
         XCTAssertNil(viewModel.errorMessage)
         XCTAssertFalse(viewModel.authenticationSucceeded)
@@ -105,7 +105,7 @@ final class OnboardingViewModelTests: XCTestCase {
     
     // MARK: - Error Handling Tests
     
-    func testClearError() {
+    @MainActor func testClearError() {
         // Set an error
         viewModel.errorMessage = "Test error"
         XCTAssertNotNil(viewModel.errorMessage)
@@ -115,7 +115,7 @@ final class OnboardingViewModelTests: XCTestCase {
         XCTAssertNil(viewModel.errorMessage)
     }
     
-    func testSetAppState() {
+    @MainActor func testSetAppState() {
         let newAppState = OnboardingMockAppState()
         viewModel.setAppState(newAppState)
         

@@ -5,7 +5,7 @@ final class ValidationTests: XCTestCase {
     
     // MARK: - Family Name Validation Tests
     
-    func testValidateFamilyName_ValidNames() {
+    @MainActor func testValidateFamilyName_ValidNames() {
         let validNames = [
             "Smith Family",
             "The Johnsons",
@@ -21,7 +21,7 @@ final class ValidationTests: XCTestCase {
         }
     }
     
-    func testValidateFamilyName_InvalidNames() {
+    @MainActor func testValidateFamilyName_InvalidNames() {
         let invalidCases = [
             ("", "Family name cannot be empty"),
             ("   ", "Family name cannot be empty"), // Whitespace only
@@ -40,7 +40,7 @@ final class ValidationTests: XCTestCase {
         }
     }
     
-    func testValidateFamilyName_WhitespaceHandling() {
+    @MainActor func testValidateFamilyName_WhitespaceHandling() {
         let nameWithWhitespace = "  Smith Family  "
         let result = Validation.validateFamilyName(nameWithWhitespace)
         
@@ -49,7 +49,7 @@ final class ValidationTests: XCTestCase {
     
     // MARK: - Family Code Validation Tests
     
-    func testValidateFamilyCode_ValidCodes() {
+    @MainActor func testValidateFamilyCode_ValidCodes() {
         let validCodes = [
             "ABC123",
             "HELLO1",
@@ -66,7 +66,7 @@ final class ValidationTests: XCTestCase {
         }
     }
     
-    func testValidateFamilyCode_InvalidCodes() {
+    @MainActor func testValidateFamilyCode_InvalidCodes() {
         let invalidCases = [
             ("", "Family code cannot be empty"),
             ("   ", "Family code cannot be empty"), // Whitespace only
@@ -85,7 +85,7 @@ final class ValidationTests: XCTestCase {
         }
     }
     
-    func testValidateFamilyCode_CaseInsensitive() {
+    @MainActor func testValidateFamilyCode_CaseInsensitive() {
         let lowercaseCode = "abc123"
         let result = Validation.validateFamilyCode(lowercaseCode)
         
@@ -94,7 +94,7 @@ final class ValidationTests: XCTestCase {
     
     // MARK: - Display Name Validation Tests
     
-    func testValidateDisplayName_ValidNames() {
+    @MainActor func testValidateDisplayName_ValidNames() {
         let validNames = [
             "John",
             "Mary Smith",
@@ -111,7 +111,7 @@ final class ValidationTests: XCTestCase {
         }
     }
     
-    func testValidateDisplayName_InvalidNames() {
+    @MainActor func testValidateDisplayName_InvalidNames() {
         let invalidCases = [
             ("", "Display name cannot be empty"),
             ("   ", "Display name cannot be empty"), // Whitespace only
@@ -130,7 +130,7 @@ final class ValidationTests: XCTestCase {
     
     // MARK: - URL Validation Tests
     
-    func testValidateURL_ValidURLs() {
+    @MainActor func testValidateURL_ValidURLs() {
         let validURLs = [
             "https://example.com",
             "http://test.org",
@@ -145,7 +145,7 @@ final class ValidationTests: XCTestCase {
         }
     }
     
-    func testValidateURL_InvalidURLs() {
+    @MainActor func testValidateURL_InvalidURLs() {
         let invalidCases = [
             ("", "URL cannot be empty"),
             ("not-a-url", "Invalid URL format"),
@@ -164,42 +164,42 @@ final class ValidationTests: XCTestCase {
     
     // MARK: - Helper Methods Tests
     
-    func testSanitizeInput_TrimsWhitespace() {
+    @MainActor func testSanitizeInput_TrimsWhitespace() {
         let input = "  Hello World  "
         let sanitized = Validation.sanitizeInput(input)
         
         XCTAssertEqual(sanitized, "Hello World", "Should trim whitespace")
     }
     
-    func testSanitizeInput_LimitsLength() {
+    @MainActor func testSanitizeInput_LimitsLength() {
         let longInput = String(repeating: "A", count: 150)
         let sanitized = Validation.sanitizeInput(longInput, maxLength: 50)
         
         XCTAssertEqual(sanitized.count, 50, "Should limit to max length")
     }
     
-    func testSanitizeInput_DefaultMaxLength() {
+    @MainActor func testSanitizeInput_DefaultMaxLength() {
         let longInput = String(repeating: "A", count: 150)
         let sanitized = Validation.sanitizeInput(longInput)
         
         XCTAssertEqual(sanitized.count, 100, "Should use default max length of 100")
     }
     
-    func testFormatFamilyCode_ConvertsToUppercase() {
+    @MainActor func testFormatFamilyCode_ConvertsToUppercase() {
         let input = "abc123"
         let formatted = Validation.formatFamilyCode(input)
         
         XCTAssertEqual(formatted, "ABC123", "Should convert to uppercase")
     }
     
-    func testFormatFamilyCode_RemovesInvalidCharacters() {
+    @MainActor func testFormatFamilyCode_RemovesInvalidCharacters() {
         let input = "abc-123 def@456"
         let formatted = Validation.formatFamilyCode(input)
         
         XCTAssertEqual(formatted, "ABC123DE", "Should remove invalid characters")
     }
     
-    func testFormatFamilyCode_LimitsLength() {
+    @MainActor func testFormatFamilyCode_LimitsLength() {
         let input = "abcdefghijklmnop"
         let formatted = Validation.formatFamilyCode(input)
         
@@ -207,7 +207,7 @@ final class ValidationTests: XCTestCase {
         XCTAssertEqual(formatted, "ABCDEFGH", "Should keep first 8 valid characters")
     }
     
-    func testFormatFamilyCode_TrimsWhitespace() {
+    @MainActor func testFormatFamilyCode_TrimsWhitespace() {
         let input = "  abc123  "
         let formatted = Validation.formatFamilyCode(input)
         
@@ -216,14 +216,14 @@ final class ValidationTests: XCTestCase {
     
     // MARK: - ValidationResult Tests
     
-    func testValidationResult_Success() {
+    @MainActor func testValidationResult_Success() {
         let result = ValidationResult.success
         
         XCTAssertTrue(result.isValid, "Success result should be valid")
         XCTAssertEqual(result.message, "Valid", "Success result should have correct message")
     }
     
-    func testValidationResult_Failure() {
+    @MainActor func testValidationResult_Failure() {
         let errorMessage = "Test error message"
         let result = ValidationResult.failure(errorMessage)
         

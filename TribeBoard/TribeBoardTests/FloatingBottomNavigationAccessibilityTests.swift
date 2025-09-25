@@ -7,7 +7,7 @@ final class FloatingBottomNavigationAccessibilityTests: XCTestCase {
     
     // MARK: - Dynamic Type Tests
     
-    func testNavigationItemDynamicTypeScaling() {
+    @MainActor func testNavigationItemDynamicTypeScaling() {
         // Test that navigation items scale appropriately with Dynamic Type
         let smallTypeSize = DynamicTypeSize.small
         let largeTypeSize = DynamicTypeSize.accessibility3
@@ -33,7 +33,7 @@ final class FloatingBottomNavigationAccessibilityTests: XCTestCase {
         XCTAssertEqual(largeScaledLabel, 22.0, accuracy: 0.1)
     }
     
-    func testContainerHeightScaling() {
+    @MainActor func testContainerHeightScaling() {
         // Test that container height scales with Dynamic Type
         let baseHeight: CGFloat = 72
         let standardType = DynamicTypeSize.medium
@@ -46,7 +46,7 @@ final class FloatingBottomNavigationAccessibilityTests: XCTestCase {
         XCTAssertEqual(largeHeight, 100.8, accuracy: 0.1) // 72 * 1.4
     }
     
-    func testTouchTargetScaling() {
+    @MainActor func testTouchTargetScaling() {
         // Test that touch targets maintain minimum size and scale appropriately
         let baseTarget: CGFloat = 44
         let largeType = DynamicTypeSize.accessibility1
@@ -59,7 +59,7 @@ final class FloatingBottomNavigationAccessibilityTests: XCTestCase {
     
     // MARK: - High Contrast Tests
     
-    func testHighContrastColors() {
+    @MainActor func testHighContrastColors() {
         // Test that high contrast mode uses accessible colors
         let standardPrimary = Color.brandPrimaryDynamic
         let accessiblePrimary = Color.brandPrimaryAccessible
@@ -70,7 +70,7 @@ final class FloatingBottomNavigationAccessibilityTests: XCTestCase {
         XCTAssertNotNil(accessiblePrimary)
     }
     
-    func testHighContrastBorders() {
+    @MainActor func testHighContrastBorders() {
         // Test that high contrast mode increases border visibility
         let standardBorderWidth: CGFloat = 1
         let highContrastBorderWidth: CGFloat = 2
@@ -85,19 +85,19 @@ final class FloatingBottomNavigationAccessibilityTests: XCTestCase {
     
     // MARK: - VoiceOver Tests
     
-    func testAccessibilityLabels() {
+    @MainActor func testAccessibilityLabels() {
         // Test that navigation items have proper accessibility labels
-        let homeTab = NavigationTab.home
+        let homeTab = NavigationTab.dashboard
         let activeLabel = "\(homeTab.displayName), selected"
         let inactiveLabel = homeTab.displayName
         
         XCTAssertEqual(activeLabel, "Home, selected")
-        XCTAssertEqual(inactiveLabel, "Home")
+        XCTAssertEqual(inactiveLabel, "Dashboard")
     }
     
-    func testAccessibilityHints() {
+    @MainActor func testAccessibilityHints() {
         // Test that navigation items have helpful accessibility hints
-        let homeTab = NavigationTab.home
+        let homeTab = NavigationTab.dashboard
         let activeHint = "Currently viewing \(homeTab.displayName)"
         let inactiveHint = "Navigate to \(homeTab.displayName)"
         
@@ -105,7 +105,7 @@ final class FloatingBottomNavigationAccessibilityTests: XCTestCase {
         XCTAssertEqual(inactiveHint, "Navigate to Home")
     }
     
-    func testAccessibilityTraits() {
+    @MainActor func testAccessibilityTraits() {
         // Test that proper accessibility traits are applied
         // This would be tested in UI tests with actual trait verification
         // Here we test the logic structure
@@ -119,7 +119,7 @@ final class FloatingBottomNavigationAccessibilityTests: XCTestCase {
     
     // MARK: - Reduce Motion Tests
     
-    func testReduceMotionRespected() {
+    @MainActor func testReduceMotionRespected() {
         // Test that animations are disabled when reduce motion is enabled
         let reduceMotion = true
         let animation: Animation? = reduceMotion ? .none : DesignSystem.Animation.spring
@@ -129,7 +129,7 @@ final class FloatingBottomNavigationAccessibilityTests: XCTestCase {
     
     // MARK: - Layout Tests
     
-    func testMinimumTouchTargets() {
+    @MainActor func testMinimumTouchTargets() {
         // Test that all interactive elements meet minimum touch target requirements
         let minTouchTarget: CGFloat = 44
         let scaledTarget: CGFloat = 57.2 // Example scaled target
@@ -137,7 +137,7 @@ final class FloatingBottomNavigationAccessibilityTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(scaledTarget, minTouchTarget)
     }
     
-    func testSpacingAdjustments() {
+    @MainActor func testSpacingAdjustments() {
         // Test that spacing adjusts appropriately for larger text sizes
         let baseSpacing: CGFloat = 4
         let scaleFactor: CGFloat = 2.0 // accessibility3
@@ -148,18 +148,18 @@ final class FloatingBottomNavigationAccessibilityTests: XCTestCase {
     
     // MARK: - Integration Tests
     
-    func testAccessibilityRotor() {
+    @MainActor func testAccessibilityRotor() {
         // Test that accessibility rotor is properly configured
         let tabs = NavigationTab.allCases
         
         XCTAssertEqual(tabs.count, 4)
-        XCTAssertTrue(tabs.contains(.home))
+        XCTAssertTrue(tabs.contains(.dashboard))
         XCTAssertTrue(tabs.contains(.schoolRun))
-        XCTAssertTrue(tabs.contains(.shopping))
+        XCTAssertTrue(tabs.contains(.messages))
         XCTAssertTrue(tabs.contains(.tasks))
     }
     
-    func testMultilineTextSupport() {
+    @MainActor func testMultilineTextSupport() {
         // Test that labels can handle multiple lines for long text
         let longTabName = "Very Long Tab Name That Might Wrap"
         
@@ -170,12 +170,12 @@ final class FloatingBottomNavigationAccessibilityTests: XCTestCase {
     
     // MARK: - Performance Tests
     
-    func testAccessibilityPerformance() {
+    @MainActor func testAccessibilityPerformance() {
         // Test that accessibility enhancements don't significantly impact performance
         measure {
             // Simulate creating multiple navigation items with accessibility features
             for _ in 0..<100 {
-                let _ = NavigationTab.home.displayName
+                let _ = NavigationTab.dashboard.displayName
                 let _ = DynamicTypeSize.accessibility3.scaleFactor
             }
         }
@@ -206,7 +206,7 @@ extension FloatingBottomNavigationAccessibilityTests {
     
     /// Helper to create a test floating navigation with specific accessibility settings
     private func createTestFloatingNavigation(
-        selectedTab: NavigationTab = .home,
+        selectedTab: NavigationTab = .dashboard,
         dynamicTypeSize: DynamicTypeSize = .medium,
         highContrast: Bool = false,
         reduceMotion: Bool = false

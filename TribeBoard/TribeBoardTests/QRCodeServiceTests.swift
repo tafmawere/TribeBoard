@@ -18,7 +18,7 @@ final class QRCodeServiceTests: XCTestCase {
     
     // MARK: - Successful QR Code Generation Tests
     
-    func testGenerateQRCode_ValidString() {
+    @MainActor func testGenerateQRCode_ValidString() {
         // Test with a simple valid string
         let testString = "ABC123"
         let qrImage = qrCodeService.generateQRCode(from: testString)
@@ -32,7 +32,7 @@ final class QRCodeServiceTests: XCTestCase {
         XCTAssertTrue(type(of: qrImage) == type(of: fallbackImage), "Should return SwiftUI Image type")
     }
     
-    func testGenerateQRCode_ValidStringWithCustomSize() {
+    @MainActor func testGenerateQRCode_ValidStringWithCustomSize() {
         let testString = "TEST123"
         let customSize = CGSize(width: 300, height: 300)
         let qrImage = qrCodeService.generateQRCode(from: testString, size: customSize)
@@ -41,21 +41,21 @@ final class QRCodeServiceTests: XCTestCase {
         XCTAssertTrue(type(of: qrImage) == type(of: Image(systemName: "xmark.circle")), "Should return SwiftUI Image type")
     }
     
-    func testGenerateQRCode_AlphanumericString() {
+    @MainActor func testGenerateQRCode_AlphanumericString() {
         let alphanumericString = "FAMILY2024CODE"
         let qrImage = qrCodeService.generateQRCode(from: alphanumericString)
         
         XCTAssertNotNil(qrImage, "Should generate QR code for alphanumeric string")
     }
     
-    func testGenerateQRCode_NumericString() {
+    @MainActor func testGenerateQRCode_NumericString() {
         let numericString = "1234567890"
         let qrImage = qrCodeService.generateQRCode(from: numericString)
         
         XCTAssertNotNil(qrImage, "Should generate QR code for numeric string")
     }
     
-    func testGenerateQRCode_MixedCaseString() {
+    @MainActor func testGenerateQRCode_MixedCaseString() {
         let mixedCaseString = "FamilyCode123"
         let qrImage = qrCodeService.generateQRCode(from: mixedCaseString)
         
@@ -64,7 +64,7 @@ final class QRCodeServiceTests: XCTestCase {
     
     // MARK: - Fallback Behavior Tests (Empty and Invalid Input)
     
-    func testGenerateQRCode_EmptyString() {
+    @MainActor func testGenerateQRCode_EmptyString() {
         let qrImage = qrCodeService.generateQRCode(from: "")
         
         // Empty string should return fallback image according to the implementation
@@ -74,7 +74,7 @@ final class QRCodeServiceTests: XCTestCase {
         XCTAssertTrue(type(of: qrImage) == type(of: Image(systemName: "xmark.circle")), "Should return SwiftUI Image type")
     }
     
-    func testGenerateQRCode_WhitespaceOnlyString() {
+    @MainActor func testGenerateQRCode_WhitespaceOnlyString() {
         let whitespaceString = "   \n\t  "
         let qrImage = qrCodeService.generateQRCode(from: whitespaceString)
         
@@ -82,7 +82,7 @@ final class QRCodeServiceTests: XCTestCase {
         XCTAssertNotNil(qrImage, "Should return fallback image for whitespace-only string")
     }
     
-    func testGenerateQRCode_VeryLongString() {
+    @MainActor func testGenerateQRCode_VeryLongString() {
         // Test with string longer than QR code capacity (>4296 characters)
         let veryLongString = String(repeating: "A", count: 5000)
         let qrImage = qrCodeService.generateQRCode(from: veryLongString)
@@ -91,7 +91,7 @@ final class QRCodeServiceTests: XCTestCase {
         XCTAssertNotNil(qrImage, "Should return fallback image for very long string")
     }
     
-    func testGenerateQRCode_ZeroSize() {
+    @MainActor func testGenerateQRCode_ZeroSize() {
         let testString = "ABC123"
         let zeroSize = CGSize.zero
         let qrImage = qrCodeService.generateQRCode(from: testString, size: zeroSize)
@@ -100,7 +100,7 @@ final class QRCodeServiceTests: XCTestCase {
         XCTAssertNotNil(qrImage, "Should return fallback image for zero size")
     }
     
-    func testGenerateQRCode_NegativeSize() {
+    @MainActor func testGenerateQRCode_NegativeSize() {
         let testString = "ABC123"
         let negativeSize = CGSize(width: -100, height: -100)
         let qrImage = qrCodeService.generateQRCode(from: testString, size: negativeSize)
@@ -111,7 +111,7 @@ final class QRCodeServiceTests: XCTestCase {
     
     // MARK: - SwiftUI Image Verification Tests
     
-    func testGenerateQRCode_ReturnsSwiftUIImage() {
+    @MainActor func testGenerateQRCode_ReturnsSwiftUIImage() {
         let testString = "VALID123"
         let qrImage = qrCodeService.generateQRCode(from: testString)
         
@@ -122,7 +122,7 @@ final class QRCodeServiceTests: XCTestCase {
         XCTAssertNotNil(qrImage, "Should return non-nil SwiftUI Image")
     }
     
-    func testGenerateQRCode_FallbackIsSwiftUIImage() {
+    @MainActor func testGenerateQRCode_FallbackIsSwiftUIImage() {
         let emptyString = ""
         let fallbackImage = qrCodeService.generateQRCode(from: emptyString)
         
@@ -131,7 +131,7 @@ final class QRCodeServiceTests: XCTestCase {
         XCTAssertNotNil(fallbackImage, "Fallback should be non-nil SwiftUI Image")
     }
     
-    func testGenerateQRCode_ConsistentImageType() {
+    @MainActor func testGenerateQRCode_ConsistentImageType() {
         let validString = "VALID123"
         let invalidString = ""
         
@@ -144,49 +144,49 @@ final class QRCodeServiceTests: XCTestCase {
     
     // MARK: - Special Characters and Unicode Tests
     
-    func testGenerateQRCode_SpecialCharacters() {
+    @MainActor func testGenerateQRCode_SpecialCharacters() {
         let specialString = "ABC-123_!@#$%^&*()"
         let qrImage = qrCodeService.generateQRCode(from: specialString)
         
         XCTAssertNotNil(qrImage, "Should generate QR code for string with special characters")
     }
     
-    func testGenerateQRCode_UnicodeCharacters() {
+    @MainActor func testGenerateQRCode_UnicodeCharacters() {
         let unicodeString = "Hello世界🌍"
         let qrImage = qrCodeService.generateQRCode(from: unicodeString)
         
         XCTAssertNotNil(qrImage, "Should generate QR code for Unicode string")
     }
     
-    func testGenerateQRCode_EmojiCharacters() {
+    @MainActor func testGenerateQRCode_EmojiCharacters() {
         let emojiString = "Family👨‍👩‍👧‍👦🏠"
         let qrImage = qrCodeService.generateQRCode(from: emojiString)
         
         XCTAssertNotNil(qrImage, "Should generate QR code for emoji string")
     }
     
-    func testGenerateQRCode_MixedUnicodeAndASCII() {
+    @MainActor func testGenerateQRCode_MixedUnicodeAndASCII() {
         let mixedString = "Family2024世界🌍"
         let qrImage = qrCodeService.generateQRCode(from: mixedString)
         
         XCTAssertNotNil(qrImage, "Should generate QR code for mixed Unicode and ASCII string")
     }
     
-    func testGenerateQRCode_AccentedCharacters() {
+    @MainActor func testGenerateQRCode_AccentedCharacters() {
         let accentedString = "Café Niño Résumé"
         let qrImage = qrCodeService.generateQRCode(from: accentedString)
         
         XCTAssertNotNil(qrImage, "Should generate QR code for accented characters")
     }
     
-    func testGenerateQRCode_CyrillicCharacters() {
+    @MainActor func testGenerateQRCode_CyrillicCharacters() {
         let cyrillicString = "Привет мир"
         let qrImage = qrCodeService.generateQRCode(from: cyrillicString)
         
         XCTAssertNotNil(qrImage, "Should generate QR code for Cyrillic characters")
     }
     
-    func testGenerateQRCode_ArabicCharacters() {
+    @MainActor func testGenerateQRCode_ArabicCharacters() {
         let arabicString = "مرحبا بالعالم"
         let qrImage = qrCodeService.generateQRCode(from: arabicString)
         
@@ -195,35 +195,35 @@ final class QRCodeServiceTests: XCTestCase {
     
     // MARK: - Edge Case Input Tests
     
-    func testGenerateQRCode_SingleCharacter() {
+    @MainActor func testGenerateQRCode_SingleCharacter() {
         let singleChar = "A"
         let qrImage = qrCodeService.generateQRCode(from: singleChar)
         
         XCTAssertNotNil(qrImage, "Should generate QR code for single character")
     }
     
-    func testGenerateQRCode_NumbersOnly() {
+    @MainActor func testGenerateQRCode_NumbersOnly() {
         let numbersOnly = "1234567890"
         let qrImage = qrCodeService.generateQRCode(from: numbersOnly)
         
         XCTAssertNotNil(qrImage, "Should generate QR code for numbers only")
     }
     
-    func testGenerateQRCode_SpecialCharactersOnly() {
+    @MainActor func testGenerateQRCode_SpecialCharactersOnly() {
         let specialOnly = "!@#$%^&*()"
         let qrImage = qrCodeService.generateQRCode(from: specialOnly)
         
         XCTAssertNotNil(qrImage, "Should generate QR code for special characters only")
     }
     
-    func testGenerateQRCode_URLString() {
+    @MainActor func testGenerateQRCode_URLString() {
         let urlString = "https://example.com/family/join?code=ABC123"
         let qrImage = qrCodeService.generateQRCode(from: urlString)
         
         XCTAssertNotNil(qrImage, "Should generate QR code for URL string")
     }
     
-    func testGenerateQRCode_JSONString() {
+    @MainActor func testGenerateQRCode_JSONString() {
         let jsonString = "{\"familyCode\":\"ABC123\",\"type\":\"join\"}"
         let qrImage = qrCodeService.generateQRCode(from: jsonString)
         
@@ -232,7 +232,7 @@ final class QRCodeServiceTests: XCTestCase {
     
     // MARK: - Size Handling Tests
     
-    func testGenerateQRCode_DefaultSize() {
+    @MainActor func testGenerateQRCode_DefaultSize() {
         let testString = "DEFAULT123"
         let qrImage = qrCodeService.generateQRCode(from: testString)
         
@@ -240,7 +240,7 @@ final class QRCodeServiceTests: XCTestCase {
         XCTAssertNotNil(qrImage, "Should generate QR code with default size")
     }
     
-    func testGenerateQRCode_CustomValidSize() {
+    @MainActor func testGenerateQRCode_CustomValidSize() {
         let testString = "CUSTOM123"
         let customSize = CGSize(width: 300, height: 300)
         let qrImage = qrCodeService.generateQRCode(from: testString, size: customSize)
@@ -248,7 +248,7 @@ final class QRCodeServiceTests: XCTestCase {
         XCTAssertNotNil(qrImage, "Should generate QR code with custom valid size")
     }
     
-    func testGenerateQRCode_VeryLargeSize() {
+    @MainActor func testGenerateQRCode_VeryLargeSize() {
         let testString = "LARGE123"
         let largeSize = CGSize(width: 2000, height: 2000)
         let qrImage = qrCodeService.generateQRCode(from: testString, size: largeSize)
@@ -257,7 +257,7 @@ final class QRCodeServiceTests: XCTestCase {
         XCTAssertNotNil(qrImage, "Should return image (valid or fallback) for very large size")
     }
     
-    func testGenerateQRCode_VerySmallSize() {
+    @MainActor func testGenerateQRCode_VerySmallSize() {
         let testString = "SMALL123"
         let smallSize = CGSize(width: 1, height: 1)
         let qrImage = qrCodeService.generateQRCode(from: testString, size: smallSize)
@@ -268,7 +268,7 @@ final class QRCodeServiceTests: XCTestCase {
     
     // MARK: - Performance Tests
     
-    func testGenerateQRCode_Performance() {
+    @MainActor func testGenerateQRCode_Performance() {
         let testString = "PERFORMANCE123"
         
         measure {
@@ -278,7 +278,7 @@ final class QRCodeServiceTests: XCTestCase {
         }
     }
     
-    func testGenerateQRCode_PerformanceWithCustomSize() {
+    @MainActor func testGenerateQRCode_PerformanceWithCustomSize() {
         let testString = "PERFORMANCE456"
         let customSize = CGSize(width: 400, height: 400)
         
@@ -291,7 +291,7 @@ final class QRCodeServiceTests: XCTestCase {
     
     // MARK: - Consistency Tests
     
-    func testGenerateQRCode_ConsistentOutput() {
+    @MainActor func testGenerateQRCode_ConsistentOutput() {
         let testString = "CONSISTENT123"
         
         let image1 = qrCodeService.generateQRCode(from: testString)
@@ -303,7 +303,7 @@ final class QRCodeServiceTests: XCTestCase {
         XCTAssertTrue(type(of: image1) == type(of: image2), "Both generations should return same type")
     }
     
-    func testGenerateQRCode_DifferentStringsProduceDifferentResults() {
+    @MainActor func testGenerateQRCode_DifferentStringsProduceDifferentResults() {
         let string1 = "STRING1"
         let string2 = "STRING2"
         

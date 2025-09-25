@@ -292,8 +292,8 @@ class TestDataFactory {
     static func createValidationTestData() -> ValidationTestData {
         return ValidationTestData(
             validFamilies: [
-                createValidFamily(name: "Valid Family 1", code: "VALID01"),
-                createValidFamily(name: "Valid Family 2", code: "VALID02")
+                createValidFamily(name: "Valid Family 1", code: "VALID01", createdByUserId: UUID()),
+                createValidFamily(name: "Valid Family 2", code: "VALID02", createdByUserId: UUID())
             ],
             invalidFamilies: [
                 createInvalidFamily(invalidField: .name),

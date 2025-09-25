@@ -232,15 +232,19 @@ struct MainNavigationView: View {
                     currentUserId: user.id,
                     currentUserRole: membership.role
                 )
+                .environmentObject(appState)
             } else {
                 FamilyDashboardPlaceholderView()
+                    .environmentObject(appState)
             }
             
         case .calendar:
             CalendarView()
+                .environmentObject(appState)
             
         case .schoolRun:
             SchoolRunDashboardView()
+                .environmentObject(appState)
             
         case .tasks:
             if let user = appState.currentUser,
@@ -249,8 +253,10 @@ struct MainNavigationView: View {
                     currentUserId: user.id,
                     currentUserRole: membership.role
                 )
+                .environmentObject(appState)
             } else {
                 TasksPlaceholderView()
+                    .environmentObject(appState)
             }
             
         case .messages:
@@ -260,8 +266,10 @@ struct MainNavigationView: View {
                     currentUserId: user.id,
                     currentUserRole: membership.role
                 )
+                .environmentObject(appState)
             } else {
                 MessagesPlaceholderView()
+                    .environmentObject(appState)
             }
         }
     }
@@ -272,18 +280,23 @@ struct MainNavigationView: View {
         switch route {
         case .dashboard:
             SchoolRunDashboardView()
+                .environmentObject(appState)
             
         case .scheduleNew:
             ScheduleNewRunView()
+                .environmentObject(appState)
             
         case .scheduledList:
             ScheduledRunsListView()
+                .environmentObject(appState)
             
         case .runDetail(let run):
             RunDetailView(run: run)
+                .environmentObject(appState)
             
         case .runExecution(let run):
             RunExecutionView(run: run)
+                .environmentObject(appState)
         }
     }
     
@@ -672,4 +685,5 @@ struct FamilyDashboardPlaceholderView: View {
 
 #Preview {
     MainNavigationView()
+        .previewEnvironment()
 }

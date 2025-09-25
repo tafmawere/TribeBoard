@@ -3,7 +3,7 @@ import SwiftUI
 /// Main entry point for School Run feature providing overview and navigation to all run-related screens
 struct SchoolRunDashboardView: View {
     @StateObject private var runManager = ScheduledSchoolRunManager()
-    @EnvironmentObject private var appState: AppState
+    @SafeEnvironmentObject(fallback: { AppState.createFallback() }) private var appState: AppState
     
     // Accessibility environment values
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -87,7 +87,7 @@ struct HeaderSection: View {
 
 /// Action buttons section with "Schedule New Run" and "View Scheduled Runs" buttons
 struct ActionButtonsSection: View {
-    @EnvironmentObject private var appState: AppState
+    @SafeEnvironmentObject(fallback: { AppState.createFallback() }) private var appState: AppState
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     
     var body: some View {
@@ -145,7 +145,7 @@ struct ActionButtonsSection: View {
 /// Upcoming runs section displaying list of scheduled runs using RunSummaryCard
 struct UpcomingRunsSection: View {
     let runs: [ScheduledSchoolRun]
-    @EnvironmentObject private var appState: AppState
+    @SafeEnvironmentObject(fallback: { AppState.createFallback() }) private var appState: AppState
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     
     var body: some View {
@@ -206,7 +206,7 @@ struct UpcomingRunsSection: View {
 /// Past runs section showing completed runs for reference
 struct PastRunsSection: View {
     let runs: [ScheduledSchoolRun]
-    @EnvironmentObject private var appState: AppState
+    @SafeEnvironmentObject(fallback: { AppState.createFallback() }) private var appState: AppState
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     
     var body: some View {
@@ -276,7 +276,7 @@ struct PastRunsSection: View {
 
 /// Empty state for upcoming runs section
 struct UpcomingRunsEmptyState: View {
-    @EnvironmentObject private var appState: AppState
+    @SafeEnvironmentObject(fallback: { AppState.createFallback() }) private var appState: AppState
     
     var body: some View {
         VStack(spacing: DesignSystem.Spacing.lg) {

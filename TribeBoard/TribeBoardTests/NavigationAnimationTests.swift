@@ -23,14 +23,14 @@ final class NavigationAnimationTests: XCTestCase {
     
     // MARK: - Haptic Feedback Tests
     
-    func testHapticManagerNavigationFeedback() {
+    @MainActor func testHapticManagerNavigationFeedback() {
         // Test that navigation haptic feedback method exists and can be called
         XCTAssertNoThrow(hapticManager.navigation())
         XCTAssertNoThrow(hapticManager.selection())
         XCTAssertNoThrow(hapticManager.lightImpact())
     }
     
-    func testNavigationTabEnumProperties() {
+    @MainActor func testNavigationTabEnumProperties() {
         // Test that all navigation tabs have required properties
         for tab in NavigationTab.allCases {
             XCTAssertFalse(tab.displayName.isEmpty, "Tab \(tab) should have a display name")
@@ -39,20 +39,20 @@ final class NavigationAnimationTests: XCTestCase {
         }
     }
     
-    func testNavigationTabCount() {
+    @MainActor func testNavigationTabCount() {
         // Ensure we have exactly 4 navigation tabs as specified in requirements
         XCTAssertEqual(NavigationTab.allCases.count, 4, "Should have exactly 4 navigation tabs")
         
         // Verify specific tabs exist
-        XCTAssertTrue(NavigationTab.allCases.contains(.home))
+        XCTAssertTrue(NavigationTab.allCases.contains(.dashboard))
         XCTAssertTrue(NavigationTab.allCases.contains(.schoolRun))
-        XCTAssertTrue(NavigationTab.allCases.contains(.shopping))
+        XCTAssertTrue(NavigationTab.allCases.contains(.messages))
         XCTAssertTrue(NavigationTab.allCases.contains(.tasks))
     }
     
     // MARK: - Animation Tests
     
-    func testAnimationUtilitiesExist() {
+    @MainActor func testAnimationUtilitiesExist() {
         // Test that navigation-specific animations exist
         XCTAssertNotNil(AnimationUtilities.tabSelection)
         XCTAssertNotNil(AnimationUtilities.navigationEntrance)
@@ -60,7 +60,7 @@ final class NavigationAnimationTests: XCTestCase {
         XCTAssertNotNil(AnimationUtilities.viewTransition)
     }
     
-    func testDesignSystemAnimations() {
+    @MainActor func testDesignSystemAnimations() {
         // Test that design system animations used in navigation exist
         XCTAssertNotNil(DesignSystem.Animation.spring)
         XCTAssertNotNil(DesignSystem.Animation.bouncy)
@@ -70,9 +70,9 @@ final class NavigationAnimationTests: XCTestCase {
     
     // MARK: - Navigation Item Tests
     
-    func testNavigationItemInitialization() {
+    @MainActor func testNavigationItemInitialization() {
         // Test that NavigationItem can be initialized with required parameters
-        let tab = NavigationTab.home
+        let tab = NavigationTab.dashboard
         var tapCalled = false
         
         let navigationItem = NavigationItem(
@@ -91,9 +91,9 @@ final class NavigationAnimationTests: XCTestCase {
     
     // MARK: - Floating Bottom Navigation Tests
     
-    func testFloatingBottomNavigationInitialization() {
+    @MainActor func testFloatingBottomNavigationInitialization() {
         // Test that FloatingBottomNavigation can be initialized
-        @State var selectedTab = NavigationTab.home
+        @State var selectedTab = NavigationTab.dashboard
         var tabSelectionCalled = false
         
         let navigation = FloatingBottomNavigation(
@@ -106,12 +106,12 @@ final class NavigationAnimationTests: XCTestCase {
     
     // MARK: - Integration Tests
     
-    func testNavigationStateManagement() {
+    @MainActor func testNavigationStateManagement() {
         // Test that AppState properly manages navigation state
         let appState = AppState()
         
         // Test initial state
-        XCTAssertEqual(appState.selectedNavigationTab, .home)
+        XCTAssertEqual(appState.selectedNavigationTab, .dashboard)
         
         // Test tab selection
         appState.handleTabSelection(.tasks)
@@ -120,14 +120,14 @@ final class NavigationAnimationTests: XCTestCase {
         appState.handleTabSelection(.schoolRun)
         XCTAssertEqual(appState.selectedNavigationTab, .schoolRun)
         
-        appState.handleTabSelection(.shopping)
-        XCTAssertEqual(appState.selectedNavigationTab, .shopping)
+        appState.handleTabSelection(.messages)
+        XCTAssertEqual(appState.selectedNavigationTab, .messages)
         
-        appState.handleTabSelection(.home)
-        XCTAssertEqual(appState.selectedNavigationTab, .home)
+        appState.handleTabSelection(.dashboard)
+        XCTAssertEqual(appState.selectedNavigationTab, .dashboard)
     }
     
-    func testNavigationVisibilityLogic() {
+    @MainActor func testNavigationVisibilityLogic() {
         // Test that navigation visibility logic works correctly
         let appState = AppState()
         
@@ -153,21 +153,21 @@ final class NavigationAnimationTests: XCTestCase {
     
     // MARK: - Performance Tests
     
-    func testNavigationAnimationPerformance() {
+    @MainActor func testNavigationAnimationPerformance() {
         // Test that navigation animations don't cause performance issues
         measure {
             for _ in 0..<100 {
                 // Simulate rapid tab switching
                 let appState = AppState()
-                appState.handleTabSelection(.home)
+                appState.handleTabSelection(.dashboard)
                 appState.handleTabSelection(.tasks)
                 appState.handleTabSelection(.schoolRun)
-                appState.handleTabSelection(.shopping)
+                appState.handleTabSelection(.messages)
             }
         }
     }
     
-    func testHapticFeedbackPerformance() {
+    @MainActor func testHapticFeedbackPerformance() {
         // Test that haptic feedback calls don't cause performance issues
         measure {
             for _ in 0..<50 {

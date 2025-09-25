@@ -40,7 +40,7 @@ final class RoleSelectionViewModelTests: XCTestCase {
     
     // MARK: - Initialization Tests
     
-    func testInitialization() {
+    @MainActor func testInitialization() {
         XCTAssertEqual(viewModel.selectedRole, .adult)
         XCTAssertFalse(viewModel.isUpdating)
         XCTAssertNil(viewModel.errorMessage)
@@ -242,7 +242,7 @@ final class RoleSelectionViewModelTests: XCTestCase {
     
     // MARK: - Role Card Data Tests
     
-    func testGetRoleCardData() {
+    @MainActor func testGetRoleCardData() {
         // Setup
         viewModel.selectedRole = .kid
         viewModel.canSelectParentAdmin = false
@@ -270,7 +270,7 @@ final class RoleSelectionViewModelTests: XCTestCase {
     
     // MARK: - App State Integration Tests
     
-    func testSetAppState() {
+    @MainActor func testSetAppState() {
         let mockAppState = MockAppState()
         viewModel.setAppState(mockAppState)
         

@@ -45,7 +45,7 @@ final class CreateFamilyViewModelTests: XCTestCase {
     
     // MARK: - Initialization Tests
     
-    func testInitialization() {
+    @MainActor func testInitialization() {
         XCTAssertEqual(viewModel.familyName, "")
         XCTAssertFalse(viewModel.isCreating)
         XCTAssertNil(viewModel.createdFamily)
@@ -56,25 +56,25 @@ final class CreateFamilyViewModelTests: XCTestCase {
     
     // MARK: - Family Name Validation Tests
     
-    func testFamilyNameValidation_Valid() {
+    @MainActor func testFamilyNameValidation_Valid() {
         viewModel.familyName = "Smith Family"
         XCTAssertTrue(viewModel.isValidFamilyName)
         XCTAssertNil(viewModel.familyNameError)
     }
     
-    func testFamilyNameValidation_Empty() {
+    @MainActor func testFamilyNameValidation_Empty() {
         viewModel.familyName = ""
         XCTAssertFalse(viewModel.isValidFamilyName)
         XCTAssertNotNil(viewModel.familyNameError)
     }
     
-    func testFamilyNameValidation_TooShort() {
+    @MainActor func testFamilyNameValidation_TooShort() {
         viewModel.familyName = "A"
         XCTAssertFalse(viewModel.isValidFamilyName)
         XCTAssertNotNil(viewModel.familyNameError)
     }
     
-    func testFamilyNameValidation_TooLong() {
+    @MainActor func testFamilyNameValidation_TooLong() {
         viewModel.familyName = String(repeating: "A", count: 51)
         XCTAssertFalse(viewModel.isValidFamilyName)
         XCTAssertNotNil(viewModel.familyNameError)
@@ -210,7 +210,7 @@ final class CreateFamilyViewModelTests: XCTestCase {
     
     // MARK: - Error Handling Tests
     
-    func testClearError() {
+    @MainActor func testClearError() {
         viewModel.errorMessage = "Test error"
         XCTAssertNotNil(viewModel.errorMessage)
         
@@ -486,7 +486,7 @@ final class CreateFamilyViewModelTests: XCTestCase {
     
     // MARK: - Edge Case Tests
     
-    func testFormReset() {
+    @MainActor func testFormReset() {
         viewModel.familyName = "Test Family"
         viewModel.createdFamily = Family(name: "Test", code: "TEST123", createdByUserId: UUID())
         viewModel.qrCodeImage = Image(systemName: "qrcode")
@@ -499,7 +499,7 @@ final class CreateFamilyViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.creationState, .idle)
     }
     
-    func testClearError() {
+    @MainActor func testClearError() {
         viewModel.currentError = FamilyCreationError.networkUnavailable
         
         viewModel.clearError()
@@ -510,7 +510,7 @@ final class CreateFamilyViewModelTests: XCTestCase {
         }
     }
     
-    func testValidationStateUpdates() {
+    @MainActor func testValidationStateUpdates() {
         // Test real-time validation
         viewModel.familyName = ""
         XCTAssertFalse(viewModel.isValidFamilyName)

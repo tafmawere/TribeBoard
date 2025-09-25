@@ -20,7 +20,7 @@ final class AppLaunchTests: XCTestCase {
     
     // MARK: - App Launch Simulation Tests
     
-    func testTribeBoardAppInitialization() {
+    @MainActor func testTribeBoardAppInitialization() {
         // Test the actual TribeBoardApp initialization process
         // This simulates what happens when the app launches
         
@@ -61,7 +61,7 @@ final class AppLaunchTests: XCTestCase {
         }
     }
     
-    func testAppLaunchInSimulatorEnvironment() {
+    @MainActor func testAppLaunchInSimulatorEnvironment() {
         // Test app launch specifically in iOS Simulator environment
         // Simulator has CloudKit limitations, so this tests the fallback behavior
         
@@ -106,7 +106,7 @@ final class AppLaunchTests: XCTestCase {
         }
     }
     
-    func testAppLaunchWithCloudKitAvailableVsUnavailable() {
+    @MainActor func testAppLaunchWithCloudKitAvailableVsUnavailable() {
         // Test app launch behavior in both CloudKit available and unavailable scenarios
         
         print("☁️ Testing app launch with CloudKit available vs unavailable...")
@@ -163,7 +163,7 @@ final class AppLaunchTests: XCTestCase {
         }
     }
     
-    func testAppLaunchNoCrashGuarantee() {
+    @MainActor func testAppLaunchNoCrashGuarantee() {
         // Test that app launch never crashes during ModelContainer initialization
         // This is the critical requirement - no crashes should occur
         
@@ -214,7 +214,7 @@ final class AppLaunchTests: XCTestCase {
         print("✅ All launch scenarios completed without crashes")
     }
     
-    func testAppLaunchWithSystemResourceConstraints() {
+    @MainActor func testAppLaunchWithSystemResourceConstraints() {
         // Test app launch under various system resource constraints
         
         print("⚡ Testing app launch under system resource constraints...")
@@ -252,7 +252,7 @@ final class AppLaunchTests: XCTestCase {
         print("✅ App launch verified under system resource constraints")
     }
     
-    func testAppLaunchErrorRecovery() {
+    @MainActor func testAppLaunchErrorRecovery() {
         // Test that app can recover from various error conditions during launch
         
         print("🔄 Testing app launch error recovery...")
@@ -315,7 +315,7 @@ final class AppLaunchTests: XCTestCase {
         print("✅ App launch error recovery verified")
     }
     
-    func testAppLaunchPerformanceInDifferentEnvironments() {
+    @MainActor func testAppLaunchPerformanceInDifferentEnvironments() {
         // Test that app launch performance is acceptable in different environments
         
         print("⏱️ Testing app launch performance in different environments...")
@@ -338,7 +338,7 @@ final class AppLaunchTests: XCTestCase {
         print("✅ App launch performance verified")
     }
     
-    func testAppLaunchDataIntegrity() {
+    @MainActor func testAppLaunchDataIntegrity() {
         // Test that app launch maintains data integrity across different scenarios
         
         print("🔒 Testing app launch data integrity...")

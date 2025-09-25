@@ -42,7 +42,7 @@ final class DatabasePerformanceTests: DatabaseTestBase {
         print("🔍 Testing family fetch by code performance...")
         
         // Setup: Create a family to fetch
-        let testFamily = try createTestFamily(name: "Fetch Test Family", code: "FETCH01")
+        let testFamily = try createTestFamily(name: "Fetch Test Family", code: "FETCH01", createdByUserId: UUID())
         
         let (fetchedFamily, metrics) = try PerformanceTestUtilities.measureDatabaseOperation(
             operation: {
@@ -70,7 +70,7 @@ final class DatabasePerformanceTests: DatabaseTestBase {
         print("🤝 Testing membership creation performance...")
         
         // Setup: Create family and user
-        let testFamily = try createTestFamily(name: "Membership Test Family", code: "MEMB123")
+        let testFamily = try createTestFamily(name: "Membership Test Family", code: "MEMB123", createdByUserId: UUID())
         let testUser = try createTestUser(displayName: "Membership Test User")
         
         let (membership, metrics) = try PerformanceTestUtilities.measureDatabaseOperation(
@@ -254,7 +254,7 @@ final class DatabasePerformanceTests: DatabaseTestBase {
         print("🔍 Testing fetch family by ID performance...")
         
         // Setup: Create a family to fetch
-        let testFamily = try createTestFamily(name: "ID Fetch Test", code: "IDFETCH")
+        let testFamily = try createTestFamily(name: "ID Fetch Test", code: "IDFETCH", createdByUserId: UUID())
         
         let (fetchedFamily, metrics) = try PerformanceTestUtilities.measureDatabaseOperation(
             operation: {
@@ -309,7 +309,7 @@ final class DatabasePerformanceTests: DatabaseTestBase {
         
         // Setup: Create some existing families to ensure uniqueness checking
         for i in 1...10 {
-            _ = try createTestFamily(name: "Existing Family \(i)", code: "EXIST\(i)")
+            _ = try createTestFamily(name: "Existing Family \(i)", code: "EXIST\(i)", createdByUserId: UUID())
         }
         
         let (uniqueCode, metrics) = try PerformanceTestUtilities.measureDatabaseOperation(
@@ -340,7 +340,7 @@ final class DatabasePerformanceTests: DatabaseTestBase {
         print("🔄 Testing update membership role performance...")
         
         // Setup: Create family, user, and membership
-        let testFamily = try createTestFamily(name: "Role Update Family", code: "ROLEUPD")
+        let testFamily = try createTestFamily(name: "Role Update Family", code: "ROLEUPD", createdByUserId: UUID())
         let testUser = try createTestUser(displayName: "Role Update User")
         let testMembership = try createTestMembership(family: testFamily, user: testUser, role: .kid)
         

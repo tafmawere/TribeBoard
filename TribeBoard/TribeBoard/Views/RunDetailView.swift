@@ -3,7 +3,7 @@ import SwiftUI
 /// Detailed view of a specific run before execution, showing overview and route details
 struct RunDetailView: View {
     let run: ScheduledSchoolRun
-    @EnvironmentObject private var appState: AppState
+    @SafeEnvironmentObject(fallback: { AppState.createFallback() }) private var appState: AppState
     @State private var showingStartRunAlert = false
     
     var body: some View {
@@ -148,35 +148,31 @@ struct RunDetailView: View {
 }
 
 #Preview("Run Detail - Upcoming Run") {
-    SchoolRunPreviewProvider.previewWithSampleData {
-        NavigationStack {
-            RunDetailView(run: SchoolRunPreviewProvider.upcomingRun)
-        }
+    NavigationStack {
+        RunDetailView(run: SchoolRunPreviewProvider.upcomingRun)
     }
+    .previewEnvironment()
 }
 
 #Preview("Run Detail - Completed Run") {
-    SchoolRunPreviewProvider.previewWithSampleData {
-        NavigationStack {
-            RunDetailView(run: SchoolRunPreviewProvider.completedRun)
-        }
+    NavigationStack {
+        RunDetailView(run: SchoolRunPreviewProvider.completedRun)
     }
+    .previewEnvironment()
 }
 
 #Preview("Run Detail - Long Run") {
-    SchoolRunPreviewProvider.previewWithSampleData {
-        NavigationStack {
-            RunDetailView(run: SchoolRunPreviewProvider.longRun)
-        }
+    NavigationStack {
+        RunDetailView(run: SchoolRunPreviewProvider.longRun)
     }
+    .previewEnvironment()
 }
 
 #Preview("Run Detail - Short Run") {
-    SchoolRunPreviewProvider.previewWithSampleData {
-        NavigationStack {
-            RunDetailView(run: SchoolRunPreviewProvider.shortRun)
-        }
+    NavigationStack {
+        RunDetailView(run: SchoolRunPreviewProvider.shortRun)
     }
+    .previewEnvironment()
 }
 
 #Preview("Run Detail - Dark Mode") {

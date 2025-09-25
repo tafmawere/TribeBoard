@@ -190,14 +190,14 @@ final class KeychainServiceTests: XCTestCase {
     
     // MARK: - Error Handling Tests
     
-    func testInvalidDataError() {
+    @MainActor func testInvalidDataError() {
         // Test storing invalid data should be handled gracefully
         // This test verifies that our convenience methods handle encoding properly
         let testHash = "test.hash"
         XCTAssertNoThrow(try keychainService.storeAppleUserIdHash(testHash))
     }
     
-    func testKeychainErrorDescriptions() {
+    @MainActor func testKeychainErrorDescriptions() {
         let itemNotFoundError = KeychainService.KeychainError.itemNotFound
         let duplicateItemError = KeychainService.KeychainError.duplicateItem
         let invalidDataError = KeychainService.KeychainError.invalidData
