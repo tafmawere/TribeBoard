@@ -1,107 +1,48 @@
 import SwiftUI
 
+/// Detailed view for a shopping task with editing capabilities
 struct TaskDetailView: View {
-    let task: FamilyTask
-    let userProfiles: [UUID: UserProfile]
-    let canEdit: Bool
-    let canComplete: Bool
-    let onStatusChange: (FamilyTask.TaskStatus) -> Void
-    let onDelete: () -> Void
+    let task: ShoppingTask
+    let onTaskUpdated: (ShoppingTask) -> Void
     
     @Environment(\.dismiss) private var dismiss
-    @State private var showingDeleteConfirmation = false
-    @State private var showingStatusMenu = false
+    @State private var editedTask: ShoppingTask
+    @State private var isEditing = false
+    @State private var showDeleteConfirmation = false
     
-    private var assigneeName: String {
-        userProfiles[task.assignedTo]?.displayName ?? "Unknown User"
-    }
-    
-    private var assignedByName: String {
-        userProfiles[task.assignedBy]?.displayName ?? "Unknown User"
-    }
-    
-    private var formattedCreatedDate: String {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .short
-        return formatter.string(from: task.createdAt)
-    }
-    
-    private var formattedDueDate: String? {
-        guard let dueDate = task.dueDate else { return nil }
-        
-        let formatter = DateFormatter()
-        let calendar = Calendar.current
-        
-        if calendar.isDate(dueDate, inSameDayAs: Date()) {
-            formatter.timeStyle = .short
-            return "Today at \(formatter.string(from: dueDate))"
-        } else if calendar.isDateInTomorrow(dueDate) {
-            formatter.timeStyle = .short
-            return "Tomorrow at \(formatter.string(from: dueDate))"
-        } else {
-            formatter.dateStyle = .medium
-            formatter.timeStyle = .short
-            return formatter.string(from: dueDate)
-        }
-    }
-    
-    private var isOverdue: Bool {
-        guard let dueDate = task.dueDate else { return false }
-        return dueDate < Date() && task.status != .completed
-    }
-    
-    private var timeUntilDue: String? {
-        guard let dueDate = task.dueDate else { return nil }
-        
-        let calendar = Calendar.current
-        let now = Date()
-        
-        if dueDate < now && task.status != .completed {
-            let components = calendar.dateComponents([.day, .hour], from: dueDate, to: now)
-            if let days = components.day, days > 0 {
-                return "\(days) day\(days == 1 ? "" : "s") overdue"
-            } else if let hours = components.hour, hours > 0 {
-                return "\(hours) hour\(hours == 1 ? "" : "s") overdue"
-            } else {
-                return "Just overdue"
-            }
-        } else if dueDate > now {
-            let components = calendar.dateComponents([.day, .hour], from: now, to: dueDate)
-            if let days = components.day, days > 0 {
-                return "Due in \(days) day\(days == 1 ? "" : "s")"
-            } else if let hours = components.hour, hours > 0 {
-                return "Due in \(hours) hour\(hours == 1 ? "" : "s")"
-            } else {
-                return "Due very soon"
-            }
-        }
-        
-        return nil
+    init(task: ShoppingTask, onTaskUpdated: @escaping (ShoppingTask) -> Void) {
+        self.task = task
+        self.onTaskUpdated = onTaskUpdated
+        self._editedTask = State(initialValue: task)
     }
     
     var body: some View {
         NavigationView {
             ScrollView {
-                VStack(spacing: 24) {
+                VStack(spacing: DesignSystem.Spacing.lg) {
                     // Task header
-                    taskHeaderView
+                    taskHeaderSection
                     
                     // Task details
-                    taskDetailsView
+                    taskDetailsSection
                     
-                    // Assignment info
-                    assignmentInfoView
+                    // Items section
+                    itemsSection
                     
-                    // Timeline info
-                    timelineInfoView
+                    // Location section
+                    if let location = task.location {
+                        locationSection(location)
+                    }
+                    
+                    // Notes section
+                    if let notes = task.notes, !notes.isEmpty {
+                        notesSection(notes)
+                    }
                     
                     // Action buttons
-                    if canEdit || canComplete {
-                        actionButtonsView
-                    }
+                    actionButtonsSection
                 }
-                .padding()
+                .screenPadding()
             }
             .navigationTitle("Task Details")
             .navigationBarTitleDisplayMode(.inline)
@@ -112,307 +53,447 @@ struct TaskDetailView: View {
                     }
                 }
                 
-                if canEdit {
-                    ToolbarItem(placement: .navigationBarTrailing) {
-                        Menu {
-                            Button("Change Status") {
-                                showingStatusMenu = true
-                            }
-                            
-                            Divider()
-                            
-                            Button("Delete Task", role: .destructive) {
-                                showingDeleteConfirmation = true
-                            }
-                        } label: {
-                            Image(systemName: "ellipsis.circle")
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(isEditing ? "Save" : "Edit") {
+                        if isEditing {
+                            saveChanges()
+                        } else {
+                            isEditing = true
                         }
                     }
+                    .fontWeight(.semibold)
                 }
             }
         }
-        .confirmationDialog(
-            "Change Status",
-            isPresented: $showingStatusMenu,
-            titleVisibility: .visible
-        ) {
-            if task.status != .pending {
-                Button("Mark as Pending") {
-                    onStatusChange(.pending)
-                    dismiss()
-                }
-            }
-            
-            if task.status != .inProgress {
-                Button("Mark as In Progress") {
-                    onStatusChange(.inProgress)
-                    dismiss()
-                }
-            }
-            
-            if task.status != .completed {
-                Button("Mark as Completed") {
-                    onStatusChange(.completed)
-                    dismiss()
-                }
-            }
-            
-            Button("Cancel", role: .cancel) { }
-        } message: {
-            Text("Change the status of this task")
-        }
-        .alert("Delete Task", isPresented: $showingDeleteConfirmation) {
+        .alert("Delete Task", isPresented: $showDeleteConfirmation) {
             Button("Delete", role: .destructive) {
-                onDelete()
+                deleteTask()
             }
             Button("Cancel", role: .cancel) { }
         } message: {
-            Text("Are you sure you want to delete '\(task.title)'? This action cannot be undone.")
+            Text("Are you sure you want to delete this shopping task? This action cannot be undone.")
         }
     }
     
-    // MARK: - View Components
+    // MARK: - Task Header Section
     
-    private var taskHeaderView: some View {
-        VStack(spacing: 16) {
-            // Category and status
+    private var taskHeaderSection: some View {
+        VStack(alignment: .leading, spacing: DesignSystem.Spacing.md) {
             HStack {
-                HStack(spacing: 8) {
-                    Text(task.category.icon)
-                        .font(.title)
+                Text(task.taskType.emoji)
+                    .font(.largeTitle)
+                
+                VStack(alignment: .leading, spacing: DesignSystem.Spacing.xs) {
+                    Text(task.taskType.rawValue)
+                        .headlineSmall()
+                        .foregroundColor(.primary)
                     
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(task.category.displayName)
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                            .foregroundColor(.secondary)
-                        
-                        TaskStatusBadge(status: task.status)
-                    }
+                    Text("Created by \(task.createdBy)")
+                        .captionLarge()
+                        .foregroundColor(.secondary)
                 }
                 
                 Spacer()
                 
-                // Points display
-                VStack(spacing: 4) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "star.fill")
-                            .font(.title2)
-                            .foregroundColor(.yellow)
-                        
-                        Text("\(task.points)")
-                            .font(.title2)
-                            .fontWeight(.bold)
-                    }
-                    
-                    Text("points")
+                statusBadge(for: task.status)
+            }
+            
+            // Priority indicator
+            if task.priority != .low {
+                HStack {
+                    Image(systemName: "exclamationmark.triangle.fill")
                         .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-                .padding()
-                .background(Color.yellow.opacity(0.1))
-                .cornerRadius(12)
-            }
-            
-            // Task title
-            Text(task.title)
-                .font(.title2)
-                .fontWeight(.bold)
-                .multilineTextAlignment(.center)
-        }
-        .padding()
-        .background(Color(.systemBackground))
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 2)
-    }
-    
-    private var taskDetailsView: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Details")
-                .font(.headline)
-                .fontWeight(.semibold)
-            
-            if let description = task.description, !description.isEmpty {
-                Text(description)
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-            } else {
-                Text("No description provided")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                    .italic()
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding()
-        .background(Color(.systemBackground))
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 2)
-    }
-    
-    private var assignmentInfoView: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Assignment")
-                .font(.headline)
-                .fontWeight(.semibold)
-            
-            VStack(spacing: 12) {
-                // Assigned to
-                HStack {
-                    Image(systemName: "person.circle.fill")
-                        .font(.title2)
-                        .foregroundColor(.blue)
+                        .foregroundColor(priorityColor(for: task.priority))
                     
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Assigned to")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        
-                        Text(assigneeName)
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                    }
+                    Text("\(task.priority.rawValue) Priority")
+                        .captionLarge()
+                        .foregroundColor(priorityColor(for: task.priority))
+                        .fontWeight(.semibold)
                     
                     Spacer()
                 }
+            }
+        }
+        .cardPadding()
+        .background(
+            RoundedRectangle(cornerRadius: BrandStyle.cornerRadius)
+                .fill(LinearGradient.brandGradientSubtle)
+                .overlay(
+                    RoundedRectangle(cornerRadius: BrandStyle.cornerRadius)
+                        .stroke(priorityColor(for: task.priority).opacity(0.3), lineWidth: 2)
+                )
+        )
+    }
+    
+    // MARK: - Task Details Section
+    
+    private var taskDetailsSection: some View {
+        VStack(alignment: .leading, spacing: DesignSystem.Spacing.md) {
+            sectionHeader("Task Details", icon: "info.circle")
+            
+            VStack(spacing: DesignSystem.Spacing.sm) {
+                detailRow(
+                    icon: "person.circle.fill",
+                    title: "Assigned To",
+                    value: task.assignedTo,
+                    color: .brandPrimary
+                )
                 
-                // Assigned by
-                HStack {
-                    Image(systemName: "person.badge.plus")
-                        .font(.title2)
-                        .foregroundColor(.green)
-                    
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Assigned by")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        
-                        Text(assignedByName)
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                    }
-                    
-                    Spacer()
-                }
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding()
-        .background(Color(.systemBackground))
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 2)
-    }
-    
-    private var timelineInfoView: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Timeline")
-                .font(.headline)
-                .fontWeight(.semibold)
-            
-            VStack(spacing: 12) {
-                // Created date
-                HStack {
-                    Image(systemName: "plus.circle.fill")
-                        .font(.title2)
-                        .foregroundColor(.gray)
-                    
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Created")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        
-                        Text(formattedCreatedDate)
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                    }
-                    
-                    Spacer()
-                }
+                detailRow(
+                    icon: task.isOverdue ? "exclamationmark.triangle.fill" : "clock",
+                    title: "Due Date",
+                    value: task.formattedDueDate,
+                    color: task.isOverdue ? .red : .orange
+                )
                 
-                // Due date (if set)
-                if let dueDate = formattedDueDate {
+                detailRow(
+                    icon: "calendar",
+                    title: "Created",
+                    value: formatDate(task.createdAt),
+                    color: .secondary
+                )
+                
+                if task.isOverdue {
                     HStack {
-                        Image(systemName: isOverdue ? "exclamationmark.triangle.fill" : "clock.fill")
-                            .font(.title2)
-                            .foregroundColor(isOverdue ? .red : .orange)
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.caption)
+                            .foregroundColor(.red)
                         
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Due date")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            
-                            Text(dueDate)
-                                .font(.subheadline)
-                                .fontWeight(.medium)
-                                .foregroundColor(isOverdue ? .red : .primary)
-                            
-                            if let timeInfo = timeUntilDue {
-                                Text(timeInfo)
-                                    .font(.caption)
-                                    .foregroundColor(isOverdue ? .red : .secondary)
-                            }
-                        }
+                        Text("This task is overdue")
+                            .captionLarge()
+                            .foregroundColor(.red)
+                            .fontWeight(.semibold)
                         
                         Spacer()
                     }
+                    .padding(DesignSystem.Spacing.sm)
+                    .background(
+                        RoundedRectangle(cornerRadius: BrandStyle.cornerRadiusSmall)
+                            .fill(Color.red.opacity(0.1))
+                    )
                 }
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding()
-        .background(Color(.systemBackground))
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 2)
     }
     
-    private var actionButtonsView: some View {
-        VStack(spacing: 12) {
-            if canComplete && task.status != .completed {
-                Button("Mark as Completed") {
-                    onStatusChange(.completed)
-                    dismiss()
-                }
-                .buttonStyle(PrimaryButtonStyle())
-            }
+    // MARK: - Items Section
+    
+    private var itemsSection: some View {
+        VStack(alignment: .leading, spacing: DesignSystem.Spacing.md) {
+            sectionHeader("Shopping Items (\(task.itemCount))", icon: "cart")
             
-            if canEdit && task.status == .pending {
-                Button("Start Working") {
-                    onStatusChange(.inProgress)
-                    dismiss()
+            VStack(spacing: DesignSystem.Spacing.sm) {
+                ForEach(task.items) { item in
+                    itemDetailRow(item)
                 }
-                .buttonStyle(SecondaryButtonStyle())
             }
         }
+    }
+    
+    private func itemDetailRow(_ item: GroceryItem) -> some View {
+        HStack(spacing: DesignSystem.Spacing.md) {
+            Text(item.ingredient.emoji)
+                .font(.title2)
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text(item.ingredient.name)
+                    .bodyMedium()
+                    .foregroundColor(.primary)
+                
+                Text("\(item.ingredient.quantity) \(item.ingredient.unit)")
+                    .captionLarge()
+                    .foregroundColor(.secondary)
+                
+                if let linkedMeal = item.linkedMeal {
+                    Text("For: \(linkedMeal)")
+                        .captionSmall()
+                        .foregroundColor(.brandPrimary)
+                }
+                
+                if let notes = item.notes {
+                    Text(notes)
+                        .captionSmall()
+                        .foregroundColor(.secondary)
+                        .italic()
+                }
+            }
+            
+            Spacer()
+            
+            if item.isUrgent {
+                Text("URGENT")
+                    .captionSmall()
+                    .fontWeight(.bold)
+                    .foregroundColor(.white)
+                    .padding(.horizontal, DesignSystem.Spacing.xs)
+                    .padding(.vertical, 2)
+                    .background(
+                        RoundedRectangle(cornerRadius: BrandStyle.cornerRadiusSmall)
+                            .fill(Color.red)
+                    )
+            }
+        }
+        .cardPadding()
+        .background(
+            RoundedRectangle(cornerRadius: BrandStyle.cornerRadius)
+                .fill(Color(.systemBackground))
+                .lightShadow()
+        )
+    }
+    
+    // MARK: - Location Section
+    
+    private func locationSection(_ location: TaskLocation) -> some View {
+        VStack(alignment: .leading, spacing: DesignSystem.Spacing.md) {
+            sectionHeader("Location", icon: "location")
+            
+            HStack(spacing: DesignSystem.Spacing.md) {
+                Text(location.type.emoji)
+                    .font(.title2)
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(location.name)
+                        .bodyMedium()
+                        .foregroundColor(.primary)
+                    
+                    Text(location.address)
+                        .captionLarge()
+                        .foregroundColor(.secondary)
+                        .lineLimit(2)
+                }
+                
+                Spacer()
+                
+                Button("Directions") {
+                    // In a real app, this would open Maps
+                    HapticManager.shared.lightImpact()
+                }
+                .buttonStyle(TertiaryButtonStyle())
+            }
+            .cardPadding()
+            .background(
+                RoundedRectangle(cornerRadius: BrandStyle.cornerRadius)
+                    .fill(Color(.systemBackground))
+                    .lightShadow()
+            )
+            
+            // Map placeholder
+            SchoolRunMapPlaceholder(
+                currentStop: RunStop(name: location.name, type: .custom, task: "Shopping", estimatedMinutes: 15),
+                showCurrentLocation: true,
+                mapStyle: .thumbnail
+            )
+            .frame(height: 120)
+        }
+    }
+    
+    // MARK: - Notes Section
+    
+    private func notesSection(_ notes: String) -> some View {
+        VStack(alignment: .leading, spacing: DesignSystem.Spacing.md) {
+            sectionHeader("Notes", icon: "note.text")
+            
+            Text(notes)
+                .bodyMedium()
+                .foregroundColor(.primary)
+                .padding(DesignSystem.Spacing.md)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    RoundedRectangle(cornerRadius: BrandStyle.cornerRadius)
+                        .fill(Color(.systemGray6))
+                )
+        }
+    }
+    
+    // MARK: - Action Buttons Section
+    
+    private var actionButtonsSection: some View {
+        VStack(spacing: DesignSystem.Spacing.md) {
+            // Status update buttons
+            if task.status == .pending {
+                Button("Start Task") {
+                    updateTaskStatus(.inProgress)
+                }
+                .buttonStyle(PrimaryButtonStyle())
+            } else if task.status == .inProgress {
+                Button("Mark Complete") {
+                    updateTaskStatus(.completed)
+                }
+                .buttonStyle(PrimaryButtonStyle())
+            } else if task.status == .completed {
+                HStack {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.title2)
+                        .foregroundColor(.green)
+                    
+                    Text("Task Completed")
+                        .titleMedium()
+                        .foregroundColor(.green)
+                    
+                    Spacer()
+                }
+                .cardPadding()
+                .background(
+                    RoundedRectangle(cornerRadius: BrandStyle.cornerRadius)
+                        .fill(Color.green.opacity(0.1))
+                )
+            }
+            
+            // Secondary actions
+            HStack(spacing: DesignSystem.Spacing.md) {
+                Button("Duplicate") {
+                    duplicateTask()
+                }
+                .buttonStyle(SecondaryButtonStyle())
+                
+                Button("Delete") {
+                    showDeleteConfirmation = true
+                }
+                .buttonStyle(DestructiveButtonStyle())
+            }
+        }
+    }
+    
+    // MARK: - Helper Views
+    
+    private func sectionHeader(_ title: String, icon: String) -> some View {
+        HStack(spacing: DesignSystem.Spacing.sm) {
+            Image(systemName: icon)
+                .font(.title3)
+                .foregroundColor(.brandPrimary)
+            
+            Text(title)
+                .titleSmall()
+                .foregroundColor(.primary)
+            
+            Spacer()
+        }
+    }
+    
+    private func detailRow(icon: String, title: String, value: String, color: Color) -> some View {
+        HStack(spacing: DesignSystem.Spacing.sm) {
+            Image(systemName: icon)
+                .font(.caption)
+                .foregroundColor(color)
+                .frame(width: 16)
+            
+            Text(title)
+                .captionLarge()
+                .foregroundColor(.secondary)
+            
+            Spacer()
+            
+            Text(value)
+                .captionLarge()
+                .foregroundColor(.primary)
+                .fontWeight(.medium)
+        }
+    }
+    
+    private func statusBadge(for status: TaskStatus) -> some View {
+        HStack(spacing: DesignSystem.Spacing.xs) {
+            Text(status.emoji)
+                .font(.caption)
+            
+            Text(status.rawValue)
+                .captionSmall()
+                .fontWeight(.semibold)
+        }
+        .padding(.horizontal, DesignSystem.Spacing.sm)
+        .padding(.vertical, DesignSystem.Spacing.xs)
+        .background(
+            RoundedRectangle(cornerRadius: BrandStyle.cornerRadiusSmall)
+                .fill(statusColor(for: status).opacity(0.2))
+        )
+        .foregroundColor(statusColor(for: status))
+    }
+    
+    private func statusColor(for status: TaskStatus) -> Color {
+        switch status {
+        case .pending: return .orange
+        case .inProgress: return .blue
+        case .completed: return .green
+        case .cancelled: return .gray
+        }
+    }
+    
+    private func priorityColor(for priority: TaskPriority) -> Color {
+        switch priority {
+        case .low: return .gray
+        case .medium: return .yellow
+        case .high: return .orange
+        case .critical: return .red
+        }
+    }
+    
+    // MARK: - Helper Methods
+    
+    private func formatDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter.string(from: date)
+    }
+    
+    // MARK: - Actions
+    
+    private func updateTaskStatus(_ status: TaskStatus) {
+        var updatedTask = task
+        updatedTask.status = status
+        onTaskUpdated(updatedTask)
+        
+        // Provide haptic feedback
+        switch status {
+        case .completed:
+            HapticManager.shared.successImpact()
+        default:
+            HapticManager.shared.lightImpact()
+        }
+        
+        dismiss()
+    }
+    
+    private func duplicateTask() {
+        let duplicatedTask = ShoppingTask(
+            items: task.items,
+            assignedTo: task.assignedTo,
+            taskType: task.taskType,
+            dueDate: Calendar.current.date(byAdding: .day, value: 1, to: task.dueDate) ?? task.dueDate,
+            notes: task.notes,
+            location: task.location,
+            status: .pending,
+            createdBy: task.createdBy
+        )
+        
+        onTaskUpdated(duplicatedTask)
+        HapticManager.shared.lightImpact()
+        dismiss()
+    }
+    
+    private func deleteTask() {
+        // In a real app, this would delete the task
+        HapticManager.shared.warning()
+        dismiss()
+    }
+    
+    private func saveChanges() {
+        onTaskUpdated(editedTask)
+        isEditing = false
+        HapticManager.shared.lightImpact()
     }
 }
 
-// MARK: - Preview
-
-#Preview {
-    let mockTask = FamilyTask(
-        id: UUID(),
-        title: "Clean bedroom and organize desk",
-        description: "Tidy up the entire room, make the bed, and organize all items on the desk. Put away any clothes and vacuum the floor.",
-        assignedTo: UUID(),
-        assignedBy: UUID(),
-        dueDate: Calendar.current.date(byAdding: .day, value: 1, to: Date()),
-        status: .inProgress,
-        points: 15,
-        category: .chores,
-        createdAt: Calendar.current.date(byAdding: .day, value: -2, to: Date()) ?? Date()
+#Preview("Task Detail View") {
+    TaskDetailView(
+        task: MealPlanDataProvider.mockShoppingTasks().first!,
+        onTaskUpdated: { _ in }
     )
-    
-    let mockProfiles = [
-        mockTask.assignedTo: UserProfile(displayName: "Ethan Mawere", appleUserIdHash: "hash_ethan"),
-        mockTask.assignedBy: UserProfile(displayName: "Tafadzwa Mawere", appleUserIdHash: "hash_tafadzwa")
-    ]
-    
-    return TaskDetailView(
-        task: mockTask,
-        userProfiles: mockProfiles,
-        canEdit: true,
-        canComplete: true,
-        onStatusChange: { _ in },
-        onDelete: { }
+}
+
+#Preview("Task Detail View - Overdue") {
+    let overdueTasks = MealPlanDataProvider.mockShoppingTasks()
+    TaskDetailView(
+        task: overdueTasks.first { $0.isOverdue } ?? overdueTasks.first!,
+        onTaskUpdated: { _ in }
     )
 }

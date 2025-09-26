@@ -141,6 +141,14 @@ class MockServiceCoordinator: ObservableObject {
                 appleUserIdHash: "mock_tour_hash"
             )
             authService.setMockAuthenticationState(authenticated: true, user: adminUser)
+            
+        case .homeLifeMealPlanning, .homeLifeGroceryShopping, .homeLifeTaskManagement, .homeLifeCompleteWorkflow:
+            // Start as authenticated admin for HomeLife features
+            let adminUser = UserProfile(
+                displayName: "HomeLife User",
+                appleUserIdHash: "mock_homelife_hash"
+            )
+            authService.setMockAuthenticationState(authenticated: true, user: adminUser)
         }
     }
     

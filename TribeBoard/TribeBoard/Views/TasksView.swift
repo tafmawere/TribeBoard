@@ -84,8 +84,11 @@ struct TasksView: View {
         }
         .sheet(isPresented: $showingFilterSheet) {
             TaskFilterSheet(
-                selectedFilter: $viewModel.selectedFilter,
-                selectedSort: $viewModel.selectedSort
+                selectedFilters: $viewModel.selectedFilters,
+                availableFamilyMembers: viewModel.userProfiles.values.map { $0.displayName },
+                onFiltersChanged: { filters in
+                    viewModel.applyFilters(filters)
+                }
             )
         }
         .sheet(isPresented: $showingAddTaskSheet) {
@@ -104,28 +107,55 @@ struct TasksView: View {
         }
         .sheet(isPresented: $viewModel.showingTaskDetail) {
             if let task = viewModel.selectedTask {
-                TaskDetailView(
-                    task: task,
-                    userProfiles: viewModel.userProfiles,
-                    canEdit: viewModel.canEditTask(task),
-                    canComplete: viewModel.canCompleteTask(task),
-                    onStatusChange: { newStatus in
-                        switch newStatus {
-                        case .pending:
-                            viewModel.markTaskPending(task)
-                        case .inProgress:
-                            viewModel.markTaskInProgress(task)
-                        case .completed:
-                            viewModel.markTaskCompleted(task)
-                        case .overdue:
-                            break // Can't manually set to overdue
+                NavigationView {
+                    VStack(spacing: 16) {
+                        Text(task.title)
+                            .font(.title2)
+                            .fontWeight(.semibold)
+                        
+                        if let description = task.description {
+                            Text(description)
+                                .foregroundColor(.secondary)
                         }
-                    },
-                    onDelete: {
-                        viewModel.deleteTask(task)
-                        viewModel.showingTaskDetail = false
+                        
+                        HStack {
+                            Text("Status:")
+                            Text(task.status.displayName)
+                                .fontWeight(.medium)
+                        }
+                        
+                        HStack {
+                            Text("Points:")
+                            Text("\(task.points)")
+                                .fontWeight(.medium)
+                        }
+                        
+                        if let dueDate = task.dueDate {
+                            HStack {
+                                Text("Due:")
+                                Text(dueDate, style: .date)
+                                    .fontWeight(.medium)
+                            }
+                        }
+                        
+                        Spacer()
+                        
+                        Button("Mark Complete") {
+                            viewModel.markTaskCompleted(task)
+                        }
+                        .buttonStyle(.borderedProminent)
                     }
-                )
+                    .padding()
+                    .navigationTitle("Task Details")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .navigationBarTrailing) {
+                            Button("Done") {
+                                viewModel.showingTaskDetail = false
+                            }
+                        }
+                    }
+                }
             }
         }
     }

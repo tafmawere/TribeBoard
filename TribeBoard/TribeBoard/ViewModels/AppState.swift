@@ -35,6 +35,32 @@ class AppState: ObservableObject {
     /// Currently selected navigation tab for bottom navigation
     @Published var selectedNavigationTab: NavigationTab = .dashboard
     
+    // MARK: - HomeLife State Properties
+    
+    /// Navigation path for HomeLife features
+    @Published var homeLifeNavigationPath = NavigationPath()
+    
+    /// Currently selected HomeLife tab
+    @Published var selectedHomeLifeTab: HomeLifeTab = .mealPlan
+    
+    /// Current meal plan data
+    @Published var currentMealPlan: MealPlan?
+    
+    /// Current grocery list items
+    @Published var groceryList: [GroceryItem] = []
+    
+    /// Current shopping tasks
+    @Published var shoppingTasks: [ShoppingTask] = []
+    
+    /// HomeLife loading state
+    @Published var homeLifeIsLoading: Bool = false
+    
+    /// HomeLife error message
+    @Published var homeLifeErrorMessage: String?
+    
+    /// HomeLife success message
+    @Published var homeLifeSuccessMessage: String?
+    
     // MARK: - Mock Service Integration
     
     /// Current user journey scenario for prototype
@@ -462,6 +488,11 @@ class AppState: ObservableObject {
             // The actual navigation will be handled by MainNavigationView
             break
             
+        case .homeLife:
+            // Navigate to HomeLife view
+            // The actual navigation will be handled by MainNavigationView
+            break
+            
         case .tasks:
             // Navigate to tasks view
             // The actual navigation will be handled by MainNavigationView
@@ -511,6 +542,11 @@ class AppState: ObservableObject {
             
         case .schoolRun:
             // Navigation to SchoolRunView will be handled by MainNavigationView
+            // based on the selectedNavigationTab state
+            break
+            
+        case .homeLife:
+            // Navigation to HomeLifeNavigationView will be handled by MainNavigationView
             // based on the selectedNavigationTab state
             break
             
@@ -627,6 +663,9 @@ class AppState: ObservableObject {
         selectedNavigationTab = .dashboard
         errorMessage = nil
         isLoading = false
+        
+        // Reset HomeLife state
+        resetHomeLifeData()
         
         // Reset demo manager if active
         if let demoManager = demoJourneyManager, demoManager.isDemoModeActive {

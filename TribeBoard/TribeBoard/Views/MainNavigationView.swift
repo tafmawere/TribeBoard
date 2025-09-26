@@ -162,6 +162,10 @@ struct MainNavigationView: View {
                 // School Run Dashboard view
                 SchoolRunDashboardView()
                 
+            case .homeLife:
+                // HomeLife navigation hub
+                HomeLifeNavigationView()
+                
             case .tasks:
                 // Tasks view
                 if let user = appState.currentUser,
@@ -244,6 +248,10 @@ struct MainNavigationView: View {
             
         case .schoolRun:
             SchoolRunDashboardView()
+                .environmentObject(appState)
+            
+        case .homeLife:
+            HomeLifeNavigationView()
                 .environmentObject(appState)
             
         case .tasks:

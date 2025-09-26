@@ -549,6 +549,54 @@ struct MockDataGenerator {
                 messages: mockFamilyMessages(),
                 schoolRuns: mockSchoolRuns()
             )
+            
+        case .homeLifeMealPlanning:
+            return DemoScenarioData(
+                family: family,
+                users: users,
+                memberships: memberships,
+                currentUser: users[1], // Grace - meal planning parent
+                calendarEvents: mockCalendarEvents(),
+                tasks: mockFamilyTasks(),
+                messages: mockFamilyMessages(),
+                schoolRuns: mockSchoolRuns()
+            )
+            
+        case .homeLifeGroceryShopping:
+            return DemoScenarioData(
+                family: family,
+                users: users,
+                memberships: memberships,
+                currentUser: users[0], // Tafadzwa - shopping coordinator
+                calendarEvents: mockCalendarEvents(),
+                tasks: mockFamilyTasks(),
+                messages: mockFamilyMessages(),
+                schoolRuns: mockSchoolRuns()
+            )
+            
+        case .homeLifeTaskManagement:
+            return DemoScenarioData(
+                family: family,
+                users: users,
+                memberships: memberships,
+                currentUser: users[0], // Tafadzwa - task manager
+                calendarEvents: mockCalendarEvents(),
+                tasks: mockFamilyTasks(),
+                messages: mockFamilyMessages(),
+                schoolRuns: mockSchoolRuns()
+            )
+            
+        case .homeLifeCompleteWorkflow:
+            return DemoScenarioData(
+                family: family,
+                users: users,
+                memberships: memberships,
+                currentUser: users[1], // Grace - complete workflow demo
+                calendarEvents: mockCalendarEvents(),
+                tasks: mockFamilyTasks(),
+                messages: mockFamilyMessages(),
+                schoolRuns: mockSchoolRuns()
+            )
         }
     }
     
@@ -1201,6 +1249,12 @@ enum DemoScenario: String, CaseIterable {
     case childUserExperience = "child_user_experience"
     case completeFeatureTour = "complete_feature_tour"
     
+    // HomeLife Demo Scenarios
+    case homeLifeMealPlanning = "homelife_meal_planning"
+    case homeLifeGroceryShopping = "homelife_grocery_shopping"
+    case homeLifeTaskManagement = "homelife_task_management"
+    case homeLifeCompleteWorkflow = "homelife_complete_workflow"
+    
     var displayName: String {
         switch self {
         case .newUserOnboarding:
@@ -1213,6 +1267,14 @@ enum DemoScenario: String, CaseIterable {
             return "Child User Experience"
         case .completeFeatureTour:
             return "Complete Feature Tour"
+        case .homeLifeMealPlanning:
+            return "HomeLife: Meal Planning"
+        case .homeLifeGroceryShopping:
+            return "HomeLife: Grocery Shopping"
+        case .homeLifeTaskManagement:
+            return "HomeLife: Task Management"
+        case .homeLifeCompleteWorkflow:
+            return "HomeLife: Complete Workflow"
         }
     }
     
@@ -1228,6 +1290,14 @@ enum DemoScenario: String, CaseIterable {
             return "View the app from a child's perspective with age-appropriate features and restrictions."
         case .completeFeatureTour:
             return "Tour all major features and modules of the TribeBoard app in a comprehensive walkthrough."
+        case .homeLifeMealPlanning:
+            return "Discover how families plan meals, check pantry inventory, and organize weekly menus."
+        case .homeLifeGroceryShopping:
+            return "Learn to manage grocery lists, add urgent items, and order from delivery platforms."
+        case .homeLifeTaskManagement:
+            return "See how shopping tasks are created, assigned to family members, and tracked to completion."
+        case .homeLifeCompleteWorkflow:
+            return "Experience the full HomeLife workflow from meal planning to grocery delivery and task completion."
         }
     }
     
@@ -1243,6 +1313,53 @@ enum DemoScenario: String, CaseIterable {
             return 150 // 2.5 minutes
         case .completeFeatureTour:
             return 300 // 5 minutes
+        case .homeLifeMealPlanning:
+            return 90 // 1.5 minutes
+        case .homeLifeGroceryShopping:
+            return 120 // 2 minutes
+        case .homeLifeTaskManagement:
+            return 90 // 1.5 minutes
+        case .homeLifeCompleteWorkflow:
+            return 240 // 4 minutes
+        }
+    }
+    
+    /// Category for organizing demo scenarios
+    var category: DemoCategory {
+        switch self {
+        case .newUserOnboarding, .existingUserLogin:
+            return .onboarding
+        case .familyAdminTasks, .childUserExperience:
+            return .userExperience
+        case .completeFeatureTour:
+            return .comprehensive
+        case .homeLifeMealPlanning, .homeLifeGroceryShopping, .homeLifeTaskManagement, .homeLifeCompleteWorkflow:
+            return .homeLife
+        }
+    }
+}
+
+/// Categories for organizing demo scenarios
+enum DemoCategory: String, CaseIterable {
+    case onboarding = "Onboarding"
+    case userExperience = "User Experience"
+    case homeLife = "HomeLife Features"
+    case comprehensive = "Comprehensive Tours"
+    
+    var displayName: String {
+        return rawValue
+    }
+    
+    var icon: String {
+        switch self {
+        case .onboarding:
+            return "person.badge.plus"
+        case .userExperience:
+            return "person.3.sequence"
+        case .homeLife:
+            return "house.heart"
+        case .comprehensive:
+            return "map"
         }
     }
 }

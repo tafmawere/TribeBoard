@@ -1,4 +1,11 @@
 {
+  "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/TribeBoard/AppDelegate.swift" : {
+    "const-values" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/Build/Intermediates.noindex/TribeBoard.build/Debug-iphonesimulator/TribeBoard.build/Objects-normal/arm64/AppDelegate.swiftconstvalues",
+    "dependencies" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/Build/Intermediates.noindex/TribeBoard.build/Debug-iphonesimulator/TribeBoard.build/Objects-normal/arm64/AppDelegate.d",
+    "diagnostics" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/Build/Intermediates.noindex/TribeBoard.build/Debug-iphonesimulator/TribeBoard.build/Objects-normal/arm64/AppDelegate.dia",
+    "object" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/Build/Intermediates.noindex/TribeBoard.build/Debug-iphonesimulator/TribeBoard.build/Objects-normal/arm64/AppDelegate.o",
+    "swift-dependencies" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/Build/Intermediates.noindex/TribeBoard.build/Debug-iphonesimulator/TribeBoard.build/Objects-normal/arm64/AppDelegate.swiftdeps"
+  },
   "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/TribeBoard/ContentView.swift" : {
     "const-values" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/Build/Intermediates.noindex/TribeBoard.build/Debug-iphonesimulator/TribeBoard.build/Objects-normal/arm64/ContentView.swiftconstvalues",
     "dependencies" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/Build/Intermediates.noindex/TribeBoard.build/Debug-iphonesimulator/TribeBoard.build/Objects-normal/arm64/ContentView.d",
@@ -12,6 +19,83 @@
     "diagnostics" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/Build/Intermediates.noindex/TribeBoard.build/Debug-iphonesimulator/TribeBoard.build/Objects-normal/arm64/TribeBoardApp.dia",
     "object" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/Build/Intermediates.noindex/TribeBoard.build/Debug-iphonesimulator/TribeBoard.build/Objects-normal/arm64/TribeBoardApp.o",
     "swift-dependencies" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/Build/Intermediates.noindex/TribeBoard.build/Debug-iphonesimulator/TribeBoard.build/Objects-normal/arm64/TribeBoardApp.swiftdeps"
+  },
+  "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/TribeBoard/Views/RunDetailView.swift" : {
+    "const-values" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/Build/Intermediates.noindex/TribeBoard.build/Debug-iphonesimulator/TribeBoard.build/Objects-normal/arm64/RunDetailView.swiftconstvalues",
+    "dependencies" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/Build/Intermediates.noindex/TribeBoard.build/Debug-iphonesimulator/TribeBoard.build/Objects-normal/arm64/RunDetailView.d",
+    "diagnostics" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/Build/Intermediates.noindex/TribeBoard.build/Debug-iphonesimulator/TribeBoard.build/Objects-normal/arm64/RunDetailView.dia",
+    "object" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/Build/Intermediates.noindex/TribeBoard.build/Debug-iphonesimulator/TribeBoard.build/Objects-normal/arm64/RunDetailView.o",
+    "swift-dependencies" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/Build/Intermediates.noindex/TribeBoard.build/Debug-iphonesimulator/TribeBoard.build/Objects-normal/arm64/RunDetailView.swiftdeps"
+  },
+  "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/TribeBoard/Views/RunExecutionView.swift" : {
+    "const-values" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/Build/Intermediates.noindex/TribeBoard.build/Debug-iphonesimulator/TribeBoard.build/Objects-normal/arm64/RunExecutionView.swiftconstvalues",
+    "dependencies" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/Build/Intermediates.noindex/TribeBoard.build/Debug-iphonesimulator/TribeBoard.build/Objects-normal/arm64/RunExecutionView.d",
+    "diagnostics" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/Build/Intermediates.noindex/TribeBoard.build/Debug-iphonesimulator/TribeBoard.build/Objects-normal/arm64/RunExecutionView.dia",
+    "object" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/Build/Intermediates.noindex/TribeBoard.build/Debug-iphonesimulator/TribeBoard.build/Objects-normal/arm64/RunExecutionView.o",
+    "swift-dependencies" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/Build/Intermediates.noindex/TribeBoard.build/Debug-iphonesimulator/TribeBoard.build/Objects-normal/arm64/RunExecutionView.swiftdeps"
+  },
+  "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/TribeBoard/Views/ScheduleNewRunView.swift" : {
+    "const-values" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/Build/Intermediates.noindex/TribeBoard.build/Debug-iphonesimulator/TribeBoard.build/Objects-normal/arm64/ScheduleNewRunView.swiftconstvalues",
+    "dependencies" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/Build/Intermediates.noindex/TribeBoard.build/Debug-iphonesimulator/TribeBoard.build/Objects-normal/arm64/ScheduleNewRunView.d",
+    "diagnostics" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/Build/Intermediates.noindex/TribeBoard.build/Debug-iphonesimulator/TribeBoard.build/Objects-normal/arm64/ScheduleNewRunView.dia",
+    "object" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/Build/Intermediates.noindex/TribeBoard.build/Debug-iphonesimulator/TribeBoard.build/Objects-normal/arm64/ScheduleNewRunView.o",
+    "swift-dependencies" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/Build/Intermediates.noindex/TribeBoard.build/Debug-iphonesimulator/TribeBoard.build/Objects-normal/arm64/ScheduleNewRunView.swiftdeps"
+  },
+  "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/TribeBoard/Views/ScheduledRunsListView.swift" : {
+    "const-values" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/Build/Intermediates.noindex/TribeBoard.build/Debug-iphonesimulator/TribeBoard.build/Objects-normal/arm64/ScheduledRunsListView.swiftconstvalues",
+    "dependencies" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/Build/Intermediates.noindex/TribeBoard.build/Debug-iphonesimulator/TribeBoard.build/Objects-normal/arm64/ScheduledRunsListView.d",
+    "diagnostics" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/Build/Intermediates.noindex/TribeBoard.build/Debug-iphonesimulator/TribeBoard.build/Objects-normal/arm64/ScheduledRunsListView.dia",
+    "object" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/Build/Intermediates.noindex/TribeBoard.build/Debug-iphonesimulator/TribeBoard.build/Objects-normal/arm64/ScheduledRunsListView.o",
+    "swift-dependencies" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/Build/Intermediates.noindex/TribeBoard.build/Debug-iphonesimulator/TribeBoard.build/Objects-normal/arm64/ScheduledRunsListView.swiftdeps"
+  },
+  "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/TribeBoard/Views/SchoolRunDashboardView.swift" : {
+    "const-values" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/Build/Intermediates.noindex/TribeBoard.build/Debug-iphonesimulator/TribeBoard.build/Objects-normal/arm64/SchoolRunDashboardView.swiftconstvalues",
+    "dependencies" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/Build/Intermediates.noindex/TribeBoard.build/Debug-iphonesimulator/TribeBoard.build/Objects-normal/arm64/SchoolRunDashboardView.d",
+    "diagnostics" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/Build/Intermediates.noindex/TribeBoard.build/Debug-iphonesimulator/TribeBoard.build/Objects-normal/arm64/SchoolRunDashboardView.dia",
+    "object" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/Build/Intermediates.noindex/TribeBoard.build/Debug-iphonesimulator/TribeBoard.build/Objects-normal/arm64/SchoolRunDashboardView.o",
+    "swift-dependencies" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/Build/Intermediates.noindex/TribeBoard.build/Debug-iphonesimulator/TribeBoard.build/Objects-normal/arm64/SchoolRunDashboardView.swiftdeps"
+  },
+  "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/TribeBoard/Views/SchoolRunPreviewShowcase.swift" : {
+    "const-values" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/Build/Intermediates.noindex/TribeBoard.build/Debug-iphonesimulator/TribeBoard.build/Objects-normal/arm64/SchoolRunPreviewShowcase.swiftconstvalues",
+    "dependencies" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/Build/Intermediates.noindex/TribeBoard.build/Debug-iphonesimulator/TribeBoard.build/Objects-normal/arm64/SchoolRunPreviewShowcase.d",
+    "diagnostics" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/Build/Intermediates.noindex/TribeBoard.build/Debug-iphonesimulator/TribeBoard.build/Objects-normal/arm64/SchoolRunPreviewShowcase.dia",
+    "object" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/Build/Intermediates.noindex/TribeBoard.build/Debug-iphonesimulator/TribeBoard.build/Objects-normal/arm64/SchoolRunPreviewShowcase.o",
+    "swift-dependencies" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/Build/Intermediates.noindex/TribeBoard.build/Debug-iphonesimulator/TribeBoard.build/Objects-normal/arm64/SchoolRunPreviewShowcase.swiftdeps"
+  },
+  "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/TribeBoard/Views/SchoolRunView.swift" : {
+    "const-values" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/Build/Intermediates.noindex/TribeBoard.build/Debug-iphonesimulator/TribeBoard.build/Objects-normal/arm64/SchoolRunView.swiftconstvalues",
+    "dependencies" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/Build/Intermediates.noindex/TribeBoard.build/Debug-iphonesimulator/TribeBoard.build/Objects-normal/arm64/SchoolRunView.d",
+    "diagnostics" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/Build/Intermediates.noindex/TribeBoard.build/Debug-iphonesimulator/TribeBoard.build/Objects-normal/arm64/SchoolRunView.dia",
+    "object" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/Build/Intermediates.noindex/TribeBoard.build/Debug-iphonesimulator/TribeBoard.build/Objects-normal/arm64/SchoolRunView.o",
+    "swift-dependencies" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/Build/Intermediates.noindex/TribeBoard.build/Debug-iphonesimulator/TribeBoard.build/Objects-normal/arm64/SchoolRunView.swiftdeps"
+  },
+  "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/TribeBoard/Views/SettingsView.swift" : {
+    "const-values" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/Build/Intermediates.noindex/TribeBoard.build/Debug-iphonesimulator/TribeBoard.build/Objects-normal/arm64/SettingsView.swiftconstvalues",
+    "dependencies" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/Build/Intermediates.noindex/TribeBoard.build/Debug-iphonesimulator/TribeBoard.build/Objects-normal/arm64/SettingsView.d",
+    "diagnostics" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/Build/Intermediates.noindex/TribeBoard.build/Debug-iphonesimulator/TribeBoard.build/Objects-normal/arm64/SettingsView.dia",
+    "object" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/Build/Intermediates.noindex/TribeBoard.build/Debug-iphonesimulator/TribeBoard.build/Objects-normal/arm64/SettingsView.o",
+    "swift-dependencies" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/Build/Intermediates.noindex/TribeBoard.build/Debug-iphonesimulator/TribeBoard.build/Objects-normal/arm64/SettingsView.swiftdeps"
+  },
+  "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/TribeBoard/Views/ShoppingView.swift" : {
+    "const-values" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/Build/Intermediates.noindex/TribeBoard.build/Debug-iphonesimulator/TribeBoard.build/Objects-normal/arm64/ShoppingView.swiftconstvalues",
+    "dependencies" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/Build/Intermediates.noindex/TribeBoard.build/Debug-iphonesimulator/TribeBoard.build/Objects-normal/arm64/ShoppingView.d",
+    "diagnostics" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/Build/Intermediates.noindex/TribeBoard.build/Debug-iphonesimulator/TribeBoard.build/Objects-normal/arm64/ShoppingView.dia",
+    "object" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/Build/Intermediates.noindex/TribeBoard.build/Debug-iphonesimulator/TribeBoard.build/Objects-normal/arm64/ShoppingView.o",
+    "swift-dependencies" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/Build/Intermediates.noindex/TribeBoard.build/Debug-iphonesimulator/TribeBoard.build/Objects-normal/arm64/ShoppingView.swiftdeps"
+  },
+  "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/TribeBoard/Views/TasksView.swift" : {
+    "const-values" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/Build/Intermediates.noindex/TribeBoard.build/Debug-iphonesimulator/TribeBoard.build/Objects-normal/arm64/TasksView.swiftconstvalues",
+    "dependencies" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/Build/Intermediates.noindex/TribeBoard.build/Debug-iphonesimulator/TribeBoard.build/Objects-normal/arm64/TasksView.d",
+    "diagnostics" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/Build/Intermediates.noindex/TribeBoard.build/Debug-iphonesimulator/TribeBoard.build/Objects-normal/arm64/TasksView.dia",
+    "object" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/Build/Intermediates.noindex/TribeBoard.build/Debug-iphonesimulator/TribeBoard.build/Objects-normal/arm64/TasksView.o",
+    "swift-dependencies" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/Build/Intermediates.noindex/TribeBoard.build/Debug-iphonesimulator/TribeBoard.build/Objects-normal/arm64/TasksView.swiftdeps"
+  },
+  "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/TribeBoard/Views/TermsOfServiceView.swift" : {
+    "const-values" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/Build/Intermediates.noindex/TribeBoard.build/Debug-iphonesimulator/TribeBoard.build/Objects-normal/arm64/TermsOfServiceView.swiftconstvalues",
+    "dependencies" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/Build/Intermediates.noindex/TribeBoard.build/Debug-iphonesimulator/TribeBoard.build/Objects-normal/arm64/TermsOfServiceView.d",
+    "diagnostics" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/Build/Intermediates.noindex/TribeBoard.build/Debug-iphonesimulator/TribeBoard.build/Objects-normal/arm64/TermsOfServiceView.dia",
+    "object" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/Build/Intermediates.noindex/TribeBoard.build/Debug-iphonesimulator/TribeBoard.build/Objects-normal/arm64/TermsOfServiceView.o",
+    "swift-dependencies" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/Build/Intermediates.noindex/TribeBoard.build/Debug-iphonesimulator/TribeBoard.build/Objects-normal/arm64/TermsOfServiceView.swiftdeps"
   },
   "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/Build/Intermediates.noindex/TribeBoard.build/Debug-iphonesimulator/TribeBoard.build/DerivedSources/GeneratedAssetSymbols.swift" : {
     "const-values" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/Build/Intermediates.noindex/TribeBoard.build/Debug-iphonesimulator/TribeBoard.build/Objects-normal/arm64/GeneratedAssetSymbols.swiftconstvalues",

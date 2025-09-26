@@ -1,147 +1,119 @@
 import SwiftUI
 
+/// Sheet view for filtering shopping tasks
 struct TaskFilterSheet: View {
-    @Binding var selectedFilter: TaskFilter
-    @Binding var selectedSort: TaskSort
+    @Binding var selectedFilters: TaskFilters
+    let availableFamilyMembers: [String]
+    let onFiltersChanged: (TaskFilters) -> Void
+    
     @Environment(\.dismiss) private var dismiss
+    @State private var tempFilters: TaskFilters
+    
+    init(
+        selectedFilters: Binding<TaskFilters>,
+        availableFamilyMembers: [String],
+        onFiltersChanged: @escaping (TaskFilters) -> Void
+    ) {
+        self._selectedFilters = selectedFilters
+        self.availableFamilyMembers = availableFamilyMembers
+        self.onFiltersChanged = onFiltersChanged
+        self._tempFilters = State(initialValue: selectedFilters.wrappedValue)
+    }
     
     var body: some View {
         NavigationView {
-            VStack(spacing: 0) {
-                // Filter section
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("Filter Tasks")
-                        .font(.headline)
-                        .fontWeight(.semibold)
-                        .padding(.horizontal)
-                    
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 12) {
-                            ForEach(TaskFilter.allCases, id: \.displayName) { filter in
-                                FilterChip(
-                                    title: filter.displayName,
-                                    isSelected: selectedFilter.displayName == filter.displayName,
-                                    action: {
-                                        selectedFilter = filter
-                                    }
-                                )
+            Form {
+                // Family member filter
+                Section("Assigned To") {
+                    Picker("Family Member", selection: $tempFilters.assignedTo) {
+                        Text("All Members")
+                            .tag(String?.none)
+                        
+                        ForEach(availableFamilyMembers, id: \.self) { member in
+                            Text(member)
+                                .tag(String?.some(member))
+                        }
+                    }
+                    .pickerStyle(.menu)
+                }
+                
+                // Status filter
+                Section("Task Status") {
+                    Picker("Status", selection: $tempFilters.status) {
+                        Text("All Statuses")
+                            .tag(TaskStatus?.none)
+                        
+                        ForEach(TaskStatus.allCases, id: \.self) { status in
+                            HStack {
+                                Text(status.emoji)
+                                Text(status.rawValue)
                             }
+                            .tag(TaskStatus?.some(status))
                         }
-                        .padding(.horizontal)
                     }
+                    .pickerStyle(.menu)
                 }
-                .padding(.vertical)
                 
-                Divider()
+                // Special filters
+                Section("Special Filters") {
+                    Toggle("Show Overdue Only", isOn: $tempFilters.showOverdueOnly)
+                }
                 
-                // Sort section
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("Sort By")
-                        .font(.headline)
-                        .fontWeight(.semibold)
-                        .padding(.horizontal)
+                // Quick filter presets
+                Section("Quick Filters") {
+                    Button("My Tasks") {
+                        tempFilters.assignedTo = "Current User" // In real app, use actual current user
+                        tempFilters.status = nil
+                        tempFilters.showOverdueOnly = false
+                    }
                     
-                    VStack(spacing: 8) {
-                        ForEach(TaskSort.allCases, id: \.displayName) { sort in
-                            SortOptionRow(
-                                title: sort.displayName,
-                                isSelected: selectedSort.displayName == sort.displayName,
-                                action: {
-                                    selectedSort = sort
-                                }
-                            )
-                        }
+                    Button("Pending Tasks") {
+                        tempFilters.assignedTo = nil
+                        tempFilters.status = .pending
+                        tempFilters.showOverdueOnly = false
                     }
-                    .padding(.horizontal)
+                    
+                    Button("Overdue Tasks") {
+                        tempFilters.assignedTo = nil
+                        tempFilters.status = nil
+                        tempFilters.showOverdueOnly = true
+                    }
                 }
-                .padding(.vertical)
                 
-                Spacer()
-                
-                // Reset button
-                Button("Reset to Defaults") {
-                    selectedFilter = .all
-                    selectedSort = .dueDate
+                // Clear filters
+                Section {
+                    Button("Clear All Filters") {
+                        tempFilters = TaskFilters()
+                    }
+                    .foregroundColor(.red)
                 }
-                .buttonStyle(SecondaryButtonStyle())
-                .padding()
             }
-            .navigationTitle("Filter & Sort")
+            .navigationTitle("Filter Tasks")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
                         dismiss()
                     }
                 }
-            }
-        }
-    }
-}
-
-// MARK: - Filter Chip
-
-struct FilterChip: View {
-    let title: String
-    let isSelected: Bool
-    let action: () -> Void
-    
-    var body: some View {
-        Button(action: action) {
-            Text(title)
-                .font(.subheadline)
-                .fontWeight(.medium)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-                .background(
-                    RoundedRectangle(cornerRadius: 20)
-                        .fill(isSelected ? Color.brandPrimary : Color(.systemGray5))
-                )
-                .foregroundColor(isSelected ? .white : .primary)
-        }
-        .buttonStyle(PlainButtonStyle())
-    }
-}
-
-// MARK: - Sort Option Row
-
-struct SortOptionRow: View {
-    let title: String
-    let isSelected: Bool
-    let action: () -> Void
-    
-    var body: some View {
-        Button(action: action) {
-            HStack {
-                Text(title)
-                    .font(.subheadline)
-                    .foregroundColor(.primary)
                 
-                Spacer()
-                
-                if isSelected {
-                    Image(systemName: "checkmark")
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.brandPrimary)
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Apply") {
+                        selectedFilters = tempFilters
+                        onFiltersChanged(tempFilters)
+                        dismiss()
+                    }
+                    .fontWeight(.semibold)
                 }
             }
-            .padding(.vertical, 12)
-            .padding(.horizontal, 16)
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(isSelected ? Color.brandPrimary.opacity(0.1) : Color.clear)
-            )
         }
-        .buttonStyle(PlainButtonStyle())
     }
 }
 
-// MARK: - Preview
-
-#Preview {
+#Preview("Task Filter Sheet") {
     TaskFilterSheet(
-        selectedFilter: .constant(.all),
-        selectedSort: .constant(.dueDate)
+        selectedFilters: .constant(TaskFilters()),
+        availableFamilyMembers: ["Tafadzwa Mawere", "Grace Mawere", "Ethan Mawere", "Zoe Mawere"],
+        onFiltersChanged: { _ in }
     )
 }

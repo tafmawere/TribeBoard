@@ -4,7 +4,7 @@
 
 The TribeBoard app is experiencing crashes due to missing environment objects in the school run scheduler views. The crash occurs when `ScheduledRunsListView` attempts to access an `AppState` environment object that hasn't been properly injected into the view hierarchy. This creates a critical reliability issue that prevents users from accessing the scheduled runs functionality.
 
-## Requirements
+## Requirementso
 
 ### Requirement 1
 

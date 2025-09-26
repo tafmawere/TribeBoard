@@ -20,6 +20,9 @@ struct DemoLauncherView: View {
                     // Quick Start Section
                     quickStartSection
                     
+                    // HomeLife Features Section
+                    homeLifeFeaturesSection
+                    
                     // All Scenarios Section
                     allScenariosSection
                     
@@ -107,6 +110,67 @@ struct DemoLauncherView: View {
         }
     }
     
+    // MARK: - HomeLife Features Section
+    
+    private var homeLifeFeaturesSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Image(systemName: "house.heart.fill")
+                    .font(.title2)
+                    .foregroundColor(.brandPrimary)
+                
+                Text("HomeLife Features")
+                    .font(.title2)
+                    .fontWeight(.semibold)
+            }
+            
+            Text("Discover meal planning, grocery shopping, and task management features")
+                .font(.body)
+                .foregroundColor(.secondary)
+            
+            LazyVGrid(columns: [
+                GridItem(.flexible()),
+                GridItem(.flexible())
+            ], spacing: 12) {
+                HomeLifeDemoCard(
+                    title: "Meal Planning",
+                    subtitle: "Plan & organize meals",
+                    icon: "🍽️",
+                    color: .brandPrimary
+                ) {
+                    startDemo(.homeLifeMealPlanning)
+                }
+                
+                HomeLifeDemoCard(
+                    title: "Grocery Shopping",
+                    subtitle: "Manage shopping lists",
+                    icon: "🛒",
+                    color: .green
+                ) {
+                    startDemo(.homeLifeGroceryShopping)
+                }
+                
+                HomeLifeDemoCard(
+                    title: "Task Management",
+                    subtitle: "Assign shopping tasks",
+                    icon: "✅",
+                    color: .orange
+                ) {
+                    startDemo(.homeLifeTaskManagement)
+                }
+                
+                HomeLifeDemoCard(
+                    title: "Complete Workflow",
+                    subtitle: "Full HomeLife experience",
+                    icon: "🏠",
+                    color: .purple
+                ) {
+                    startDemo(.homeLifeCompleteWorkflow)
+                }
+            }
+        }
+    }
+    
     // MARK: - All Scenarios Section
     
     private var allScenariosSection: some View {
@@ -115,10 +179,29 @@ struct DemoLauncherView: View {
                 .font(.title2)
                 .fontWeight(.semibold)
             
-            LazyVStack(spacing: 12) {
-                ForEach(DemoScenario.allCases, id: \.self) { scenario in
-                    DemoScenarioRow(scenario: scenario) {
-                        startDemo(scenario)
+            // Group scenarios by category
+            ForEach(DemoCategory.allCases, id: \.self) { category in
+                let scenariosInCategory = DemoScenario.allCases.filter { $0.category == category }
+                
+                if !scenariosInCategory.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Image(systemName: category.icon)
+                                .font(.headline)
+                                .foregroundColor(.secondary)
+                            
+                            Text(category.displayName)
+                                .font(.headline)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        LazyVStack(spacing: 8) {
+                            ForEach(scenariosInCategory, id: \.self) { scenario in
+                                DemoScenarioRow(scenario: scenario) {
+                                    startDemo(scenario)
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -381,7 +464,89 @@ struct DemoInfoItem: View {
     }
 }
 
+// MARK: - HomeLife Demo Card
+
+struct HomeLifeDemoCard: View {
+    let title: String
+    let subtitle: String
+    let icon: String
+    let color: Color
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 12) {
+                Text(icon)
+                    .font(.system(size: 32))
+                
+                VStack(spacing: 4) {
+                    Text(title)
+                        .font(.headline)
+                        .foregroundColor(.primary)
+                    
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 120)
+            .padding()
+            .background(
+                LinearGradient(
+                    colors: [color.opacity(0.1), color.opacity(0.05)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(color.opacity(0.3), lineWidth: 1)
+            )
+            .cornerRadius(12)
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+}
+
 #Preview {
     DemoLauncherView()
         .environmentObject(AppState())
+}
+
+#Preview("HomeLife Demo Cards") {
+    LazyVGrid(columns: [
+        GridItem(.flexible()),
+        GridItem(.flexible())
+    ], spacing: 12) {
+        HomeLifeDemoCard(
+            title: "Meal Planning",
+            subtitle: "Plan & organize meals",
+            icon: "🍽️",
+            color: .brandPrimary
+        ) {}
+        
+        HomeLifeDemoCard(
+            title: "Grocery Shopping",
+            subtitle: "Manage shopping lists",
+            icon: "🛒",
+            color: .green
+        ) {}
+        
+        HomeLifeDemoCard(
+            title: "Task Management",
+            subtitle: "Assign shopping tasks",
+            icon: "✅",
+            color: .orange
+        ) {}
+        
+        HomeLifeDemoCard(
+            title: "Complete Workflow",
+            subtitle: "Full HomeLife experience",
+            icon: "🏠",
+            color: .purple
+        ) {}
+    }
+    .padding()
 }

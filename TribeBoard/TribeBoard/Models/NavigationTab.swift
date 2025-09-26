@@ -6,6 +6,7 @@ enum NavigationTab: String, CaseIterable, Identifiable {
     case dashboard = "dashboard"
     case calendar = "calendar"
     case schoolRun = "schoolRun"
+    case homeLife = "homeLife"
     case tasks = "tasks"
     case messages = "messages"
     
@@ -20,6 +21,8 @@ enum NavigationTab: String, CaseIterable, Identifiable {
             return "Calendar"
         case .schoolRun:
             return "Run"
+        case .homeLife:
+            return "HomeLife"
         case .tasks:
             return "Tasks"
         case .messages:
@@ -36,6 +39,8 @@ enum NavigationTab: String, CaseIterable, Identifiable {
             return "calendar"
         case .schoolRun:
             return "car"
+        case .homeLife:
+            return "house.heart"
         case .tasks:
             return "checkmark.circle"
         case .messages:
@@ -52,6 +57,8 @@ enum NavigationTab: String, CaseIterable, Identifiable {
             return "calendar"
         case .schoolRun:
             return "car.fill"
+        case .homeLife:
+            return "house.heart.fill"
         case .tasks:
             return "checkmark.circle"
         case .messages:

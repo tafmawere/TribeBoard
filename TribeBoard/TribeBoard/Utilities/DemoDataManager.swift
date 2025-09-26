@@ -290,6 +290,14 @@ class DemoDataManager: ObservableObject {
             return .childUser
         case .completeFeatureTour:
             return .familyAdmin // Use admin for full access
+        case .homeLifeMealPlanning:
+            return .familyAdmin // Use admin for HomeLife features
+        case .homeLifeGroceryShopping:
+            return .familyAdmin // Use admin for HomeLife features
+        case .homeLifeTaskManagement:
+            return .familyAdmin // Use admin for HomeLife features
+        case .homeLifeCompleteWorkflow:
+            return .familyAdmin // Use admin for HomeLife features
         }
     }
     

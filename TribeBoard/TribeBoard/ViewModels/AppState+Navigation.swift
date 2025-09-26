@@ -198,6 +198,10 @@ extension AppState {
             // Navigate to school run dashboard safely
             safeNavigate(to: .dashboard)
             
+        case .homeLife:
+            // HomeLife navigation handled by MainNavigationView
+            break
+            
         case .tasks:
             // Tasks navigation handled by MainNavigationView
             break

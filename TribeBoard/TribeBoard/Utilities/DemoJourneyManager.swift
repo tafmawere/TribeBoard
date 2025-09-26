@@ -195,6 +195,12 @@ class DemoJourneyManager: ObservableObject {
             appState.configureDemoScenario(.childUser)
         case .completeFeatureTour:
             appState.configureDemoScenario(.familyAdmin) // Use admin for full access
+        case .homeLifeMealPlanning, .homeLifeGroceryShopping, .homeLifeTaskManagement, .homeLifeCompleteWorkflow:
+            appState.configureDemoScenario(.familyAdmin) // Use admin for HomeLife features
+            // Load HomeLife-specific data
+            Task {
+                await appState.loadHomeLifeDemoData()
+            }
         }
     }
     
@@ -238,6 +244,14 @@ class DemoJourneyManager: ObservableObject {
             return childUserExperienceSteps
         case .completeFeatureTour:
             return completeFeatureTourSteps
+        case .homeLifeMealPlanning:
+            return homeLifeMealPlanningSteps
+        case .homeLifeGroceryShopping:
+            return homeLifeGroceryShoppingSteps
+        case .homeLifeTaskManagement:
+            return homeLifeTaskManagementSteps
+        case .homeLifeCompleteWorkflow:
+            return homeLifeCompleteWorkflowSteps
         }
     }
     
@@ -480,6 +494,213 @@ class DemoJourneyManager: ObservableObject {
                 action: { appState, demoManager in
                     // Navigate to settings (simulated)
                     try? await Task.sleep(nanoseconds: 2_500_000_000)
+                    demoManager.nextDemoStep()
+                }
+            )
+        ]
+    }
+    
+    // MARK: - HomeLife Demo Steps
+    
+    /// HomeLife meal planning demo steps
+    private var homeLifeMealPlanningSteps: [DemoStep] {
+        return [
+            DemoStep(
+                title: "HomeLife Hub",
+                instructions: "Welcome to HomeLife! This is your family's meal planning and shopping hub. Let's start by exploring the meal planning features.",
+                action: { appState, demoManager in
+                    appState.selectedNavigationTab = .homeLife
+                    appState.currentFlow = .familyDashboard
+                    try? await Task.sleep(nanoseconds: 2_500_000_000)
+                    demoManager.nextDemoStep()
+                }
+            ),
+            DemoStep(
+                title: "Meal Plan Dashboard",
+                instructions: "Here's your family's meal plan for the month. You can see planned meals, ingredients needed, and check what you have in your pantry.",
+                action: { appState, demoManager in
+                    appState.homeLifeNavigationPath.append(HomeLifeTab.mealPlan)
+                    try? await Task.sleep(nanoseconds: 3_000_000_000)
+                    demoManager.nextDemoStep()
+                }
+            ),
+            DemoStep(
+                title: "Pantry Check",
+                instructions: "Tap 'Check Pantry' on any meal to see what ingredients you need. Check off items you already have at home.",
+                action: { appState, demoManager in
+                    // Simulate navigating to pantry check
+                    appState.homeLifeNavigationPath.append(HomeLifeTab.pantry)
+                    try? await Task.sleep(nanoseconds: 3_500_000_000)
+                    demoManager.nextDemoStep()
+                }
+            ),
+            DemoStep(
+                title: "Generate Grocery List",
+                instructions: "After checking your pantry, generate a grocery list with missing ingredients. This automatically creates your shopping list!",
+                action: { appState, demoManager in
+                    // Simulate grocery list generation
+                    try? await Task.sleep(nanoseconds: 2_500_000_000)
+                    demoManager.nextDemoStep()
+                }
+            )
+        ]
+    }
+    
+    /// HomeLife grocery shopping demo steps
+    private var homeLifeGroceryShoppingSteps: [DemoStep] {
+        return [
+            DemoStep(
+                title: "Grocery List Management",
+                instructions: "Your grocery list has two tabs: Weekly items from meal planning and Urgent additions for last-minute needs.",
+                action: { appState, demoManager in
+                    appState.selectedNavigationTab = .homeLife
+                    appState.homeLifeNavigationPath.append(HomeLifeTab.groceryList)
+                    try? await Task.sleep(nanoseconds: 3_000_000_000)
+                    demoManager.nextDemoStep()
+                }
+            ),
+            DemoStep(
+                title: "Adding Urgent Items",
+                instructions: "Tap the + button to add urgent items like diapers or medicine that weren't in your meal plan.",
+                action: { appState, demoManager in
+                    // Simulate adding urgent items
+                    try? await Task.sleep(nanoseconds: 2_500_000_000)
+                    demoManager.nextDemoStep()
+                }
+            ),
+            DemoStep(
+                title: "Order Online",
+                instructions: "When ready to shop, tap 'Order Online' to choose from delivery platforms like Woolworths Dash, Checkers Sixty60, or Pick n Pay.",
+                action: { appState, demoManager in
+                    // Simulate platform selection
+                    try? await Task.sleep(nanoseconds: 3_000_000_000)
+                    demoManager.nextDemoStep()
+                }
+            ),
+            DemoStep(
+                title: "Platform Selection",
+                instructions: "Compare delivery times, minimum orders, and fees to choose the best platform for your needs. Your list is automatically sent!",
+                action: { appState, demoManager in
+                    try? await Task.sleep(nanoseconds: 2_500_000_000)
+                    demoManager.nextDemoStep()
+                }
+            )
+        ]
+    }
+    
+    /// HomeLife task management demo steps
+    private var homeLifeTaskManagementSteps: [DemoStep] {
+        return [
+            DemoStep(
+                title: "Shopping Tasks",
+                instructions: "Convert grocery items into assigned tasks for family members. Perfect for teaching kids responsibility or coordinating shopping runs.",
+                action: { appState, demoManager in
+                    appState.selectedNavigationTab = .homeLife
+                    appState.homeLifeNavigationPath.append(HomeLifeTab.tasks)
+                    try? await Task.sleep(nanoseconds: 3_000_000_000)
+                    demoManager.nextDemoStep()
+                }
+            ),
+            DemoStep(
+                title: "Create Shopping Task",
+                instructions: "Assign urgent items to family members with due dates and locations. Choose between 'Shop Run' or 'School Run + Shop Stop'.",
+                action: { appState, demoManager in
+                    // Simulate task creation
+                    try? await Task.sleep(nanoseconds: 3_500_000_000)
+                    demoManager.nextDemoStep()
+                }
+            ),
+            DemoStep(
+                title: "Task Tracking",
+                instructions: "Family members can see their assigned tasks, update status, and mark items as complete. Parents can track progress in real-time.",
+                action: { appState, demoManager in
+                    try? await Task.sleep(nanoseconds: 3_000_000_000)
+                    demoManager.nextDemoStep()
+                }
+            ),
+            DemoStep(
+                title: "Task Filters",
+                instructions: "Filter tasks by person, due date, or status to stay organized. Overdue tasks are highlighted for immediate attention.",
+                action: { appState, demoManager in
+                    try? await Task.sleep(nanoseconds: 2_500_000_000)
+                    demoManager.nextDemoStep()
+                }
+            )
+        ]
+    }
+    
+    /// HomeLife complete workflow demo steps
+    private var homeLifeCompleteWorkflowSteps: [DemoStep] {
+        return [
+            DemoStep(
+                title: "Complete HomeLife Workflow",
+                instructions: "Let's experience the full HomeLife journey from meal planning to grocery delivery and task completion.",
+                action: { appState, demoManager in
+                    appState.selectedNavigationTab = .homeLife
+                    try? await Task.sleep(nanoseconds: 2_000_000_000)
+                    demoManager.nextDemoStep()
+                }
+            ),
+            DemoStep(
+                title: "Step 1: Plan Meals",
+                instructions: "Start by reviewing your family's meal plan. See what meals are coming up and what ingredients you'll need.",
+                action: { appState, demoManager in
+                    appState.homeLifeNavigationPath.append(HomeLifeTab.mealPlan)
+                    try? await Task.sleep(nanoseconds: 3_000_000_000)
+                    demoManager.nextDemoStep()
+                }
+            ),
+            DemoStep(
+                title: "Step 2: Check Pantry",
+                instructions: "Check your pantry to see what ingredients you already have. This prevents buying duplicates and saves money.",
+                action: { appState, demoManager in
+                    appState.homeLifeNavigationPath.append(HomeLifeTab.pantry)
+                    try? await Task.sleep(nanoseconds: 3_500_000_000)
+                    demoManager.nextDemoStep()
+                }
+            ),
+            DemoStep(
+                title: "Step 3: Generate Shopping List",
+                instructions: "Generate your grocery list with missing ingredients. The system automatically organizes items by category.",
+                action: { appState, demoManager in
+                    appState.homeLifeNavigationPath.append(HomeLifeTab.groceryList)
+                    try? await Task.sleep(nanoseconds: 3_000_000_000)
+                    demoManager.nextDemoStep()
+                }
+            ),
+            DemoStep(
+                title: "Step 4: Add Urgent Items",
+                instructions: "Add any urgent items you need that weren't in your meal plan. These are marked with priority indicators.",
+                action: { appState, demoManager in
+                    try? await Task.sleep(nanoseconds: 2_500_000_000)
+                    demoManager.nextDemoStep()
+                }
+            ),
+            DemoStep(
+                title: "Step 5: Create Tasks",
+                instructions: "Convert urgent items into tasks for family members. Assign shopping runs with specific locations and due dates.",
+                action: { appState, demoManager in
+                    appState.homeLifeNavigationPath.append(HomeLifeTab.tasks)
+                    try? await Task.sleep(nanoseconds: 3_000_000_000)
+                    demoManager.nextDemoStep()
+                }
+            ),
+            DemoStep(
+                title: "Step 6: Order Online",
+                instructions: "For remaining items, order online through your preferred delivery platform. Compare options and place your order.",
+                action: { appState, demoManager in
+                    // Navigate back to grocery list for ordering
+                    appState.homeLifeNavigationPath.removeLast()
+                    appState.homeLifeNavigationPath.append(HomeLifeTab.groceryList)
+                    try? await Task.sleep(nanoseconds: 3_000_000_000)
+                    demoManager.nextDemoStep()
+                }
+            ),
+            DemoStep(
+                title: "Workflow Complete!",
+                instructions: "You've completed the full HomeLife workflow! Your family now has organized meal plans, shopping lists, assigned tasks, and grocery deliveries on the way.",
+                action: { appState, demoManager in
+                    try? await Task.sleep(nanoseconds: 3_000_000_000)
                     demoManager.nextDemoStep()
                 }
             )

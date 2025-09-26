@@ -9,6 +9,7 @@ class TasksViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var successMessage: String?
     @Published var selectedFilter: TaskFilter = .all
+    @Published var selectedFilters: TaskFilters = .empty
     @Published var selectedSort: TaskSort = .dueDate
     @Published var showingTaskDetail = false
     @Published var selectedTask: FamilyTask?
@@ -220,6 +221,10 @@ class TasksViewModel: ObservableObject {
         selectedSort = sort
     }
     
+    func applyFilters(_ filters: TaskFilters) {
+        selectedFilters = filters
+    }
+    
     // MARK: - Mock Task Creation
     
     func addMockTask(title: String, category: FamilyTask.TaskCategory, assignedTo: UUID, points: Int, dueDate: Date?) {
@@ -285,6 +290,20 @@ class TasksViewModel: ObservableObject {
 }
 
 // MARK: - Supporting Types
+
+struct TaskFilters {
+    var assignedTo: String?
+    var status: TaskStatus?
+    var category: FamilyTask.TaskCategory?
+    var dueDateRange: ClosedRange<Date>?
+    var showOverdueOnly: Bool = false
+    
+    var isEmpty: Bool {
+        assignedTo == nil && status == nil && category == nil && dueDateRange == nil && !showOverdueOnly
+    }
+    
+    static let empty = TaskFilters()
+}
 
 enum TaskFilter: CaseIterable, Equatable {
     case all

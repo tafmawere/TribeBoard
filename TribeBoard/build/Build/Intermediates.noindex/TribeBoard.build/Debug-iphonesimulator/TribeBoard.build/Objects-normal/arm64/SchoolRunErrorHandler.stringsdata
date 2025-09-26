@@ -1,0 +1,16 @@
+{
+  "source": "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/TribeBoard/Utilities/SchoolRunErrorHandler.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "OK",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 166
+        }
+      }
+    ]
+  },
+  "version": 1
+}

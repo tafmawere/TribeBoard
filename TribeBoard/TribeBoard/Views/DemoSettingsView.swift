@@ -185,7 +185,8 @@ struct DemoSettingsView: View {
     // MARK: - Demo Scenarios Section
     
     private var demoScenariosSection: some View {
-        Section("Quick Start Scenarios") {
+        Group {
+            Section("Quick Start Scenarios") {
             ForEach(DemoScenario.allCases.prefix(3), id: \.self) { scenario in
                 Button(action: {
                     appState.startGuidedDemo(scenario)
@@ -212,6 +213,36 @@ struct DemoSettingsView: View {
                 }
                 .foregroundColor(.primary)
             }
+        }
+        
+        Section("HomeLife Features") {
+            ForEach([DemoScenario.homeLifeMealPlanning, .homeLifeGroceryShopping, .homeLifeTaskManagement, .homeLifeCompleteWorkflow], id: \.self) { scenario in
+                Button(action: {
+                    appState.startGuidedDemo(scenario)
+                }) {
+                    HStack {
+                        Image(systemName: iconForScenario(scenario))
+                            .foregroundColor(colorForScenario(scenario))
+                        
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(scenario.displayName)
+                                .font(.headline)
+                            
+                            Text(formatDuration(scenario.estimatedDuration))
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        Spacer()
+                        
+                        Image(systemName: "play.circle")
+                            .font(.caption)
+                            .foregroundColor(.accentColor)
+                    }
+                }
+                .foregroundColor(.primary)
+            }
+        }
         }
     }
     
@@ -352,6 +383,14 @@ struct DemoSettingsView: View {
             return "figure.child.circle"
         case .completeFeatureTour:
             return "map"
+        case .homeLifeMealPlanning:
+            return "fork.knife.circle"
+        case .homeLifeGroceryShopping:
+            return "cart.circle"
+        case .homeLifeTaskManagement:
+            return "checklist.circle"
+        case .homeLifeCompleteWorkflow:
+            return "house.heart.circle"
         }
     }
     
@@ -367,6 +406,14 @@ struct DemoSettingsView: View {
             return .orange
         case .completeFeatureTour:
             return .red
+        case .homeLifeMealPlanning:
+            return .brandPrimary
+        case .homeLifeGroceryShopping:
+            return .green
+        case .homeLifeTaskManagement:
+            return .orange
+        case .homeLifeCompleteWorkflow:
+            return .purple
         }
     }
     
