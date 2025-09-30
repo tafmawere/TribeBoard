@@ -6,12 +6,18 @@ struct SettingsView: View {
     @EnvironmentObject var appState: AppState
     @Environment(\.dismiss) private var dismiss
     
+    // MARK: - State
+    
+    @State private var showingAuthError = false
+    @State private var currentAuthError: AuthError?
+    
     // MARK: - Initialization
     
-    init(currentUserId: UUID, currentUserRole: Role) {
+    init(currentUserId: UUID, currentUserRole: Role, authService: AuthService? = nil) {
         self._viewModel = StateObject(wrappedValue: SettingsViewModel(
             currentUserId: currentUserId,
-            currentUserRole: currentUserRole
+            currentUserRole: currentUserRole,
+            authService: authService
         ))
     }
     
@@ -119,6 +125,25 @@ struct SettingsView: View {
                 currentUserRole: viewModel.currentUserRole
             )
         }
+        .alert("Sign Out", isPresented: $viewModel.showSignOutConfirmation) {
+            Button("Cancel", role: .cancel) { }
+            Button("Sign Out", role: .destructive) {
+                Task {
+                    await handleSignOut()
+                }
+            }
+        } message: {
+            Text("Are you sure you want to sign out? You'll need to sign in again to access your account.")
+        }
+        .authErrorAlert(
+            isPresented: $showingAuthError,
+            error: currentAuthError,
+            onRetry: {
+                Task {
+                    await handleSignOut()
+                }
+            }
+        )
     }
     
     // MARK: - View Components
@@ -126,17 +151,31 @@ struct SettingsView: View {
     private var profileSection: some View {
         SettingsSection(title: "Profile", icon: "person.circle") {
             VStack(spacing: 12) {
-                // Profile info row
+                // Enhanced profile display with authentication status
+                UserProfileView(
+                    userProfile: viewModel.currentUserProfile,
+                    authService: viewModel.authService,
+                    onProfileUpdate: { updatedProfile in
+                        viewModel.updateProfile(updatedProfile)
+                    }
+                )
+                
+                Divider()
+                
+                // Role and family information
                 HStack(spacing: 12) {
-                    MemberAvatarView(userProfile: viewModel.currentUserProfile)
-                        .frame(width: 60, height: 60)
+                    Image(systemName: "person.badge")
+                        .foregroundColor(.brandPrimary)
+                        .frame(width: 20)
                     
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(viewModel.currentUserProfile?.displayName ?? "Unknown User")
-                            .font(.headline)
-                            .fontWeight(.semibold)
-                        
-                        RoleBadge(role: viewModel.currentUserRole)
+                        HStack {
+                            Text("Role:")
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                            
+                            RoleBadge(role: viewModel.currentUserRole)
+                        }
                         
                         if let family = appState.currentFamily {
                             Text("Member of \(family.name)")
@@ -146,32 +185,8 @@ struct SettingsView: View {
                     }
                     
                     Spacer()
-                    
-                    Button("Edit") {
-                        viewModel.showProfileEditor = true
-                    }
-                    .font(.subheadline)
-                    .foregroundColor(.brandPrimary)
                 }
-                
-                Divider()
-                
-                // Profile actions
-                SettingsRow(
-                    title: "Edit Profile",
-                    icon: "pencil",
-                    action: {
-                        viewModel.showProfileEditor = true
-                    }
-                )
-                
-                SettingsRow(
-                    title: "Change Display Name",
-                    icon: "textformat",
-                    action: {
-                        viewModel.successMessage = "Display name editing coming soon!"
-                    }
-                )
+                .padding(.vertical, 8)
             }
         }
     }
@@ -491,6 +506,24 @@ struct SettingsView: View {
             }
         }
     }
+    
+    // MARK: - Sign-Out Handling
+    
+    private func handleSignOut() async {
+        do {
+            try await viewModel.confirmSignOut()
+        } catch let error as AuthError {
+            await MainActor.run {
+                currentAuthError = error
+                showingAuthError = true
+            }
+        } catch {
+            await MainActor.run {
+                currentAuthError = .unknownError(error)
+                showingAuthError = true
+            }
+        }
+    }
 }
 
 // MARK: - Settings Section
@@ -638,7 +671,8 @@ struct SettingsToggleRow: View {
 #Preview {
     SettingsView(
         currentUserId: UUID(),
-        currentUserRole: .parentAdmin
+        currentUserRole: .parentAdmin,
+        authService: nil
     )
     .environmentObject(AppState())
 }

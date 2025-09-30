@@ -2,9 +2,16 @@ import Foundation
 import Security
 
 /// Service for secure storage and retrieval of sensitive data using iOS Keychain
+/// 
+/// Security Configuration:
+/// - Uses app-specific service identifier (bundle ID) to ensure keychain items are isolated to this app
+/// - Configures items with kSecAttrAccessibleWhenUnlockedThisDeviceOnly for maximum security
+/// - Sets kSecAttrSynchronizable to false to prevent iCloud sync and ensure device-only storage
+/// - Keychain items are automatically cleaned up when the app is uninstalled due to app-specific configuration
 class KeychainService {
     
     // MARK: - Keychain Keys
+    static let appleUserIdKey = "com.tribeboard.appleUserId"
     static let appleUserIdHashKey = "com.tribeboard.appleUserIdHash"
     static let familyIdKey = "com.tribeboard.familyId"
     
@@ -43,8 +50,10 @@ class KeychainService {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrAccount as String: key,
+            kSecAttrService as String: Bundle.main.bundleIdentifier ?? "com.tribeboard.TribeBoard",
             kSecValueData as String: data,
-            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
+            kSecAttrSynchronizable as String: false // Ensure data stays on device only
         ]
         
         let status = SecItemAdd(query as CFDictionary, nil)
@@ -66,6 +75,7 @@ class KeychainService {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrAccount as String: key,
+            kSecAttrService as String: Bundle.main.bundleIdentifier ?? "com.tribeboard.TribeBoard",
             kSecReturnData as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne
         ]
@@ -92,7 +102,8 @@ class KeychainService {
     func delete(for key: String) throws {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
-            kSecAttrAccount as String: key
+            kSecAttrAccount as String: key,
+            kSecAttrService as String: Bundle.main.bundleIdentifier ?? "com.tribeboard.TribeBoard"
         ]
         
         let status = SecItemDelete(query as CFDictionary)
@@ -103,6 +114,26 @@ class KeychainService {
     }
     
     // MARK: - Convenience Methods for App-Specific Data
+    
+    /// Store Apple User ID securely
+    /// - Parameter userId: The Apple User ID to store
+    /// - Throws: KeychainError if the operation fails
+    func storeAppleUserId(_ userId: String) throws {
+        guard let data = userId.data(using: .utf8) else {
+            throw KeychainError.invalidData
+        }
+        try store(data, for: Self.appleUserIdKey)
+    }
+    
+    /// Retrieve Apple User ID
+    /// - Returns: The stored Apple User ID, or nil if not found
+    /// - Throws: KeychainError if the operation fails
+    func retrieveAppleUserId() throws -> String? {
+        guard let data = try retrieve(for: Self.appleUserIdKey) else {
+            return nil
+        }
+        return String(data: data, encoding: .utf8)
+    }
     
     /// Store Apple User ID hash securely
     /// - Parameter hash: The Apple User ID hash to store
@@ -143,6 +174,12 @@ class KeychainService {
         return UUID(uuidString: uuidString)
     }
     
+    /// Delete Apple User ID from Keychain
+    /// - Throws: KeychainError if the operation fails
+    func deleteAppleUserId() throws {
+        try delete(for: Self.appleUserIdKey)
+    }
+    
     /// Delete Apple User ID hash from Keychain
     /// - Throws: KeychainError if the operation fails
     func deleteAppleUserIdHash() throws {
@@ -158,6 +195,7 @@ class KeychainService {
     /// Clear all app-specific data from Keychain
     /// - Throws: KeychainError if any operation fails
     func clearAll() throws {
+        try deleteAppleUserId()
         try deleteAppleUserIdHash()
         try deleteFamilyId()
     }

@@ -24,11 +24,13 @@ class SettingsViewModel: ObservableObject {
     @Published var showFamilyMemberManagement = false
     @Published var showPrivacySettings = false
     @Published var showSecuritySettings = false
+    @Published var showSignOutConfirmation = false
     
     // MARK: - Properties
     
     let currentUserId: UUID
     let currentUserRole: Role
+    let authService: AuthService?
     
     var canManageFamily: Bool {
         currentUserRole == .parentAdmin
@@ -36,9 +38,10 @@ class SettingsViewModel: ObservableObject {
     
     // MARK: - Initialization
     
-    init(currentUserId: UUID, currentUserRole: Role) {
+    init(currentUserId: UUID, currentUserRole: Role, authService: AuthService? = nil) {
         self.currentUserId = currentUserId
         self.currentUserRole = currentUserRole
+        self.authService = authService
         
         // Initialize with mock data
         self.familySettings = MockFamilySettings()
@@ -124,8 +127,19 @@ class SettingsViewModel: ObservableObject {
     }
     
     func signOut() {
-        successMessage = "Signing out..."
-        // In a real app, this would trigger sign out
+        showSignOutConfirmation = true
+    }
+    
+    func confirmSignOut() async throws {
+        guard let authService = authService else {
+            throw AuthError.unknownError(NSError(domain: "SettingsError", code: 1, userInfo: [NSLocalizedDescriptionKey: "Authentication service not available"]))
+        }
+        
+        isLoading = true
+        defer { isLoading = false }
+        
+        try await authService.signOut()
+        successMessage = "Successfully signed out"
     }
     
     func clearError() {

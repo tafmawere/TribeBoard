@@ -3,6 +3,7 @@ import SwiftUI
 /// Main navigation view that handles app-wide navigation and state management for UI/UX prototype
 struct MainNavigationView: View {
     @StateObject private var appState = AppState()
+    @EnvironmentObject private var authService: AuthService
     
     // Mock Services for prototype - no real database or CloudKit dependencies
     @State private var mockServiceCoordinator: MockServiceCoordinator?
@@ -18,6 +19,10 @@ struct MainNavigationView: View {
                     .accessibilityElement(children: .ignore)
                     .accessibilityLabel("TribeBoard app loading")
                     .accessibilityHint("Please wait while the app loads")
+            } else if !authService.isAuthenticated {
+                // User is not authenticated - show sign-in view
+                SignInView()
+                    .transition(.opacity.combined(with: .scale))
             } else {
                 // Main app content with mock services
                 NavigationStack(path: $appState.navigationPath) {
@@ -100,6 +105,9 @@ struct MainNavigationView: View {
         .onAppear {
             initializePrototypeApp()
         }
+        .onChange(of: authService.isAuthenticated) { _, isAuthenticated in
+            handleAuthenticationStateChange(isAuthenticated)
+        }
         .overlay {
             // Enhanced global loading overlay
             if appState.isLoading {
@@ -139,20 +147,22 @@ struct MainNavigationView: View {
     @ViewBuilder
     private var dashboardContent: some View {
         Group {
-            switch appState.selectedNavigationTab {
-            case .dashboard:
-                // Main family dashboard with School Run access
-                if let user = appState.currentUser,
-                   let family = appState.currentFamily,
-                   let membership = appState.currentMembership {
-                    MockFamilyDashboardView(
-                        family: family,
-                        currentUserId: user.id,
-                        currentUserRole: membership.role
-                    )
-                } else {
-                    FamilyDashboardPlaceholderView()
-                }
+            // Ensure user is authenticated before showing protected content
+            if authService.isAuthenticated {
+                switch appState.selectedNavigationTab {
+                case .dashboard:
+                    // Main family dashboard with School Run access
+                    if let user = appState.currentUser,
+                       let family = appState.currentFamily,
+                       let membership = appState.currentMembership {
+                        MockFamilyDashboardView(
+                            family: family,
+                            currentUserId: user.id,
+                            currentUserRole: membership.role
+                        )
+                    } else {
+                        FamilyDashboardPlaceholderView()
+                    }
                 
             case .calendar:
                 // Calendar view
@@ -166,17 +176,25 @@ struct MainNavigationView: View {
                 // HomeLife navigation hub
                 HomeLifeNavigationView()
                 
-            case .tasks:
-                // Tasks view
-                if let user = appState.currentUser,
-                   let membership = appState.currentMembership {
-                    TasksView(
-                        currentUserId: user.id,
-                        currentUserRole: membership.role
-                    )
-                } else {
-                    TasksPlaceholderView()
+                case .tasks:
+                    // Tasks view
+                    if let user = appState.currentUser,
+                       let membership = appState.currentMembership {
+                        TasksView(
+                            currentUserId: user.id,
+                            currentUserRole: membership.role
+                        )
+                    } else {
+                        TasksPlaceholderView()
+                    }
                 }
+            } else {
+                // User not authenticated - show placeholder
+                Text("Please sign in to access this feature")
+                    .bodyMedium()
+                    .foregroundColor(.secondary)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color(.systemGroupedBackground))
             }
         }
         .transition(
@@ -214,7 +232,9 @@ struct MainNavigationView: View {
     /// Get destination view for navigation
     @ViewBuilder
     private func destinationView(for tab: NavigationTab) -> some View {
-        switch tab {
+        // Ensure user is authenticated before showing protected content
+        if authService.isAuthenticated {
+            switch tab {
         case .dashboard:
             if let user = appState.currentUser,
                let family = appState.currentFamily,
@@ -242,25 +262,35 @@ struct MainNavigationView: View {
             HomeLifeNavigationView()
                 .environmentObject(appState)
             
-        case .tasks:
-            if let user = appState.currentUser,
-               let membership = appState.currentMembership {
-                TasksView(
-                    currentUserId: user.id,
-                    currentUserRole: membership.role
-                )
-                .environmentObject(appState)
-            } else {
-                TasksPlaceholderView()
+            case .tasks:
+                if let user = appState.currentUser,
+                   let membership = appState.currentMembership {
+                    TasksView(
+                        currentUserId: user.id,
+                        currentUserRole: membership.role
+                    )
                     .environmentObject(appState)
+                } else {
+                    TasksPlaceholderView()
+                        .environmentObject(appState)
+                }
             }
+        } else {
+            // User not authenticated - show sign-in prompt
+            Text("Please sign in to access this feature")
+                .bodyMedium()
+                .foregroundColor(.secondary)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color(.systemGroupedBackground))
         }
     }
     
     /// Get destination view for School Run navigation
     @ViewBuilder
     private func schoolRunDestinationView(for route: SchoolRunRoute) -> some View {
-        switch route {
+        // Ensure user is authenticated before showing protected content
+        if authService.isAuthenticated {
+            switch route {
         case .dashboard:
             SchoolRunDashboardView()
                 .environmentObject(appState)
@@ -277,9 +307,17 @@ struct MainNavigationView: View {
             RunDetailView(run: run)
                 .environmentObject(appState)
             
-        case .runExecution(let run):
-            RunExecutionView(run: run)
-                .environmentObject(appState)
+            case .runExecution(let run):
+                RunExecutionView(run: run)
+                    .environmentObject(appState)
+            }
+        } else {
+            // User not authenticated - show sign-in prompt
+            Text("Please sign in to access School Run features")
+                .bodyMedium()
+                .foregroundColor(.secondary)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color(.systemGroupedBackground))
         }
     }
     
@@ -330,6 +368,29 @@ struct MainNavigationView: View {
         }
     }
     
+    // MARK: - Authentication State Management
+    
+    private func handleAuthenticationStateChange(_ isAuthenticated: Bool) {
+        if !isAuthenticated {
+            // User signed out - reset app state and provide haptic feedback
+            Task {
+                await appState.signOut()
+            }
+            HapticManager.shared.lightImpact()
+            
+            // Clear any navigation state
+            appState.navigationPath = NavigationPath()
+            appState.selectedNavigationTab = .dashboard
+        } else {
+            // User signed in - provide success haptic feedback
+            HapticManager.shared.success()
+            
+            // If we have a current user from AuthService, update AppState
+            if let currentUser = authService.currentUser {
+                appState.signIn(user: currentUser)
+            }
+        }
+    }
 
 }
 
@@ -593,6 +654,7 @@ struct TasksPlaceholderView: View {
 /// Placeholder for family dashboard view
 struct FamilyDashboardPlaceholderView: View {
     @EnvironmentObject var appState: AppState
+    @EnvironmentObject private var authService: AuthService
     
     var body: some View {
         VStack(spacing: 30) {
@@ -628,12 +690,28 @@ struct FamilyDashboardPlaceholderView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
-                Button("Sign Out") {
-                    Task {
-                        await appState.signOut()
-                    }
+                NavigationLink(destination: settingsView) {
+                    Image(systemName: "gearshape")
+                        .foregroundColor(.brandPrimary)
                 }
+                .accessibilityLabel("Settings")
+                .accessibilityHint("Open app settings")
             }
+        }
+    }
+    
+    @ViewBuilder
+    private var settingsView: some View {
+        if let user = appState.currentUser,
+           let membership = appState.currentMembership {
+            SettingsView(
+                currentUserId: user.id,
+                currentUserRole: membership.role,
+                authService: authService
+            )
+        } else {
+            Text("Settings unavailable")
+                .foregroundColor(.secondary)
         }
     }
 }

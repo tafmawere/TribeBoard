@@ -13,6 +13,7 @@ import UserNotifications
 struct TribeBoardApp: App {
     let modelContainer: ModelContainer
     @StateObject private var cloudKitService = CloudKitService()
+    @StateObject private var authService = AuthService()
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     
     init() {
@@ -42,37 +43,9 @@ struct TribeBoardApp: App {
         WindowGroup {
             AppLaunchView(
                 modelContainer: modelContainer,
-                cloudKitService: cloudKitService
+                cloudKitService: cloudKitService,
+                authService: authService
             )
-        }
-    }
-    
-    // MARK: - CloudKit Setup
-    
-    @MainActor
-    private func setupCloudKit() async {
-        do {
-            try await cloudKitService.performInitialSetup()
-            print("CloudKit setup completed successfully")
-        } catch {
-            print("CloudKit setup failed: \(error)")
-            // Continue without CloudKit - app should work offline
-        }
-    }
-    
-    // MARK: - Notification Permissions
-    
-    private func requestNotificationPermissions() async {
-        let center = UNUserNotificationCenter.current()
-        do {
-            let granted = try await center.requestAuthorization(options: [.alert, .sound, .badge])
-            if granted {
-                print("Notification permissions granted")
-            } else {
-                print("Notification permissions denied")
-            }
-        } catch {
-            print("Failed to request notification permissions: \(error)")
         }
     }
 }
@@ -100,6 +73,7 @@ extension UIApplication {
 struct AppLaunchView: View {
     let modelContainer: ModelContainer
     let cloudKitService: CloudKitService
+    let authService: AuthService
     
     @State private var isInitializing = true
     @State private var initializationMessage = "Starting TribeBoard..."
@@ -110,9 +84,10 @@ struct AppLaunchView: View {
                 AnimatedSplashScreenView(message: initializationMessage)
                     .transition(.opacity)
             } else {
-                MainNavigationView()
+                AuthenticationStateView()
                     .modelContainer(modelContainer)
                     .environmentObject(cloudKitService)
+                    .environmentObject(authService)
                     .transition(.opacity)
             }
         }
@@ -142,6 +117,13 @@ struct AppLaunchView: View {
             }
             
             await setupCloudKit()
+            
+            // Setup authentication service
+            await MainActor.run {
+                initializationMessage = "Setting up authentication..."
+            }
+            
+            await setupAuthService()
             
             // Request notification permissions
             await MainActor.run {
@@ -182,6 +164,25 @@ struct AppLaunchView: View {
         } catch {
             print("CloudKit setup failed: \(error)")
             // Continue without CloudKit - app should work offline
+        }
+    }
+    
+    // MARK: - Authentication Setup
+    
+    @MainActor
+    private func setupAuthService() async {
+        do {
+            // Create a DataService with the model context for the AuthService
+            let dataService = DataService(modelContext: modelContainer.mainContext)
+            authService.setDataService(dataService)
+            
+            // Check for existing authentication after setting up the data service
+            await authService.checkExistingAuthentication()
+            
+            print("AuthService setup completed successfully")
+        } catch {
+            print("AuthService setup failed: \(error)")
+            // Continue without authentication - user will need to sign in manually
         }
     }
     

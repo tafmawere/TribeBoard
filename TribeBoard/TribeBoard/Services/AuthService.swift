@@ -80,15 +80,20 @@ class AuthService: NSObject, ObservableObject {
     /// Sign in with Apple ID
     /// - Throws: AuthError if authentication fails
     func signInWithApple() async throws {
+        // Check network connectivity before attempting authentication
+        guard NetworkMonitor.shared.isNetworkAvailableForAuth() else {
+            throw AuthError.networkUnavailable
+        }
+        
         isLoading = true
         defer { isLoading = false }
         
         do {
             let authorization = try await performAppleSignIn()
-            let userProfile = try await processAuthorization(authorization)
+            let (userProfile, appleUserId) = try await processAuthorization(authorization)
             
             // Store authentication data securely
-            try await storeAuthenticationData(userProfile)
+            try await storeAuthenticationData(userProfile, appleUserId: appleUserId)
             
             // Update authentication state
             currentUser = userProfile
@@ -101,6 +106,10 @@ class AuthService: NSObject, ObservableObject {
             } else if let asError = error as? ASAuthorizationError {
                 throw mapASAuthorizationError(asError)
             } else {
+                // Check if error might be network-related
+                if isNetworkError(error) {
+                    throw AuthError.networkUnavailable
+                }
                 throw AuthError.unknownError(error)
             }
         }
@@ -139,35 +148,51 @@ class AuthService: NSObject, ObservableObject {
     // MARK: - Private Authentication Methods
     
     /// Check for existing authentication on app launch
-    private func checkExistingAuthentication() async {
-        guard let dataService = dataService else { return }
+    func checkExistingAuthentication() async {
+        guard let dataService = dataService else { 
+            print("🔍 AuthService: DataService not available for authentication check")
+            return 
+        }
+        
+        print("🔍 AuthService: Checking existing authentication...")
         
         do {
-            // Try to retrieve stored Apple ID hash
-            guard let storedHash = try keychainService.retrieveAppleUserIdHash() else {
-                // No stored authentication
+            // Try to retrieve stored Apple user identifier and hash
+            guard let storedAppleUserId = try keychainService.retrieveAppleUserId(),
+                  let storedHash = try keychainService.retrieveAppleUserIdHash() else {
+                print("ℹ️ AuthService: No stored authentication credentials found")
                 return
             }
             
-            // Try to find user profile with stored hash
-            if let userProfile = try dataService.fetchUserProfile(byAppleUserIdHash: storedHash) {
-                // Verify the credential is still valid with Apple
-                let credentialState = await checkAppleIDCredentialState(userProfile.appleUserIdHash)
+            print("🔍 AuthService: Found stored credentials, verifying with Apple...")
+            
+            // Verify the credential is still valid with Apple
+            let credentialState = await checkAppleIDCredentialState(storedAppleUserId)
+            
+            if credentialState == .authorized {
+                print("✅ AuthService: Apple credentials are still valid")
                 
-                if credentialState == .authorized {
+                // Try to find user profile with stored hash
+                if let userProfile = try dataService.fetchUserProfile(byAppleUserIdHash: storedHash) {
+                    print("✅ AuthService: User profile found, restoring authentication state")
                     // User is still authenticated
-                    currentUser = userProfile
-                    isAuthenticated = true
+                    await MainActor.run {
+                        currentUser = userProfile
+                        isAuthenticated = true
+                    }
                 } else {
-                    // Credential is no longer valid, clear stored data
+                    print("❌ AuthService: User profile not found, clearing stored data")
+                    // User profile not found, clear stored data
                     try keychainService.clearAll()
                 }
             } else {
-                // User profile not found, clear stored data
+                print("❌ AuthService: Apple credentials are no longer valid (state: \(credentialState)), clearing stored data")
+                // Credential is no longer valid, clear stored data
                 try keychainService.clearAll()
             }
             
         } catch {
+            print("❌ AuthService: Error checking existing authentication: \(error.localizedDescription)")
             // If there's any error checking authentication, clear stored data
             try? keychainService.clearAll()
         }
@@ -192,7 +217,7 @@ class AuthService: NSObject, ObservableObject {
     }
     
     /// Process the authorization result and create/retrieve user profile
-    private func processAuthorization(_ authorization: ASAuthorization) async throws -> UserProfile {
+    private func processAuthorization(_ authorization: ASAuthorization) async throws -> (UserProfile, String) {
         guard let dataService = dataService else {
             throw AuthError.dataServiceError(DataServiceError.invalidData("DataService not available"))
         }
@@ -201,12 +226,14 @@ class AuthService: NSObject, ObservableObject {
             throw AuthError.invalidCredentials
         }
         
+        let appleUserId = appleIDCredential.user
+        
         // Create hash from Apple user identifier for privacy
-        let userIdHash = createUserIdHash(from: appleIDCredential.user)
+        let userIdHash = createUserIdHash(from: appleUserId)
         
         // Try to find existing user profile
         if let existingUser = try dataService.fetchUserProfile(byAppleUserIdHash: userIdHash) {
-            return existingUser
+            return (existingUser, appleUserId)
         }
         
         // Create new user profile
@@ -217,15 +244,16 @@ class AuthService: NSObject, ObservableObject {
                 displayName: displayName,
                 appleUserIdHash: userIdHash
             )
-            return newUser
+            return (newUser, appleUserId)
         } catch {
             throw AuthError.dataServiceError(error)
         }
     }
     
     /// Store authentication data securely
-    private func storeAuthenticationData(_ userProfile: UserProfile) async throws {
+    private func storeAuthenticationData(_ userProfile: UserProfile, appleUserId: String) async throws {
         do {
+            try keychainService.storeAppleUserId(appleUserId)
             try keychainService.storeAppleUserIdHash(userProfile.appleUserIdHash)
         } catch {
             throw AuthError.keychainError(error)
@@ -265,12 +293,19 @@ class AuthService: NSObject, ObservableObject {
     }
     
     /// Check Apple ID credential state
-    private func checkAppleIDCredentialState(_ userIdHash: String) async -> ASAuthorizationAppleIDProvider.CredentialState {
+    private func checkAppleIDCredentialState(_ appleUserId: String) async -> ASAuthorizationAppleIDProvider.CredentialState {
         return await withCheckedContinuation { continuation in
-            // Note: We can't directly check the hashed ID with Apple, so we'll assume authorized
-            // In a real implementation, you'd need to store the original Apple ID and check that
-            // For now, we'll return authorized to maintain the authentication state
-            continuation.resume(returning: .authorized)
+            let appleIDProvider = ASAuthorizationAppleIDProvider()
+            appleIDProvider.getCredentialState(forUserID: appleUserId) { credentialState, error in
+                if let error = error {
+                    print("❌ AuthService: Error checking Apple ID credential state: \(error.localizedDescription)")
+                    // If there's an error, assume not authorized for safety
+                    continuation.resume(returning: .notFound)
+                } else {
+                    print("ℹ️ AuthService: Apple ID credential state: \(credentialState)")
+                    continuation.resume(returning: credentialState)
+                }
+            }
         }
     }
     
@@ -302,6 +337,33 @@ class AuthService: NSObject, ObservableObject {
         @unknown default:
             return .unknownError(error)
         }
+    }
+    
+    /// Check if an error is likely network-related
+    private func isNetworkError(_ error: Error) -> Bool {
+        let nsError = error as NSError
+        
+        // Check for common network error domains and codes
+        if nsError.domain == NSURLErrorDomain {
+            switch nsError.code {
+            case NSURLErrorNotConnectedToInternet,
+                 NSURLErrorNetworkConnectionLost,
+                 NSURLErrorTimedOut,
+                 NSURLErrorCannotConnectToHost,
+                 NSURLErrorCannotFindHost,
+                 NSURLErrorDNSLookupFailed:
+                return true
+            default:
+                return false
+            }
+        }
+        
+        // Check for other network-related error indicators
+        let errorDescription = error.localizedDescription.lowercased()
+        return errorDescription.contains("network") ||
+               errorDescription.contains("internet") ||
+               errorDescription.contains("connection") ||
+               errorDescription.contains("offline")
     }
 }
 
