@@ -146,7 +146,7 @@ struct NavigationItem: View {
         )
         
         NavigationItem(
-            tab: .messages,
+            tab: .homeLife,
             isActive: false,
             onTap: {}
         )
@@ -176,7 +176,7 @@ struct NavigationItem: View {
         )
         
         NavigationItem(
-            tab: .messages,
+            tab: .homeLife,
             isActive: true,
             onTap: {}
         )
@@ -206,7 +206,7 @@ struct NavigationItem: View {
         )
         
         NavigationItem(
-            tab: .messages,
+            tab: .homeLife,
             isActive: false,
             onTap: {}
         )
@@ -287,7 +287,7 @@ struct NavigationItem: View {
             )
             
             NavigationItem(
-                tab: .messages,
+                tab: .homeLife,
                 isActive: false,
                 onTap: {}
             )

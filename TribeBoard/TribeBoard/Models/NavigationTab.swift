@@ -8,7 +8,6 @@ enum NavigationTab: String, CaseIterable, Identifiable {
     case schoolRun = "schoolRun"
     case homeLife = "homeLife"
     case tasks = "tasks"
-    case messages = "messages"
     
     var id: String { rawValue }
     
@@ -25,8 +24,6 @@ enum NavigationTab: String, CaseIterable, Identifiable {
             return "HomeLife"
         case .tasks:
             return "Tasks"
-        case .messages:
-            return "Messages"
         }
     }
     
@@ -43,8 +40,6 @@ enum NavigationTab: String, CaseIterable, Identifiable {
             return "house.heart"
         case .tasks:
             return "checkmark.circle"
-        case .messages:
-            return "message"
         }
     }
     
@@ -61,8 +56,6 @@ enum NavigationTab: String, CaseIterable, Identifiable {
             return "house.heart.fill"
         case .tasks:
             return "checkmark.circle"
-        case .messages:
-            return "message.fill"
         }
     }
 }

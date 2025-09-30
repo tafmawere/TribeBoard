@@ -85,6 +85,9 @@ class AppState: ObservableObject {
         setupMockServices()
         setupDemoManager()
         checkAuthenticationState()
+        
+        // Ensure navigation state is valid for 5-tab layout
+        validateNavigationTab()
     }
     
     // MARK: - Mock Service Setup
@@ -296,8 +299,7 @@ class AppState: ObservableObject {
         currentFamily = nil
         isAuthenticated = false
         currentFlow = .onboarding
-        navigationPath = NavigationPath()
-        selectedNavigationTab = .dashboard
+        resetNavigationState() // Use new method that validates 5-tab layout
         isLoading = false
     }
     
@@ -368,6 +370,9 @@ class AppState: ObservableObject {
         currentFamily = family
         currentMembership = membership
         currentFlow = .familyDashboard
+        
+        // Ensure navigation state is valid for 5-tab layout when joining family
+        validateNavigationPath()
     }
     
     /// Create family using mock services
@@ -451,6 +456,9 @@ class AppState: ObservableObject {
         currentFamily = nil
         currentMembership = nil
         currentFlow = .familySelection
+        
+        // Reset navigation state when leaving family
+        resetNavigationState()
     }
     
     // MARK: - Navigation Methods
@@ -465,10 +473,56 @@ class AppState: ObservableObject {
         navigationPath = NavigationPath()
     }
     
+    /// Validate and ensure selectedNavigationTab is appropriate for 5-tab layout
+    func validateNavigationTab() {
+        // Ensure the current selected tab is valid in the 5-tab layout
+        guard NavigationTab.allCases.contains(selectedNavigationTab) else {
+            // If current tab is invalid, default to dashboard
+            selectedNavigationTab = .dashboard
+            return
+        }
+        
+        // Tab is valid, no changes needed
+    }
+    
+    /// Reset navigation state for 5-tab layout
+    func resetNavigationState() {
+        navigationPath = NavigationPath()
+        selectedNavigationTab = .dashboard
+        validateNavigationTab()
+    }
+    
+    /// Validate navigation path works with reduced tab count
+    func validateNavigationPath() {
+        // Check if current navigation path contains any invalid references
+        // For 5-tab layout, ensure no navigation destinations reference removed tabs
+        
+        // If navigation path is empty, it's valid
+        if navigationPath.isEmpty {
+            return
+        }
+        
+        // For complex navigation paths, we reset to ensure compatibility
+        // This prevents issues with deep links or saved state that might reference removed tabs
+        navigationPath = NavigationPath()
+        
+        // Ensure selected tab is still valid
+        validateNavigationTab()
+    }
+    
     // MARK: - Bottom Navigation Methods
     
     /// Select a navigation tab and handle navigation logic
     func selectTab(_ tab: NavigationTab) {
+        // Validate that the tab is valid for 5-tab layout
+        guard NavigationTab.allCases.contains(tab) else {
+            // If invalid tab, default to dashboard
+            selectedNavigationTab = .dashboard
+            currentFlow = .familyDashboard
+            resetNavigation()
+            return
+        }
+        
         selectedNavigationTab = tab
         
         // Handle navigation logic based on selected tab
@@ -497,11 +551,6 @@ class AppState: ObservableObject {
             // Navigate to tasks view
             // The actual navigation will be handled by MainNavigationView
             break
-            
-        case .messages:
-            // Navigate to messages view
-            // The actual navigation will be handled by MainNavigationView
-            break
         }
     }
     
@@ -521,10 +570,21 @@ class AppState: ObservableObject {
     
     /// Handle tab selection with coordination for NavigationStack
     func handleTabSelection(_ tab: NavigationTab) {
+        // Validate that the tab is valid for 5-tab layout
+        guard NavigationTab.allCases.contains(tab) else {
+            // If invalid tab, default to dashboard and reset navigation
+            selectedNavigationTab = .dashboard
+            navigationPath = NavigationPath()
+            if currentFlow != .familyDashboard {
+                currentFlow = .familyDashboard
+            }
+            return
+        }
+        
         // Update selected tab
         selectedNavigationTab = tab
         
-        // Reset navigation path to ensure clean navigation
+        // Reset navigation path to ensure clean navigation with 5-tab layout
         navigationPath = NavigationPath()
         
         // Handle specific navigation logic for each tab
@@ -552,11 +612,6 @@ class AppState: ObservableObject {
             
         case .tasks:
             // Navigation to TasksView will be handled by MainNavigationView
-            // based on the selectedNavigationTab state
-            break
-            
-        case .messages:
-            // Navigation to MessagingView will be handled by MainNavigationView
             // based on the selectedNavigationTab state
             break
         }
@@ -659,8 +714,7 @@ class AppState: ObservableObject {
         currentFamily = nil
         currentMembership = nil
         currentFlow = .onboarding
-        navigationPath = NavigationPath()
-        selectedNavigationTab = .dashboard
+        resetNavigationState() // Use new method that validates 5-tab layout
         errorMessage = nil
         isLoading = false
         

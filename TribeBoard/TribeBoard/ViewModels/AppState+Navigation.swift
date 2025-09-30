@@ -205,10 +205,6 @@ extension AppState {
         case .tasks:
             // Tasks navigation handled by MainNavigationView
             break
-            
-        case .messages:
-            // Messages navigation handled by MainNavigationView
-            break
         }
     }
     

@@ -353,11 +353,11 @@ final class GroceryListManagementUITests: XCTestCase {
             // State should change
             XCTAssertNotEqual(itemCheckbox.isSelected, initialState, "Item completion state should toggle")
         } else if completionToggle.exists {
-            let initialState = completionToggle.isOn
+            let initialState = completionToggle.isSelected
             completionToggle.tap()
             
             // State should change
-            XCTAssertNotEqual(completionToggle.isOn, initialState, "Item completion state should toggle")
+            XCTAssertNotEqual(completionToggle.isSelected, initialState, "Item completion state should toggle")
         }
     }
     

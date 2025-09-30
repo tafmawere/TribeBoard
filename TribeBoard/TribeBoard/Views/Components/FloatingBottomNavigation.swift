@@ -178,12 +178,12 @@ struct FloatingBottomNavigation: View {
     .background(Color(.systemGroupedBackground))
 }
 
-#Preview("Floating Bottom Navigation - Messages Selected") {
+#Preview("Floating Bottom Navigation - Tasks Selected") {
     VStack {
         Spacer()
         
         FloatingBottomNavigation(
-            selectedTab: .constant(.messages),
+            selectedTab: .constant(.tasks),
             onTabSelected: { _ in }
         )
     }
@@ -302,7 +302,7 @@ struct FloatingBottomNavigation: View {
             .padding()
         
         FloatingBottomNavigation(
-            selectedTab: .constant(.messages),
+            selectedTab: .constant(.tasks),
             onTabSelected: { _ in }
         )
     }
@@ -335,7 +335,7 @@ struct FloatingBottomNavigation: View {
             .labelMedium()
         
         FloatingBottomNavigation(
-            selectedTab: .constant(.messages),
+            selectedTab: .constant(.tasks),
             onTabSelected: { _ in }
         )
         .frame(width: 430) // iPhone 14 Pro Max width

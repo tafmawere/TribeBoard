@@ -177,18 +177,6 @@ struct MainNavigationView: View {
                 } else {
                     TasksPlaceholderView()
                 }
-                
-            case .messages:
-                // Messages view
-                if let user = appState.currentUser,
-                   let membership = appState.currentMembership {
-                    MessagingView(
-                        currentUserId: user.id,
-                        currentUserRole: membership.role
-                    )
-                } else {
-                    MessagesPlaceholderView()
-                }
             }
         }
         .transition(
@@ -264,19 +252,6 @@ struct MainNavigationView: View {
                 .environmentObject(appState)
             } else {
                 TasksPlaceholderView()
-                    .environmentObject(appState)
-            }
-            
-        case .messages:
-            if let user = appState.currentUser,
-               let membership = appState.currentMembership {
-                MessagingView(
-                    currentUserId: user.id,
-                    currentUserRole: membership.role
-                )
-                .environmentObject(appState)
-            } else {
-                MessagesPlaceholderView()
                     .environmentObject(appState)
             }
         }
@@ -613,31 +588,7 @@ struct TasksPlaceholderView: View {
     }
 }
 
-/// Placeholder for messages view when user data is not available
-struct MessagesPlaceholderView: View {
-    var body: some View {
-        VStack(spacing: DesignSystem.Spacing.xl) {
-            Image(systemName: "message.fill")
-                .font(.system(size: 64))
-                .foregroundColor(.brandPrimary)
-                .accessibilityHidden(true)
-            
-            Text("Messages")
-                .headlineLarge()
-                .foregroundColor(.primary)
-            
-            Text("Sign in to view your family messages")
-                .bodyMedium()
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
-            
-            Spacer()
-        }
-        .padding()
-        .navigationTitle("Messages")
-        .navigationBarTitleDisplayMode(.inline)
-    }
-}
+
 
 /// Placeholder for family dashboard view
 struct FamilyDashboardPlaceholderView: View {
