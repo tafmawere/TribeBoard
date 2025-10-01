@@ -234,4 +234,38 @@ class MockKeychainService {
         try deleteAppleUserIdHash()
         try deleteFamilyId()
     }
+    
+    // MARK: - State Management Extensions
+    
+    /// Response delay for performance testing
+    private var responseDelay: TimeInterval = 0.0
+    
+    /// Whether the service is configured for testing
+    var isConfigured: Bool = true
+    
+    /// Set mock error for testing
+    func setMockError(_ error: KeychainService.KeychainError) {
+        errorToThrow = error
+        shouldSucceed = false
+    }
+    
+    /// Set response delay for performance testing
+    func setResponseDelay(_ delay: TimeInterval) {
+        responseDelay = delay
+    }
+    
+    /// Restore data from snapshot
+    func restoreData(_ data: [String: Data]) {
+        storage = data
+    }
+    
+    /// Get call counts for test verification
+    /// - Returns: Dictionary of operation names to call counts
+    func getCallCounts() -> [String: Int] {
+        return [
+            "store": storeCallCount,
+            "retrieve": retrieveCallCount,
+            "delete": deleteCallCount
+        ]
+    }
 }

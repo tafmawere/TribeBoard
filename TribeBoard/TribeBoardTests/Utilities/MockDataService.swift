@@ -433,4 +433,76 @@ class MockDataService: ObservableObject {
     func hasFamily(withCode code: String) -> Bool {
         return familiesByCode[code] != nil
     }
+    
+    // MARK: - State Management Extensions
+    
+    /// Complete data service state
+    struct DataState {
+        var userCount: Int = 0
+        var familyCount: Int = 0
+        var membershipCount: Int = 0
+        var callCounts: [String: Int] = [:]
+        var lastError: DataServiceError?
+        var isNetworkAvailable: Bool = true
+        var responseDelay: TimeInterval = 0.0
+    }
+    
+    /// Response delay for performance testing
+    private var responseDelay: TimeInterval = 0.0
+    
+    /// Network availability for testing
+    private var networkAvailable: Bool = true
+    
+    /// Whether the service is configured for testing
+    var isConfigured: Bool = true
+    
+    /// Get current complete state
+    var currentState: DataState {
+        return DataState(
+            userCount: userProfiles.count,
+            familyCount: families.count,
+            membershipCount: memberships.count,
+            callCounts: getCallCounts(),
+            lastError: shouldSucceed ? nil : errorToThrow,
+            isNetworkAvailable: networkAvailable,
+            responseDelay: responseDelay
+        )
+    }
+    
+    /// Set mock error for testing
+    func setMockError(_ error: DataServiceError) {
+        errorToThrow = error
+        shouldSucceed = false
+    }
+    
+    /// Set network unavailable state
+    func setNetworkUnavailable(_ unavailable: Bool) {
+        networkAvailable = !unavailable
+        if unavailable {
+            setMockError(.invalidData("Network unavailable"))
+        }
+    }
+    
+    /// Set response delay for performance testing
+    func setResponseDelay(_ delay: TimeInterval) {
+        responseDelay = delay
+        simulatedDelay = delay
+    }
+    
+    /// Restore state from snapshot
+    func restoreState(_ state: DataState) {
+        // Clear current data
+        reset()
+        
+        // Restore configuration
+        networkAvailable = state.isNetworkAvailable
+        responseDelay = state.responseDelay
+        simulatedDelay = state.responseDelay
+        
+        if let error = state.lastError {
+            setMockError(error)
+        } else {
+            shouldSucceed = true
+        }
+    }
 }

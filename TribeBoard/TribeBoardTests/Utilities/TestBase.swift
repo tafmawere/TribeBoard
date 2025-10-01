@@ -30,6 +30,7 @@ class TestBase: XCTestCase {
     
     // MARK: - Setup Methods
     
+    @MainActor
     private func setupMockServices() {
         mockAuthService = MockAuthService()
         mockDataService = MockDataService()
@@ -45,7 +46,7 @@ class TestBase: XCTestCase {
             MealPlan.self,
             GroceryItem.self,
             ShoppingTask.self
-        ])
+        ] as [any PersistentModel.Type])
         
         let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
         
@@ -56,6 +57,7 @@ class TestBase: XCTestCase {
         }
     }
     
+    @MainActor
     private func cleanupTestEnvironment() {
         // Reset mock services
         mockAuthService?.reset()
@@ -126,12 +128,10 @@ extension TestBase {
     
     /// Creates a test user profile
     func createTestUser(name: String = "Test User", 
-                       email: String = "test@example.com") -> UserProfile {
+                       appleUserIdHash: String = "test.hash.\(UUID().uuidString)") -> UserProfile {
         return UserProfile(
-            id: UUID(),
-            name: name,
-            email: email,
-            appleUserID: "test.apple.id.\(UUID().uuidString)"
+            displayName: name,
+            appleUserIdHash: appleUserIdHash
         )
     }
     
@@ -140,10 +140,9 @@ extension TestBase {
                          createdBy: UserProfile? = nil) -> Family {
         let creator = createdBy ?? createTestUser()
         return Family(
-            id: UUID(),
             name: name,
-            createdBy: creator.id,
-            inviteCode: "TEST\(Int.random(in: 1000...9999))"
+            code: "TEST\(Int.random(in: 1000...9999))",
+            createdByUserId: creator.id
         )
     }
     
@@ -152,10 +151,9 @@ extension TestBase {
                         family: Family? = nil) -> ChildProfile {
         let testFamily = family ?? createTestFamily()
         return ChildProfile(
-            id: UUID(),
             name: name,
-            familyID: testFamily.id,
-            dateOfBirth: Calendar.current.date(byAdding: .year, value: -8, to: Date()) ?? Date()
+            avatar: "child_avatar",
+            age: 8
         )
     }
 }

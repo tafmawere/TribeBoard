@@ -51,6 +51,17 @@ class MockAuthService: ObservableObject {
     /// Mock Apple user ID hash for testing
     var mockAppleUserIdHash: String = "mock_hash_value"
     
+    // MARK: - State Management
+    
+    /// Current authentication state for state management
+    private var _currentState: AuthState = AuthState()
+    
+    /// Response delay for simulating slow operations
+    private var responseDelay: TimeInterval = 0.0
+    
+    /// Whether the service is configured for testing
+    var isConfigured: Bool = true
+    
     // MARK: - Operation Types
     
     enum Operation {
@@ -71,11 +82,8 @@ class MockAuthService: ObservableObject {
     init() {
         // Create default mock user profile
         mockUserProfile = UserProfile(
-            id: UUID(),
             displayName: "Test User",
-            appleUserIdHash: mockAppleUserIdHash,
-            createdAt: Date(),
-            updatedAt: Date()
+            appleUserIdHash: mockAppleUserIdHash
         )
     }
     
@@ -101,11 +109,8 @@ class MockAuthService: ObservableObject {
         
         // Reset mock data
         mockUserProfile = UserProfile(
-            id: UUID(),
             displayName: "Test User",
-            appleUserIdHash: mockAppleUserIdHash,
-            createdAt: Date(),
-            updatedAt: Date()
+            appleUserIdHash: mockAppleUserIdHash
         )
     }
     
@@ -260,7 +265,7 @@ class MockAuthService: ObservableObject {
         guard let mockKeychain = mockKeychainService else { return }
         
         do {
-            guard let storedAppleUserId = try mockKeychain.retrieveAppleUserId(),
+            guard let _ = try mockKeychain.retrieveAppleUserId(),
                   let storedHash = try mockKeychain.retrieveAppleUserIdHash() else {
                 return
             }
@@ -321,5 +326,95 @@ class MockAuthService: ObservableObject {
     /// - Returns: True if current state matches expected state
     func isInAuthenticationState(_ authenticated: Bool) -> Bool {
         return isAuthenticated == authenticated
+    }
+    
+    // MARK: - State Management Extensions
+    
+    /// Authentication states for state management
+    enum AuthenticationState: Equatable {
+        case unauthenticated
+        case authenticating
+        case authenticated
+        case error(AuthError)
+    }
+    
+    /// Complete authentication state
+    struct AuthState {
+        var authenticationState: AuthenticationState = .unauthenticated
+        var userProfile: UserProfile?
+        var lastError: AuthError?
+        var callCounts: [String: Int] = [:]
+        
+        init() {
+            callCounts = [
+                "signIn": 0,
+                "signOut": 0,
+                "checkAuth": 0,
+                "getCurrentUser": 0
+            ]
+        }
+    }
+    
+    /// Get current complete state
+    var currentState: AuthState {
+        _currentState.userProfile = currentUser
+        _currentState.callCounts = getCallCounts()
+        return _currentState
+    }
+    
+    /// Set authentication state
+    func setAuthenticationState(_ state: AuthenticationState) {
+        _currentState.authenticationState = state
+        
+        switch state {
+        case .unauthenticated:
+            isAuthenticated = false
+            currentUser = nil
+        case .authenticating:
+            isLoading = true
+            isAuthenticated = false
+        case .authenticated:
+            isAuthenticated = true
+            isLoading = false
+            if currentUser == nil {
+                currentUser = mockUserProfile
+            }
+        case .error(let error):
+            isAuthenticated = false
+            currentUser = nil
+            isLoading = false
+            _currentState.lastError = error
+        }
+    }
+    
+    /// Set mock error for testing
+    func setMockError(_ error: AuthError) {
+        errorToThrow = error
+        _currentState.lastError = error
+        shouldSucceed = false
+    }
+    
+    /// Set network unavailable state
+    func setNetworkUnavailable(_ unavailable: Bool) {
+        isNetworkAvailable = !unavailable
+        if unavailable {
+            setMockError(.networkUnavailable)
+        }
+    }
+    
+    /// Set response delay for performance testing
+    func setResponseDelay(_ delay: TimeInterval) {
+        responseDelay = delay
+        simulatedDelay = delay
+    }
+    
+    /// Restore state from snapshot
+    func restoreState(_ state: AuthState) {
+        _currentState = state
+        setAuthenticationState(state.authenticationState)
+        
+        if let error = state.lastError {
+            setMockError(error)
+        }
     }
 }
