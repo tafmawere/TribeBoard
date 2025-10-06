@@ -234,7 +234,7 @@ class MockErrorHandlingCoordinator: ObservableObject {
         case .high:
             hapticManager.heavyImpact()
         case .critical:
-            hapticManager.errorImpact()
+            hapticManager.error()
         }
     }
     

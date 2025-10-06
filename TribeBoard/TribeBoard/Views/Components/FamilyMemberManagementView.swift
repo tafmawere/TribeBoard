@@ -361,7 +361,14 @@ struct MemberManagementRow: View {
                     .fontWeight(.medium)
                 
                 HStack(spacing: 8) {
-                    RoleBadge(role: member.role)
+                    Text(member.role.displayName)
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.blue.opacity(0.2))
+                        .foregroundColor(.blue)
+                        .clipShape(Capsule())
                     
                     if member.isCurrentUser {
                         Text("You")
@@ -418,7 +425,14 @@ struct PendingInvitationRow: View {
                     .fontWeight(.medium)
                 
                 HStack(spacing: 8) {
-                    RoleBadge(role: invitation.role)
+                    Text(invitation.role.displayName)
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.blue.opacity(0.2))
+                        .foregroundColor(.blue)
+                        .clipShape(Capsule())
                     
                     Text("Sent \(invitation.sentDate, style: .relative) ago")
                         .font(.caption)

@@ -122,7 +122,7 @@ struct RunDetailView: View {
         }
         
         // Add haptic feedback
-        HapticManager.shared.buttonPress()
+        HapticManager.shared.lightImpact()
         
         // Show success toast
         ToastManager.shared.info("Starting run...")
@@ -202,11 +202,10 @@ struct RunDetailView: View {
 
 }
 
-#Preview("Run Detail - Interactive") {
+#Preview("Interactive Detail View") {
     SchoolRunPreviewProvider.previewWithSampleData {
         NavigationStack {
             RunDetailView(run: SchoolRunPreviewProvider.upcomingRun)
         }
     }
-    .previewDisplayName("Interactive Detail View")
 }

@@ -280,7 +280,6 @@ struct LoadingToSuccessAnimation: View {
         ZStack {
             if isLoading && !showSuccess {
                 LoadingStateView(
-                    message: loadingMessage,
                     style: .card,
                     mockScenario: .familyCreation
                 )

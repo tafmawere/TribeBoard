@@ -353,11 +353,10 @@ struct ScheduleNewRunView: View {
     }
 }
 
-#Preview("Schedule New Run - Interactive") {
+#Preview("Interactive Form") {
     SchoolRunPreviewProvider.previewWithSampleData {
         NavigationStack {
             ScheduleNewRunView()
         }
     }
-    .previewDisplayName("Interactive Form")
 }

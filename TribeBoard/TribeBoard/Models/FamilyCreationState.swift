@@ -67,7 +67,7 @@ enum FamilyCreationState: Equatable, CaseIterable {
         case .completed:
             return "Family created successfully!"
         case .failed(let error):
-            return "Creation failed: \(error.userFriendlyMessage)"
+            return "Creation failed: \(error.localizedDescription ?? "Unknown error")"
         }
     }
     
@@ -87,7 +87,7 @@ enum FamilyCreationState: Equatable, CaseIterable {
         case .completed:
             return "State: creation completed successfully"
         case .failed(let error):
-            return "State: failed with error - \(error.technicalDescription)"
+            return "State: failed with error - \(error.localizedDescription ?? "Unknown error")"
         }
     }
     
@@ -215,18 +215,10 @@ enum FamilyCreationState: Equatable, CaseIterable {
     
     /// Whether this state allows retry operations
     var allowsRetry: Bool {
-        if case .failed(let error) = self {
-            return error.isRetryable
+        if case .failed = self {
+            return true // Most errors are retryable
         }
         return false
-    }
-    
-    /// The appropriate retry strategy for this state
-    var retryStrategy: ErrorRecoveryStrategy? {
-        if case .failed(let error) = self {
-            return error.recoveryStrategy
-        }
-        return nil
     }
     
     // MARK: - State Transition Methods
@@ -283,7 +275,7 @@ enum FamilyCreationState: Equatable, CaseIterable {
             .creatingLocally,
             .syncingToCloudKit,
             .completed,
-            .failed(.unknownError(NSError(domain: "Example", code: 0, userInfo: nil)))
+            .failed(.unknownError("Unknown error"))
         ]
     }
 }
@@ -410,7 +402,7 @@ struct FamilyCreationAnalytics {
     
     /// Records an error for analytics
     static func recordError(_ error: FamilyCreationError, in state: FamilyCreationState) {
-        print("📊 Analytics: Error in state \(state) - \(error.category.rawValue): \(error.technicalDescription)")
+        print("📊 Analytics: Error in state \(state) - \(error.localizedDescription ?? "Unknown error")")
     }
     
     /// Records successful completion

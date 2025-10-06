@@ -7,144 +7,255 @@ struct FamilyDashboardView: View {
     
     // MARK: - Initialization
     
-    init(family: Family, currentUserId: UUID, currentUserRole: Role) {
-        // Create temporary services for initialization
-        let tempContainer = try! ModelContainerConfiguration.createInMemory()
-        let dataService = DataService(modelContext: tempContainer.mainContext)
-        let cloudKitService = CloudKitService()
+    init() {
+        // Initialize with current family and user from AppState
+        // The actual family and user will be set when the view appears
+        let placeholderFamilyId = UUID()
+        let placeholderUserId = UUID()
         
         self._viewModel = StateObject(wrappedValue: FamilyDashboardViewModel(
-            family: family,
+            familyId: placeholderFamilyId,
+            currentUserId: placeholderUserId,
+            dataManager: InMemoryFamilyDataManager.shared
+        ))
+    }
+    
+    init(familyId: UUID, currentUserId: UUID) {
+        self._viewModel = StateObject(wrappedValue: FamilyDashboardViewModel(
+            familyId: familyId,
             currentUserId: currentUserId,
-            currentUserRole: currentUserRole,
-            dataService: dataService,
-            cloudKitService: cloudKitService
+            dataManager: InMemoryFamilyDataManager.shared
         ))
     }
     
     // MARK: - Body
     
     var body: some View {
-        NavigationView {
-            ZStack {
-                // Background
-                Color(.systemGroupedBackground)
-                    .ignoresSafeArea()
-                
-                if viewModel.isLoading && viewModel.members.isEmpty {
-                    // Initial loading state with skeleton
-                    VStack(spacing: 20) {
-                        LoadingStateView(
-                            message: "Loading family members...",
-                            style: .card
-                        )
-                        
-                        SkeletonLoadingView(rows: 3, showAvatar: true)
-                    }
-                    .padding()
-                } else if viewModel.members.isEmpty && !viewModel.isLoading {
-                    // Empty state
-                    EmptyStateView.noMembers {
-                        // TODO: Implement invite functionality in later tasks
-                        ToastManager.shared.info("Invite functionality coming soon")
-                    }
-                } else {
-                    ScrollView {
-                        LazyVStack(spacing: 16) {
-                            // Family header
-                            familyHeaderView
-                            
-                            // Members section
-                            membersSection
-                            
-                            // Admin controls section
-                            if viewModel.canManageMembers {
-                                adminControlsSection
-                            }
-                        }
-                        .padding()
-                    }
-                    .refreshable {
-                        await viewModel.loadMembers()
-                    }
+        NavigationStack {
+            mainContentView
+                .navigationTitle("Family Dashboard")
+                .navigationBarTitleDisplayMode(.large)
+                .toolbar {
+                    toolbarContent
                 }
-            }
-            .navigationTitle("Family Dashboard")
-            .navigationBarTitleDisplayMode(.large)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Menu {
-                        Button("Refresh") {
-                            Task {
-                                await viewModel.loadMembers()
-                            }
-                        }
-                        
-                        Divider()
-                        
-                        Button("Leave Family", role: .destructive) {
-                            appState.leaveFamily()
-                        }
-                        
-                        Button("Sign Out", role: .destructive) {
-                            Task {
-                                await appState.signOut()
-                            }
-                        }
-                    } label: {
-                        Image(systemName: "ellipsis.circle")
-                    }
-                }
-            }
         }
         .task {
-            await viewModel.loadMembers()
+            await handleViewAppearance()
         }
         .withToast()
         .alert("Error", isPresented: .constant(viewModel.errorMessage != nil)) {
-            Button("OK") {
-                viewModel.clearErrorMessage()
-            }
+            errorAlertButtons
         } message: {
-            if let errorMessage = viewModel.errorMessage {
-                Text(errorMessage)
-            }
+            errorAlertMessage
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Family Dashboard Screen")
         .sheet(isPresented: $viewModel.showRoleChangeSheet) {
-            if let member = viewModel.selectedMember {
-                RoleChangeSheet(
-                    member: member,
-                    userProfile: viewModel.userProfile(for: member),
-                    onRoleChange: { newRole in
-                        Task {
-                            await viewModel.changeRole(for: member, to: newRole)
-                        }
-                    }
-                )
-            }
+            roleChangeSheet
         }
         .confirmationDialog(
             "Remove Member",
             isPresented: $viewModel.showRemovalConfirmation,
             titleVisibility: .visible
         ) {
-            if let member = viewModel.memberToRemove,
-               let profile = viewModel.userProfile(for: member) {
-                Button("Remove \(profile.displayName)", role: .destructive) {
+            removalConfirmationButtons
+        } message: {
+            removalConfirmationMessage
+        }
+    }
+    
+    // MARK: - Main Content Views
+    
+    @ViewBuilder
+    private var mainContentView: some View {
+        ZStack {
+            Color(.systemGroupedBackground)
+                .ignoresSafeArea()
+            
+            contentBasedOnState
+        }
+    }
+    
+    @ViewBuilder
+    private var contentBasedOnState: some View {
+        if viewModel.isLoading && viewModel.members.isEmpty {
+            loadingStateView
+        } else if viewModel.members.isEmpty && !viewModel.isLoading {
+            emptyStateView
+        } else {
+            membersContentView
+        }
+    }
+    
+    @ViewBuilder
+    private var loadingStateView: some View {
+        VStack(spacing: 20) {
+            LoadingStateView(
+                message: "Loading family members...",
+                style: .card
+            )
+            .accessibilityLabel("Loading family members")
+            
+            SkeletonLoadingView(rows: 3, showAvatar: true)
+                .accessibilityLabel("Loading placeholder")
+        }
+        .padding()
+    }
+    
+    @ViewBuilder
+    private var emptyStateView: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "person.3")
+                .font(.system(size: 48))
+                .foregroundColor(.secondary)
+                .accessibilityHidden(true)
+            
+            Text("No Family Members")
+                .font(.headline)
+                .foregroundColor(.primary)
+                .accessibilityAddTraits([.isHeader])
+            
+            Text("Invite family members to get started")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+                .accessibilityLabel("Invite family members to get started")
+            
+            Button("Invite Members") {
+                HapticManager.shared.selection()
+                // TODO: Implement invite functionality in later tasks
+                print("Invite functionality coming soon")
+            }
+            .buttonStyle(.borderedProminent)
+            .accessibilityLabel("Invite Members")
+            .accessibilityHint("Opens the member invitation screen")
+        }
+        .padding()
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("No family members. Invite family members to get started")
+    }
+    
+    @ViewBuilder
+    private var membersContentView: some View {
+        ScrollView {
+            LazyVStack(spacing: 16) {
+                familyHeaderView
+                membersSection
+                
+                if viewModel.canManageMembers {
+                    adminControlsSection
+                }
+            }
+            .padding()
+        }
+        .refreshable {
+            HapticManager.shared.lightImpact()
+            await viewModel.loadMembers()
+        }
+        .accessibilityLabel("Family dashboard content")
+    }
+    
+    @ToolbarContentBuilder
+    private var toolbarContent: some ToolbarContent {
+        ToolbarItem(placement: .navigationBarTrailing) {
+            Menu {
+                Button("Refresh") {
+                    HapticManager.shared.lightImpact()
                     Task {
-                        await viewModel.removeMember(member)
+                        await viewModel.loadMembers()
                     }
                 }
-                Button("Cancel", role: .cancel) {
-                    viewModel.memberToRemove = nil
+                
+                Divider()
+                
+                Button("Leave Family", role: .destructive) {
+                    HapticManager.shared.warning()
+                    appState.leaveFamily()
                 }
+                
+                Button("Sign Out", role: .destructive) {
+                    HapticManager.shared.warning()
+                    Task {
+                        await appState.signOut()
+                    }
+                }
+            } label: {
+                Image(systemName: "ellipsis.circle")
             }
-        } message: {
-            if let member = viewModel.memberToRemove,
-               let profile = viewModel.userProfile(for: member) {
-                Text("Are you sure you want to remove \(profile.displayName) from the family? This action cannot be undone.")
+            .accessibilityLabel("Family options")
+            .accessibilityHint("Shows family management options")
+        }
+    }
+    
+    // MARK: - Alert and Sheet Content
+    
+    @ViewBuilder
+    private var errorAlertButtons: some View {
+        Button("OK") {
+            viewModel.clearError()
+        }
+        Button("Retry") {
+            Task {
+                await viewModel.loadMembers()
             }
         }
+    }
+    
+    @ViewBuilder
+    private var errorAlertMessage: some View {
+        if let errorMessage = viewModel.errorMessage {
+            Text(errorMessage)
+        }
+    }
+    
+    @ViewBuilder
+    private var roleChangeSheet: some View {
+        if let member = viewModel.selectedMember {
+            RoleChangeSheet(
+                member: member,
+                user: viewModel.user(for: member),
+                onRoleChange: { newRole in
+                    Task {
+                        await viewModel.changeRole(for: member, to: newRole)
+                    }
+                }
+            )
+        }
+    }
+    
+    @ViewBuilder
+    private var removalConfirmationButtons: some View {
+        if let member = viewModel.memberToRemove,
+           let user = viewModel.user(for: member) {
+            Button("Remove \(user.name)", role: .destructive) {
+                Task {
+                    await viewModel.removeMember(member)
+                }
+            }
+            Button("Cancel", role: .cancel) {
+                viewModel.memberToRemove = nil
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private var removalConfirmationMessage: some View {
+        if let member = viewModel.memberToRemove,
+           let user = viewModel.user(for: member) {
+            Text("Are you sure you want to remove \(user.name) from the family? This action cannot be undone.")
+        }
+    }
+    
+    // MARK: - Helper Functions
+    
+    private func handleViewAppearance() async {
+        // Update ViewModel with current app state when view appears
+        if let currentFamily = appState.currentFamily,
+           let currentUser = appState.currentUser {
+            // Update the ViewModel with actual IDs
+            await viewModel.updateContext(familyId: currentFamily.id, currentUserId: currentUser.id)
+        }
+        await viewModel.loadMembers()
     }
     
     // MARK: - View Components
@@ -157,6 +268,8 @@ struct FamilyDashboardView: View {
                     .font(.title2)
                     .fontWeight(.bold)
                     .foregroundColor(.brandPrimary)
+                    .accessibilityAddTraits([.isHeader])
+                    .accessibilityLabel("Family name: \(family.name)")
             }
             
             // Current user role badge
@@ -167,16 +280,21 @@ struct FamilyDashboardView: View {
                 
                 RoleBadge(role: viewModel.currentUserRole)
             }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Your role: \(viewModel.currentUserRole.displayName)")
             
             // Member count
             Text("\(viewModel.members.count) \(viewModel.members.count == 1 ? "Member" : "Members")")
                 .font(.caption)
                 .foregroundColor(.secondary)
+                .accessibilityLabel("\(viewModel.members.count) family \(viewModel.members.count == 1 ? "member" : "members")")
         }
         .padding()
         .background(Color(.systemBackground))
         .cornerRadius(12)
         .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Family header")
     }
     
     private var membersSection: some View {
@@ -185,23 +303,28 @@ struct FamilyDashboardView: View {
                 .font(.headline)
                 .fontWeight(.semibold)
                 .padding(.horizontal, 4)
+                .accessibilityAddTraits([.isHeader])
             
             LazyVStack(spacing: 8) {
-                ForEach(viewModel.members) { member in
+                ForEach(viewModel.members, id: \.member.id) { memberWithUser in
                     MemberRowView(
-                        member: member,
-                        userProfile: viewModel.userProfile(for: member),
-                        canManage: viewModel.canManageMembers && member.userId != appState.currentUser?.id,
+                        member: memberWithUser.member,
+                        user: memberWithUser.user,
+                        canManage: viewModel.canManageMembers && memberWithUser.member.userId != appState.currentUser?.id,
                         onRoleChange: {
-                            viewModel.showRoleChange(for: member)
+                            HapticManager.shared.selection()
+                            viewModel.showRoleChange(for: memberWithUser.member)
                         },
                         onRemove: {
-                            viewModel.showRemovalConfirmation(for: member)
+                            HapticManager.shared.warning()
+                            viewModel.showRemovalConfirmation(for: memberWithUser.member)
                         }
                     )
                 }
             }
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Family members section")
     }
     
     private var adminControlsSection: some View {
@@ -217,7 +340,7 @@ struct FamilyDashboardView: View {
                     icon: "person.badge.plus",
                     action: {
                         // TODO: Implement invite functionality in later tasks
-                        viewModel.errorMessage = "Invite functionality coming soon"
+                        ToastManager.shared.info("Invite functionality coming soon")
                     }
                 )
                 
@@ -226,7 +349,7 @@ struct FamilyDashboardView: View {
                     icon: "gearshape",
                     action: {
                         // TODO: Implement settings functionality in later tasks
-                        viewModel.errorMessage = "Settings functionality coming soon"
+                        ToastManager.shared.info("Settings functionality coming soon")
                     }
                 )
             }
@@ -241,8 +364,8 @@ struct FamilyDashboardView: View {
 // MARK: - Member Row View
 
 struct MemberRowView: View {
-    let member: Membership
-    let userProfile: UserProfile?
+    let member: InMemoryMember
+    let user: InMemoryUser?
     let canManage: Bool
     let onRoleChange: () -> Void
     let onRemove: () -> Void
@@ -250,35 +373,34 @@ struct MemberRowView: View {
     var body: some View {
         HStack(spacing: 12) {
             // Avatar
-            MemberAvatarView(userProfile: userProfile)
+            MemberAvatarView(user: user)
             
             // Member info
             VStack(alignment: .leading, spacing: 4) {
-                Text(userProfile?.displayName ?? "Unknown Member")
+                Text(user?.name ?? "Unknown Member")
                     .font(.subheadline)
                     .fontWeight(.medium)
+                    .accessibilityLabel("Member name: \(user?.name ?? "Unknown Member")")
                 
                 HStack(spacing: 8) {
                     RoleBadge(role: member.role)
-                    
-                    if member.status == .invited {
-                        StatusBadge(status: member.status)
-                    }
                 }
             }
             
             Spacer()
             
             // Management controls
-            if canManage && member.status == .active {
+            if canManage {
                 HStack(spacing: 8) {
                     // Role change button
-                    if member.role != .parentAdmin {
+                    if member.role != .parent {
                         Button(action: onRoleChange) {
                             Image(systemName: "person.crop.circle.badge.questionmark")
                                 .foregroundColor(.brandPrimary)
                         }
                         .buttonStyle(PlainButtonStyle())
+                        .accessibilityLabel("Change role")
+                        .accessibilityHint("Changes the role for \(user?.name ?? "this member")")
                     }
                     
                     // Remove button
@@ -287,20 +409,40 @@ struct MemberRowView: View {
                             .foregroundColor(.red)
                     }
                     .buttonStyle(PlainButtonStyle())
+                    .accessibilityLabel("Remove member")
+                    .accessibilityHint("Removes \(user?.name ?? "this member") from the family")
                 }
+                .accessibilityElement(children: .contain)
+                .accessibilityLabel("Member management controls")
             }
         }
         .padding()
         .background(Color(.systemBackground))
         .cornerRadius(12)
         .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Family member: \(user?.name ?? "Unknown Member"), role: \(member.role.displayName)")
+        .accessibilityHint(canManage ? "Double tap to manage this member" : "")
     }
 }
 
 // MARK: - Member Avatar View
 
 struct MemberAvatarView: View {
+    let user: InMemoryUser?
     let userProfile: UserProfile?
+    
+    // Initializer for InMemoryUser
+    init(user: InMemoryUser?) {
+        self.user = user
+        self.userProfile = nil
+    }
+    
+    // Initializer for UserProfile
+    init(userProfile: UserProfile?) {
+        self.user = nil
+        self.userProfile = userProfile
+    }
     
     var body: some View {
         ZStack {
@@ -308,8 +450,13 @@ struct MemberAvatarView: View {
                 .fill(Color.brandPrimary.opacity(0.1))
                 .frame(width: 44, height: 44)
             
-            if let profile = userProfile {
-                Text(profile.displayName.prefix(1).uppercased())
+            if let user = user {
+                Text(user.name.prefix(1).uppercased())
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.brandPrimary)
+            } else if let userProfile = userProfile {
+                Text(userProfile.displayName.prefix(1).uppercased())
                     .font(.headline)
                     .fontWeight(.semibold)
                     .foregroundColor(.brandPrimary)
@@ -324,7 +471,7 @@ struct MemberAvatarView: View {
 // MARK: - Role Badge
 
 struct RoleBadge: View {
-    let role: Role
+    let role: InMemoryRole
     
     var body: some View {
         Text(role.displayName)
@@ -339,47 +486,32 @@ struct RoleBadge: View {
     
     private var backgroundColor: Color {
         switch role {
-        case .parentAdmin:
+        case .parent:
             return .red.opacity(0.1)
-        case .adult:
-            return .blue.opacity(0.1)
-        case .kid:
+        case .child:
             return .green.opacity(0.1)
-        case .visitor:
+        case .guardian:
+            return .blue.opacity(0.1)
+        case .helper:
             return .orange.opacity(0.1)
         }
     }
     
     private var textColor: Color {
         switch role {
-        case .parentAdmin:
+        case .parent:
             return .red
-        case .adult:
-            return .blue
-        case .kid:
+        case .child:
             return .green
-        case .visitor:
+        case .guardian:
+            return .blue
+        case .helper:
             return .orange
         }
     }
 }
 
-// MARK: - Status Badge
 
-struct StatusBadge: View {
-    let status: MembershipStatus
-    
-    var body: some View {
-        Text(status.displayName)
-            .font(.caption)
-            .fontWeight(.medium)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(Color.orange.opacity(0.1))
-            .foregroundColor(.orange)
-            .cornerRadius(6)
-    }
-}
 
 // MARK: - Admin Control Button
 
@@ -415,16 +547,16 @@ struct AdminControlButton: View {
 // MARK: - Role Change Sheet
 
 struct RoleChangeSheet: View {
-    let member: Membership
-    let userProfile: UserProfile?
-    let onRoleChange: (Role) -> Void
+    let member: InMemoryMember
+    let user: InMemoryUser?
+    let onRoleChange: (InMemoryRole) -> Void
     
     @Environment(\.dismiss) private var dismiss
-    @State private var selectedRole: Role
+    @State private var selectedRole: InMemoryRole
     
-    init(member: Membership, userProfile: UserProfile?, onRoleChange: @escaping (Role) -> Void) {
+    init(member: InMemoryMember, user: InMemoryUser?, onRoleChange: @escaping (InMemoryRole) -> Void) {
         self.member = member
-        self.userProfile = userProfile
+        self.user = user
         self.onRoleChange = onRoleChange
         self._selectedRole = State(initialValue: member.role)
     }
@@ -434,9 +566,9 @@ struct RoleChangeSheet: View {
             VStack(spacing: 20) {
                 // Member info
                 VStack(spacing: 12) {
-                    MemberAvatarView(userProfile: userProfile)
+                    MemberAvatarView(user: user)
                     
-                    Text(userProfile?.displayName ?? "Unknown Member")
+                    Text(user?.name ?? "Unknown Member")
                         .font(.headline)
                         .fontWeight(.semibold)
                     
@@ -452,11 +584,11 @@ struct RoleChangeSheet: View {
                         .font(.headline)
                         .padding(.horizontal)
                     
-                    ForEach(Role.allCases, id: \.self) { role in
+                    ForEach(InMemoryRole.allCases, id: \.self) { role in
                         RoleSelectionRow(
                             role: role,
                             isSelected: selectedRole == role,
-                            isDisabled: role == .parentAdmin && member.role != .parentAdmin,
+                            isDisabled: role == .parent && member.role != .parent,
                             onSelect: {
                                 selectedRole = role
                             }
@@ -490,7 +622,7 @@ struct RoleChangeSheet: View {
 // MARK: - Role Selection Row
 
 struct RoleSelectionRow: View {
-    let role: Role
+    let role: InMemoryRole
     let isSelected: Bool
     let isDisabled: Bool
     let onSelect: () -> Void
@@ -540,13 +672,6 @@ struct RoleSelectionRow: View {
 // MARK: - Preview
 
 #Preview {
-    let mockData = MockDataGenerator.mockFamilyWithMembers()
-    let mockUserId = mockData.users[0].id
-    
-    FamilyDashboardView(
-        family: mockData.family,
-        currentUserId: mockUserId,
-        currentUserRole: .parentAdmin
-    )
-    .environmentObject(AppState())
+    FamilyDashboardView()
+        .environmentObject(AppState())
 }

@@ -230,11 +230,10 @@ struct RunOverviewCard: View {
     .background(Color(.systemGroupedBackground))
 }
 
-#Preview("Run Overview Card - Interactive") {
+#Preview("Interactive Overview Card") {
     VStack(spacing: DesignSystem.Spacing.lg) {
         RunOverviewCard(run: SchoolRunPreviewProvider.upcomingRun)
     }
     .padding()
     .background(Color(.systemGroupedBackground))
-    .previewDisplayName("Interactive Overview Card")
 }

@@ -445,7 +445,7 @@ struct TaskDetailView: View {
         // Provide haptic feedback
         switch status {
         case .completed:
-            HapticManager.shared.successImpact()
+            HapticManager.shared.success()
         default:
             HapticManager.shared.lightImpact()
         }

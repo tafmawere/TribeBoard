@@ -38,41 +38,42 @@ class ServiceCoordinator: ObservableObject {
     /// Creates CreateFamilyViewModel with proper dependencies
     func createFamilyViewModel() -> CreateFamilyViewModel {
         return CreateFamilyViewModel(
-            dataService: dataService,
-            cloudKitService: cloudKitService,
-            syncManager: syncManager,
-            qrCodeService: qrCodeService,
-            codeGenerator: codeGenerator
+            qrCodeService: qrCodeService
         )
     }
     
     /// Creates JoinFamilyViewModel with proper dependencies
     func joinFamilyViewModel() -> JoinFamilyViewModel {
-        return JoinFamilyViewModel(
-            dataService: dataService,
-            cloudKitService: cloudKitService,
-            qrCodeService: qrCodeService
+        return JoinFamilyViewModel()
+    }
+    
+    /// Creates RoleSelectionViewModel with proper dependencies (legacy method for CloudKit/DataService)
+    func roleSelectionViewModel(family: Family, user: UserProfile) -> RoleSelectionViewModel {
+        // For backward compatibility, create temporary in-memory models
+        // This is a bridge method until full migration to in-memory storage
+        let inMemoryFamily = InMemoryFamily(name: family.name, code: family.code)
+        let inMemoryUser = InMemoryUser(name: user.displayName)
+        
+        return RoleSelectionViewModel(
+            family: inMemoryFamily,
+            user: inMemoryUser
         )
     }
     
-    /// Creates RoleSelectionViewModel with proper dependencies
-    func roleSelectionViewModel(family: Family, user: UserProfile) -> RoleSelectionViewModel {
+    /// Creates RoleSelectionViewModel with in-memory models for SwiftUI compatibility
+    func roleSelectionViewModel(family: InMemoryFamily, user: InMemoryUser) -> RoleSelectionViewModel {
         return RoleSelectionViewModel(
             family: family,
-            user: user,
-            dataService: dataService,
-            cloudKitService: cloudKitService
+            user: user
         )
     }
     
     /// Creates FamilyDashboardViewModel with proper dependencies
     func familyDashboardViewModel(family: Family, currentUserId: UUID, currentUserRole: Role) -> FamilyDashboardViewModel {
+        // For the enhanced in-memory version, we use the family ID instead of the full Family object
         return FamilyDashboardViewModel(
-            family: family,
-            currentUserId: currentUserId,
-            currentUserRole: currentUserRole,
-            dataService: dataService,
-            cloudKitService: cloudKitService
+            familyId: family.id,
+            currentUserId: currentUserId
         )
     }
 }

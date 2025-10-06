@@ -170,7 +170,7 @@ struct ShakeAnimation: ViewModifier {
                         }
                     }
                     
-                    HapticManager.shared.validationError()
+                    HapticManager.shared.error()
                 }
             }
     }
@@ -266,7 +266,7 @@ struct CelebrationAnimation: ViewModifier {
                         }
                     }
                     
-                    HapticManager.shared.celebration()
+                    HapticManager.shared.success()
                 }
             }
     }
@@ -328,7 +328,7 @@ struct NavigationSelectionAnimation: ViewModifier {
                     
                     // Haptic feedback
                     if hapticFeedback {
-                        HapticManager.shared.selection()
+                        HapticManager.shared.lightImpact()
                     }
                 }
             }

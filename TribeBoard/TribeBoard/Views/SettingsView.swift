@@ -174,7 +174,14 @@ struct SettingsView: View {
                                 .font(.subheadline)
                                 .fontWeight(.medium)
                             
-                            RoleBadge(role: viewModel.currentUserRole)
+                            Text(viewModel.currentUserRole.displayName)
+                                .font(.caption)
+                                .fontWeight(.medium)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(Color.blue.opacity(0.2))
+                                .foregroundColor(.blue)
+                                .clipShape(Capsule())
                         }
                         
                         if let family = appState.currentFamily {

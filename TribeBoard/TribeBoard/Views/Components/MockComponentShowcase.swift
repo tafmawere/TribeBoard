@@ -63,7 +63,6 @@ struct MockComponentShowcase: View {
                         GridItem(.flexible())
                     ], spacing: 16) {
                         LoadingStateView(
-                            message: "Creating family...",
                             style: .card,
                             mockScenario: .familyCreation
                         )
@@ -71,21 +70,18 @@ struct MockComponentShowcase: View {
                         
                         LoadingStateView(
                             message: "Signing in...",
-                            style: .progress,
-                            mockScenario: .authentication
+                            style: .card
                         )
                         .frame(height: 120)
                         
                         LoadingStateView(
-                            message: "Syncing data...",
-                            style: .shimmer,
+                            style: .inline,
                             mockScenario: .dataSync
                         )
                         .frame(height: 120)
                         
                         LoadingStateView(
-                            message: "Generating QR...",
-                            style: .pulse,
+                            style: .overlay,
                             mockScenario: .qrGeneration
                         )
                         .frame(height: 120)
@@ -359,14 +355,14 @@ struct MockComponentShowcase: View {
                         title: "Family Name",
                         placeholder: "Enter your family name",
                         text: $familyName,
-                        validation: ValidationRules.familyName
+                        validation: FormValidationRules.familyName
                     )
                     
                     ValidatedTextField(
                         title: "Family Code",
                         placeholder: "Enter 4-8 characters",
                         text: $familyCode,
-                        validation: ValidationRules.familyCode,
+                        validation: FormValidationRules.familyCode,
                         textInputAutocapitalization: .characters,
                         autocorrectionDisabled: true
                     )
@@ -476,13 +472,13 @@ struct MockComponentShowcase: View {
         ScrollView {
             VStack(spacing: 30) {
                 LoadingStateView(
-                    style: .card,
-                    mockScenario: .familyCreation
+                    message: "Creating your family...",
+                    style: .card
                 )
                 
                 LoadingStateView(
-                    style: .progress,
-                    mockScenario: .authentication
+                    message: "Authenticating...",
+                    style: .inline
                 )
                 
                 SkeletonLoadingView(rows: 3, showAvatar: true)

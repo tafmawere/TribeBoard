@@ -464,7 +464,7 @@ private struct CompactCurrentStopCard: View {
 
 }
 
-#Preview("Current Stop Card - Interactive") {
+#Preview("Interactive Stop Card") {
     VStack(spacing: DesignSystem.Spacing.xl) {
         CurrentStopCard(
             stopNumber: 3,
@@ -475,5 +475,4 @@ private struct CompactCurrentStopCard: View {
     }
     .screenPadding()
     .background(Color(.systemGroupedBackground))
-    .previewDisplayName("Interactive Stop Card")
 }

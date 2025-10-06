@@ -30,7 +30,7 @@ struct MessageBubbleView: View {
         HStack(alignment: .bottom, spacing: 8) {
             if !isCurrentUser {
                 // Sender avatar for other users
-                MemberAvatarView(userProfile: userProfiles[message.sender])
+                MemberAvatarView(user: nil) // Placeholder - MessageBubbleView needs to be updated for InMemoryUser
                     .frame(width: 32, height: 32)
             } else {
                 Spacer()

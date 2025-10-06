@@ -283,7 +283,6 @@ struct MicroInteractionsShowcase: View {
                 
                 if isLoading {
                     LoadingStateView(
-                        message: "Processing your request...",
                         style: .card,
                         mockScenario: .dataSync
                     )

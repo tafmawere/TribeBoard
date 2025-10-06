@@ -2,7 +2,7 @@ import SwiftUI
 import Foundation
 import Combine
 
-/// ViewModel for family creation with comprehensive state machine and error handling
+/// ViewModel for family creation with SwiftUI in-memory storage
 @MainActor
 class CreateFamilyViewModel: ObservableObject {
     // MARK: - Published Properties
@@ -14,7 +14,7 @@ class CreateFamilyViewModel: ObservableObject {
     @Published var creationState: FamilyCreationState = .idle
     
     /// Created family after successful creation
-    @Published var createdFamily: Family?
+    @Published var createdFamily: InMemoryFamily?
     
     /// Generated QR code image for the family code
     @Published var qrCodeImage: Image?
@@ -22,14 +22,17 @@ class CreateFamilyViewModel: ObservableObject {
     /// Current error, if any
     @Published var currentError: FamilyCreationError?
     
+    /// Whether to show error alert
+    @Published var showErrorAlert: Bool = false
+    
+    /// Whether to show success alert
+    @Published var showSuccessAlert: Bool = false
+    
     /// Validation state for family name
     @Published var isValidFamilyName: Bool = false
     
     /// Current retry count for the active operation
     @Published var retryCount: Int = 0
-    
-    /// Whether the app is in offline mode
-    @Published var isOfflineMode: Bool = false
     
     /// Progress of the current operation (0.0 to 1.0)
     @Published var progress: Double = 0.0
@@ -39,15 +42,11 @@ class CreateFamilyViewModel: ObservableObject {
     
     // MARK: - Dependencies
     
-    private let dataService: DataService
-    private let cloudKitService: CloudKitService
-    private let syncManager: SyncManager
+    private let dataManager: InMemoryFamilyDataManager
     private let qrCodeService: QRCodeService
-    private let codeGenerator: CodeGenerator
     
     // MARK: - State Management
     
-    private let stateManager = FamilyCreationStateManager()
     private var cancellables = Set<AnyCancellable>()
     
     // MARK: - Retry Configuration
@@ -76,57 +75,55 @@ class CreateFamilyViewModel: ObservableObject {
     
     /// Whether the creation process has completed successfully
     var isCompleted: Bool {
-        return creationState.isCompleted
+        return creationState == .completed
     }
     
     /// Whether the creation process has failed
     var isFailed: Bool {
-        return creationState.isFailed
+        if case .failed = creationState {
+            return true
+        }
+        return false
     }
     
     /// Whether the current state allows retry
     var canRetry: Bool {
-        return creationState.allowsRetry && retryCount < maxRetryAttempts
+        return isFailed && retryCount < maxRetryAttempts
     }
     
     /// Whether the current state is cancellable
     var canCancel: Bool {
-        return creationState.isCancellable
+        return isCreating
     }
     
     /// User-friendly error message for display
     var errorMessage: String? {
-        return currentError?.userFriendlyMessage
+        return currentError?.errorDescription
     }
     
     /// Whether to show loading indicator
     var shouldShowLoadingIndicator: Bool {
-        return creationState.shouldShowLoadingIndicator
+        return isCreating
     }
     
     /// Whether to show progress details
     var shouldShowProgressDetails: Bool {
-        return creationState.shouldShowProgressDetails
+        return isCreating
     }
     
     // MARK: - Initialization
     
-    init(dataService: DataService, cloudKitService: CloudKitService, syncManager: SyncManager, qrCodeService: QRCodeService = QRCodeService(), codeGenerator: CodeGenerator = CodeGenerator()) {
-        self.dataService = dataService
-        self.cloudKitService = cloudKitService
-        self.syncManager = syncManager
+    init(dataManager: InMemoryFamilyDataManager? = nil, qrCodeService: QRCodeService = QRCodeService()) {
+        self.dataManager = dataManager ?? InMemoryFamilyDataManager.shared
         self.qrCodeService = qrCodeService
-        self.codeGenerator = codeGenerator
         
-        // Set up validation and state management
+        // Set up validation
         setupValidation()
-        setupStateManagement()
-        setupNetworkMonitoring()
     }
     
     // MARK: - Public Methods
     
-    /// Create a new family with comprehensive state machine and error handling
+    /// Create a new family with SwiftUI in-memory storage
     func createFamily(with appState: AppState) async {
         guard canCreateFamily else { return }
         
@@ -140,21 +137,14 @@ class CreateFamilyViewModel: ObservableObject {
             // Validate family input
             try await validateFamilyInput()
             
-            // Generate unique family code
-            let familyCode = try await generateUniqueFamilyCodeWithRetry()
-            
-            // Create family locally
-            let (family, membership) = try await createFamilyLocally(
+            // Create family in memory
+            let family = try await createFamilyInMemory(
                 name: familyName.trimmingCharacters(in: .whitespacesAndNewlines),
-                code: familyCode,
                 appState: appState
             )
             
             // Generate QR code
-            let qrImage = qrCodeService.generateQRCode(from: familyCode)
-            
-            // Sync to CloudKit (with fallback to local-only)
-            try await syncToCloudKitWithFallback(family: family, membership: membership)
+            let qrImage = qrCodeService.generateQRCode(from: family.code)
             
             // Complete creation successfully
             await completeCreation(family: family, qrImage: qrImage, appState: appState)
@@ -162,7 +152,7 @@ class CreateFamilyViewModel: ObservableObject {
         } catch let error as FamilyCreationError {
             await handleCreationError(error)
         } catch {
-            await handleCreationError(.unknownError(error))
+            await handleCreationError(.unknownError("Unknown error occurred"))
         }
     }
     
@@ -192,9 +182,21 @@ class CreateFamilyViewModel: ObservableObject {
     /// Clear any error messages
     func clearError() {
         currentError = nil
+        showErrorAlert = false
         if creationState.isFailed {
             updateState(.idle)
         }
+    }
+    
+    /// Show error alert with the current error
+    func showError(_ error: FamilyCreationError) {
+        currentError = error
+        showErrorAlert = true
+    }
+    
+    /// Show success alert
+    func showSuccess() {
+        showSuccessAlert = true
     }
     
     /// Reset the form and state
@@ -229,34 +231,34 @@ class CreateFamilyViewModel: ObservableObject {
             .assign(to: &$isValidFamilyName)
     }
     
-    /// Set up state management bindings
-    private func setupStateManagement() {
-        // Bind state manager to published properties
-        stateManager.$currentState
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] state in
-                self?.creationState = state
-                self?.progress = state.progress
-                self?.statusMessage = state.userDescription
-                self?.currentError = state.error
-            }
-            .store(in: &cancellables)
-    }
-    
-    /// Set up network monitoring for offline mode detection
-    private func setupNetworkMonitoring() {
-        // Use SyncManager for offline mode detection
-        syncManager.$isOfflineMode
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] isOffline in
-                self?.isOfflineMode = isOffline
-            }
-            .store(in: &cancellables)
-    }
-    
-    /// Update the current state
+    /// Update the current state and related properties
     private func updateState(_ newState: FamilyCreationState) {
-        stateManager.transition(to: newState)
+        creationState = newState
+        
+        // Update progress and status message based on state
+        switch newState {
+        case .idle:
+            progress = 0.0
+            statusMessage = "Ready to create family"
+        case .validating:
+            progress = 0.2
+            statusMessage = "Validating input..."
+        case .generatingCode:
+            progress = 0.4
+            statusMessage = "Generating family code..."
+        case .creatingLocally:
+            progress = 0.8
+            statusMessage = "Creating family..."
+        case .completed:
+            progress = 1.0
+            statusMessage = "Family created successfully!"
+        case .failed(let error):
+            progress = 0.0
+            statusMessage = "Creation failed"
+            currentError = error
+        default:
+            break
+        }
     }
     
     // MARK: - Creation Steps
@@ -266,7 +268,7 @@ class CreateFamilyViewModel: ObservableObject {
         updateState(.validating)
         
         guard let currentUser = appState.currentUser else {
-            throw FamilyCreationError.userNotAuthenticated
+            throw FamilyCreationError.userNotFound
         }
         
         // Additional user validation could go here
@@ -278,133 +280,55 @@ class CreateFamilyViewModel: ObservableObject {
         let trimmedName = familyName.trimmingCharacters(in: .whitespacesAndNewlines)
         
         guard !trimmedName.isEmpty else {
-            throw FamilyCreationError.invalidFamilyName("Family name cannot be empty")
+            throw FamilyCreationError.emptyFamilyName
         }
         
         guard trimmedName.count >= 2 else {
-            throw FamilyCreationError.invalidFamilyName("Family name must be at least 2 characters")
+            throw FamilyCreationError.invalidFamilyName
         }
         
         guard trimmedName.count <= 50 else {
-            throw FamilyCreationError.invalidFamilyName("Family name cannot exceed 50 characters")
+            throw FamilyCreationError.invalidFamilyName
         }
         
         print("✅ Family input validated: '\(trimmedName)'")
     }
     
-    /// Generate a unique family code with retry logic
-    private func generateUniqueFamilyCodeWithRetry() async throws -> String {
-        updateState(.generatingCode)
-        
-        do {
-            return try await codeGenerator.generateUniqueCodeSafely(
-                checkLocal: { [weak self] code in
-                    guard let self = self else { return false }
-                    
-                    // Check local storage first
-                    let localExists = try self.dataService.familyCodeExists(code)
-                    return !localExists // Return true if code is unique (not found locally)
-                },
-                checkRemote: { [weak self] code in
-                    guard let self = self else { return false }
-                    
-                    // Check CloudKit for collision if online
-                    if !self.isOfflineMode {
-                        let cloudKitRecord = try await self.cloudKitService.fetchFamily(byCode: code)
-                        return cloudKitRecord == nil // Return true if code is unique (not found)
-                    }
-                    
-                    return true // Assume unique if offline
-                }
-            )
-        } catch let error as FamilyCodeGenerationError {
-            throw FamilyCreationError.codeGenerationFailed(error)
-        } catch {
-            throw FamilyCreationError.codeGenerationFailed(.generationAlgorithmFailed)
-        }
-    }
+
     
-    /// Create family in local storage
-    private func createFamilyLocally(name: String, code: String, appState: AppState) async throws -> (Family, Membership) {
+    /// Create family in memory storage
+    private func createFamilyInMemory(name: String, appState: AppState) async throws -> InMemoryFamily {
         updateState(.creatingLocally)
         
         guard let currentUser = appState.currentUser else {
-            throw FamilyCreationError.userNotAuthenticated
+            throw FamilyCreationError.userNotFound
         }
         
-        do {
-            // Create family in local storage
-            let family = try dataService.createFamily(
-                name: name,
-                code: code,
-                createdByUserId: currentUser.id
-            )
-            
-            // Create membership for the creator as Parent Admin
-            let membership = try dataService.createMembership(
-                family: family,
-                user: currentUser,
-                role: .parentAdmin
-            )
-            
-            print("✅ Family created locally: '\(name)' with code: \(code)")
-            return (family, membership)
-            
-        } catch let error as DataServiceError {
-            throw FamilyCreationError.localCreationFailed(error)
-        } catch {
-            throw FamilyCreationError.localCreationFailed(.invalidData(error.localizedDescription))
+        // Create family in memory (code is generated automatically)
+        let family = dataManager.createFamily(name: name, createdByUserId: currentUser.id)
+        
+        // Create user in memory if not exists
+        let inMemoryUser = InMemoryUser(name: currentUser.displayName.isEmpty ? "Unknown User" : currentUser.displayName)
+        
+        // Add creator as parent member
+        let success = dataManager.addMemberToFamily(
+            familyId: family.id,
+            user: inMemoryUser,
+            role: .parent
+        )
+        
+        guard success else {
+            throw FamilyCreationError.unknownError("Failed to create family")
         }
+        
+        print("✅ Family created in memory: '\(name)' with code: \(family.code)")
+        return family
     }
     
-    /// Sync family and membership to CloudKit with fallback
-    private func syncToCloudKitWithFallback(family: Family, membership: Membership) async throws {
-        guard !isOfflineMode else {
-            // Mark for later sync using SyncManager
-            syncManager.markRecordForSync(family)
-            syncManager.markRecordForSync(membership)
-            try dataService.save()
-            print("📱 Offline mode: Family marked for later sync")
-            return
-        }
-        
-        updateState(.syncingToCloudKit)
-        
-        do {
-            // Save family to CloudKit
-            try await cloudKitService.save(family)
-            
-            // Save membership to CloudKit
-            try await cloudKitService.save(membership)
-            
-            // Mark as synced in local storage
-            family.needsSync = false
-            family.lastSyncDate = Date()
-            membership.needsSync = false
-            membership.lastSyncDate = Date()
-            
-            try dataService.save()
-            
-            print("✅ Family synced to CloudKit successfully")
-            
-        } catch let error as CloudKitError {
-            // Fallback to local-only mode using SyncManager
-            syncManager.markRecordForSync(family)
-            syncManager.markRecordForSync(membership)
-            try dataService.save()
-            
-            print("⚠️ CloudKit sync failed, falling back to local-only: \(error.localizedDescription ?? "Unknown error")")
-            
-            // Don't throw error - this is a fallback scenario
-            // The family is still created locally and will sync later
-        } catch {
-            // Handle other sync errors
-            throw FamilyCreationError.cloudKitSyncFailed(.syncFailed(error))
-        }
-    }
+
     
     /// Complete the creation process successfully
-    private func completeCreation(family: Family, qrImage: Image?, appState: AppState) async {
+    private func completeCreation(family: InMemoryFamily, qrImage: Image?, appState: AppState) async {
         // Update state
         createdFamily = family
         qrCodeImage = qrImage
@@ -416,48 +340,32 @@ class CreateFamilyViewModel: ObservableObject {
         HapticManager.shared.success()
         
         // Show success toast
-        let syncStatus = family.needsSync ? " (will sync when online)" : ""
-        ToastManager.shared.success("Family '\(family.name)' created successfully!\(syncStatus)")
+        ToastManager.shared.success("Family '\(family.name)' created successfully!")
         
-        // Add a small delay to allow SwiftData relationships to stabilize
+        // Add a small delay for UI feedback
         do {
             try await Task.sleep(nanoseconds: 200_000_000) // 0.2 seconds
         } catch {
             // Sleep interruption is not critical, continue
         }
         
-        // Update app state and navigate to dashboard
-        if let memberships = family.memberships,
-           let currentUserId = appState.currentUser?.id,
-           let membership = memberships.first(where: { $0.user?.id == currentUserId }) {
-            appState.setFamily(family, membership: membership)
-        }
+        // Navigate to role selection using AppState
+        // Navigation will be handled by the view layer
         
         print("🎉 Family creation completed successfully")
     }
     
     /// Handle creation errors with appropriate recovery strategies
     private func handleCreationError(_ error: FamilyCreationError) async {
-        print("❌ Family creation error: \(error.technicalDescription)")
+        print("❌ Family creation error: \(error.localizedDescription)")
         
-        // Update state to failed
-        updateState(.failed(error))
+        // Show error feedback
+        HapticManager.shared.error()
         
-        // Apply recovery strategy if appropriate
-        if error.isRetryable && retryCount < maxRetryAttempts {
-            print("🔄 Error is retryable, will attempt automatic retry")
-            // Automatic retry will be handled by the retry mechanism
-        } else {
-            // Show error feedback
-            HapticManager.shared.error()
-            
-            // Show error toast for non-retryable errors
-            if !error.isRetryable {
-                ToastManager.shared.error(error.userFriendlyMessage)
-            }
-        }
+        // Show error alert
+        showError(error)
         
-        // Record error for analytics
-        FamilyCreationAnalytics.recordError(error, in: creationState)
+        // Show error toast
+        ToastManager.shared.error(error.localizedDescription)
     }
 }

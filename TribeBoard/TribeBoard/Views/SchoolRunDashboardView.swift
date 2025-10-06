@@ -507,11 +507,10 @@ struct RunDetailPlaceholderView: View {
 
 }
 
-#Preview("Dashboard - Interactive Demo") {
+#Preview("Interactive Dashboard") {
     SchoolRunPreviewProvider.previewWithSampleData {
         NavigationStack {
             SchoolRunDashboardView()
         }
     }
-    .previewDisplayName("Interactive Dashboard")
 }

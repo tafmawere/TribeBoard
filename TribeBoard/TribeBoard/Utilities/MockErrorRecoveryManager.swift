@@ -99,10 +99,10 @@ class MockErrorRecoveryManager: ObservableObject {
         
         // Provide completion feedback
         if success {
-            hapticManager.successImpact()
+            hapticManager.success()
             toastManager.success("Issue resolved successfully")
         } else {
-            hapticManager.errorImpact()
+            hapticManager.error()
             toastManager.error("Unable to resolve issue")
         }
         
@@ -686,10 +686,10 @@ class MockErrorRecoveryManager: ObservableObject {
     
     private func provideFeedback(for result: MockRecoveryResult, action: MockRecoveryAction) async {
         if result.isSuccessful {
-            hapticManager.successImpact()
+            hapticManager.success()
             toastManager.success(result.message)
         } else {
-            hapticManager.errorImpact()
+            hapticManager.error()
             toastManager.error(result.message)
             
             // Suggest next action if available

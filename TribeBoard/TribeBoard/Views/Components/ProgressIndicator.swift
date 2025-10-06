@@ -324,11 +324,10 @@ extension ProgressIndicator {
 
 }
 
-#Preview("Progress Indicators - Interactive") {
+#Preview("Interactive Progress") {
     VStack(spacing: DesignSystem.Spacing.xl) {
         ProgressIndicator(current: 3, total: 6)
     }
     .screenPadding()
     .background(Color(.systemGroupedBackground))
-    .previewDisplayName("Interactive Progress")
 }

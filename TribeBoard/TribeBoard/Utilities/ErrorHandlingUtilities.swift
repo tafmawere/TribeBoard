@@ -1,8 +1,40 @@
 import Foundation
 import CloudKit
+import os.log
 
-/// Comprehensive error handling utilities for family creation
+/// Comprehensive error handling utilities for family creation and application-wide error management
+///
+/// This utility provides centralized error handling, categorization, and recovery strategies
+/// for the TribeBoard application. It includes comprehensive error analysis, logging,
+/// and recovery recommendations.
+///
+/// ## Features
+/// - Automatic error categorization from various sources
+/// - Context-aware recovery strategy determination
+/// - Error pattern analysis and insights
+/// - Comprehensive logging with appropriate levels
+/// - CloudKit and network error specialization
+/// - Accessibility-compliant error messaging
+///
+/// ## Usage
+/// ```swift
+/// let categorizedError = ErrorHandlingUtilities.categorizeError(someError)
+/// let recoveryAction = ErrorHandlingUtilities.determineRecoveryStrategy(
+///     for: categorizedError,
+///     context: errorContext
+/// )
+/// ```
+///
+/// ## Error Handling Philosophy
+/// - Fail gracefully with meaningful user feedback
+/// - Provide actionable recovery options when possible
+/// - Log appropriately for debugging without overwhelming
+/// - Respect user accessibility preferences
+/// - Maintain app stability under all error conditions
 struct ErrorHandlingUtilities {
+    
+    /// Logger for error handling events
+    private static let logger = Logger(subsystem: "com.tribeboard.app", category: "ErrorHandling")
     
     // MARK: - Error Categorization
     
@@ -14,16 +46,8 @@ struct ErrorHandlingUtilities {
         }
         
         // Handle specific error types
-        if let dataServiceError = error as? DataServiceError {
-            return .localCreationFailed(dataServiceError)
-        }
-        
-        if let cloudKitError = error as? CloudKitError {
-            return .cloudKitSyncFailed(cloudKitError)
-        }
-        
-        if let codeGenerationError = error as? FamilyCodeGenerationError {
-            return .codeGenerationFailed(codeGenerationError)
+        if error is FamilyCodeGenerationError {
+            return .codeGenerationFailed
         }
         
         // Handle CloudKit CKError
@@ -47,7 +71,7 @@ struct ErrorHandlingUtilities {
         }
         
         // Default to unknown error
-        return .unknownError(error)
+        return .unknownError(error.localizedDescription)
     }
     
     /// Categorizes CloudKit CKError into FamilyCreationError
@@ -106,7 +130,7 @@ struct ErrorHandlingUtilities {
         case NSCocoaErrorDomain:
             return categorizeCocoaError(nsError)
         default:
-            return .unknownError(nsError)
+            return .unknownError(nsError.localizedDescription)
         }
     }
     
@@ -154,7 +178,7 @@ struct ErrorHandlingUtilities {
         } else if errorDescription.contains("cancel") {
             return .operationCancelled
         } else {
-            return .unknownError(error)
+            return .unknownError(error.localizedDescription)
         }
     }
     
@@ -405,6 +429,8 @@ struct ErrorHandlingUtilities {
             default:
                 return .error
             }
+        case .critical:
+            return .critical
         }
     }
     
@@ -441,6 +467,27 @@ struct ErrorHandlingUtilities {
 }
 
 // MARK: - Supporting Types
+
+/// Error categories for classification
+enum ErrorCategory: String {
+    case validation
+    case network
+    case authentication
+    case data
+    case system
+    case user
+    case cloudKit
+    case codeGeneration
+    case localDatabase
+}
+
+/// Error priority levels
+enum ErrorPriority {
+    case low
+    case medium
+    case high
+    case critical
+}
 
 /// Context information for error handling decisions
 struct ErrorContext {

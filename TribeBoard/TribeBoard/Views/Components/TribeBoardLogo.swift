@@ -106,38 +106,33 @@ struct AppIconView: View {
 
 // MARK: - Preview
 
-#if DEBUG
-struct TribeBoardLogo_Previews: PreviewProvider {
-    static var previews: some View {
-        VStack(spacing: 30) {
-            // Different sizes
-            HStack(spacing: 20) {
-                TribeBoardLogo(size: .small)
-                TribeBoardLogo(size: .medium)
-                TribeBoardLogo(size: .large)
-            }
-            
-            // With and without background
-            HStack(spacing: 20) {
-                TribeBoardLogo(size: .medium, showBackground: true)
-                TribeBoardLogo(size: .medium, showBackground: false)
-            }
-            
-            // Logo with text
-            VStack(spacing: 16) {
-                TribeBoardLogoWithText(size: .medium)
-                TribeBoardLogoWithText(size: .large)
-            }
-            
-            // App icon representation
-            HStack(spacing: 16) {
-                AppIconView(size: 40)
-                AppIconView(size: 60)
-                AppIconView(size: 80)
-            }
+#Preview("TribeBoard Logo") {
+    VStack(spacing: 30) {
+        // Different sizes
+        HStack(spacing: 20) {
+            TribeBoardLogo(size: .small)
+            TribeBoardLogo(size: .medium)
+            TribeBoardLogo(size: .large)
         }
-        .padding()
-        .previewDisplayName("TribeBoard Logo")
+        
+        // With and without background
+        HStack(spacing: 20) {
+            TribeBoardLogo(size: .medium, showBackground: true)
+            TribeBoardLogo(size: .medium, showBackground: false)
+        }
+        
+        // Logo with text
+        VStack(spacing: 16) {
+            TribeBoardLogoWithText(size: .medium)
+            TribeBoardLogoWithText(size: .large)
+        }
+        
+        // App icon representation
+        HStack(spacing: 16) {
+            AppIconView(size: 40)
+            AppIconView(size: 60)
+            AppIconView(size: 80)
+        }
     }
+    .padding()
 }
-#endif

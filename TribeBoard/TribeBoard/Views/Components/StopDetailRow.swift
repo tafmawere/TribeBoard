@@ -294,7 +294,7 @@ struct StopDetailRow: View {
 
 }
 
-#Preview("Stop Detail Row - Interactive") {
+#Preview("Interactive Stop Detail") {
     VStack(spacing: DesignSystem.Spacing.lg) {
         StopDetailRow(
             stopNumber: 2,
@@ -304,5 +304,4 @@ struct StopDetailRow: View {
     }
     .padding()
     .background(Color(.systemGroupedBackground))
-    .previewDisplayName("Interactive Stop Detail")
 }

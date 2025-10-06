@@ -386,7 +386,7 @@ struct TaskListView: View {
             } else if task.status == .inProgress {
                 Button("Complete") {
                     viewModel.updateTaskStatus(task, to: .completed)
-                    HapticManager.shared.successImpact()
+                    HapticManager.shared.success()
                 }
                 .buttonStyle(TertiaryButtonStyle())
             }

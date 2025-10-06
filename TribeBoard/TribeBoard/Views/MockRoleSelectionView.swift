@@ -164,7 +164,7 @@ struct MockRoleSelectionView: View {
 // MARK: - Enhanced Role Card Component
 
 struct EnhancedRoleCard: View {
-    let data: RoleCardData
+    let data: InMemoryRoleCardData
     let onTap: () -> Void
     
     @State private var isPressed = false
@@ -361,13 +361,13 @@ struct EnhancedRoleCard: View {
 
 #Preview("Enhanced Role Card - Selected") {
     EnhancedRoleCard(
-        data: RoleCardData(
-            role: .parentAdmin,
+        data: InMemoryRoleCardData(
+            role: .parent,
             isSelected: true,
             isEnabled: true,
-            icon: "crown.fill",
-            title: "Parent Admin",
-            description: "Full access to manage family members, settings, and all features"
+            icon: "person.fill",
+            title: "Parent",
+            description: "Primary caregiver with full family management access"
         ),
         onTap: {}
     )
@@ -377,13 +377,13 @@ struct EnhancedRoleCard: View {
 
 #Preview("Enhanced Role Card - Disabled") {
     EnhancedRoleCard(
-        data: RoleCardData(
-            role: .parentAdmin,
+        data: InMemoryRoleCardData(
+            role: .parent,
             isSelected: false,
             isEnabled: false,
-            icon: "crown.fill",
-            title: "Parent Admin",
-            description: "Full access to manage family members, settings, and all features"
+            icon: "person.fill",
+            title: "Parent",
+            description: "Primary caregiver with full family management access"
         ),
         onTap: {}
     )

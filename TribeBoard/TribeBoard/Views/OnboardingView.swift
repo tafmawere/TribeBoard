@@ -58,13 +58,13 @@ struct OnboardingView: View {
                             // Enhanced Sign in with Apple button
                             AccessibleButton(
                                 action: {
+                                    HapticManager.shared.mediumImpact()
                                     Task {
                                         await viewModel.signInWithApple()
                                     }
                                 },
                                 label: "Sign in with Apple",
-                                hint: "Authenticates you with your Apple ID to access TribeBoard",
-                                hapticStyle: .medium
+                                hint: "Authenticates you with your Apple ID to access TribeBoard"
                             ) {
                                 HStack(spacing: 12) {
                                     if viewModel.isLoading {

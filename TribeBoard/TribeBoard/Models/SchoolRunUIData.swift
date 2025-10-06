@@ -47,7 +47,7 @@ enum RunStatus {
         case .notStarted:
             return .gray
         case .inProgress:
-            return .brandPrimary
+            return Color.brandPrimary
         case .completed:
             return .green
         }

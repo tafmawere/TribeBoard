@@ -1,480 +1,411 @@
 import Foundation
 
-/// Comprehensive error types for family creation with user-friendly messages and retry logic
-enum FamilyCreationError: LocalizedError, Equatable {
-    // MARK: - Validation Errors
-    case validationFailed(String)
-    case invalidFamilyName(String)
-    case invalidUserData(String)
+/// Family creation specific CloudKit sync errors
+enum FamilyCloudKitError: Equatable {
+    case recordNotFound
+    case conflictResolution
+    case containerNotFound
+    case retryLimitExceeded
+    case invalidRecord
+    case syncFailed(Error)
     
-    // MARK: - Code Generation Errors
-    case codeGenerationFailed(FamilyCodeGenerationError)
-    case maxCodeGenerationAttemptsExceeded
-    case codeCollisionDetected
-    
-    // MARK: - Local Database Errors
-    case localCreationFailed(DataServiceError)
-    case databaseUnavailable
-    case dataCorruption(String)
-    case constraintViolation(String)
-    
-    // MARK: - CloudKit Sync Errors
-    case cloudKitSyncFailed(CloudKitError)
-    case cloudKitUnavailable
-    case quotaExceeded
-    case accountNotAvailable
-    
-    // MARK: - Network Errors
-    case networkUnavailable
-    case connectionTimeout
-    case serverError(Int)
-    
-    // MARK: - System Errors
-    case maxRetriesExceeded
-    case operationCancelled
-    case operationSucceeded
-    case unknownError(Error)
-    
-    // MARK: - User Authentication Errors
-    case userNotAuthenticated
-    case insufficientPermissions
-    
-    // MARK: - LocalizedError Implementation
-    
-    var errorDescription: String? {
-        return userFriendlyMessage
-    }
-    
-    /// User-friendly error messages for display in the UI
-    var userFriendlyMessage: String {
-        switch self {
-        // Validation Errors
-        case .validationFailed(let message):
-            return "Please check your input: \(message)"
-        case .invalidFamilyName(let message):
-            return "Family name issue: \(message)"
-        case .invalidUserData(let message):
-            return "User information issue: \(message)"
-            
-        // Code Generation Errors
-        case .codeGenerationFailed(let codeError):
-            return "Unable to generate family code: \(codeError.userFriendlyMessage)"
-        case .maxCodeGenerationAttemptsExceeded:
-            return "Unable to create a unique family code. Please try again in a moment."
-        case .codeCollisionDetected:
-            return "Family code already exists. Generating a new one..."
-            
-        // Local Database Errors
-        case .localCreationFailed(let dataError):
-            return "Unable to save family locally: \(dataError.localizedDescription ?? "Unknown error")"
-        case .databaseUnavailable:
-            return "Local storage is temporarily unavailable. Please try again."
-        case .dataCorruption(let message):
-            return "Data integrity issue: \(message). Please restart the app."
-        case .constraintViolation(let message):
-            return "Data constraint issue: \(message)"
-            
-        // CloudKit Sync Errors
-        case .cloudKitSyncFailed(let cloudKitError):
-            return "Sync failed: \(cloudKitError.localizedDescription ?? "Unknown sync error"). Family saved locally."
-        case .cloudKitUnavailable:
-            return "iCloud is temporarily unavailable. Family saved locally and will sync later."
-        case .quotaExceeded:
-            return "iCloud storage is full. Please free up space or family will only be saved locally."
-        case .accountNotAvailable:
-            return "iCloud account not available. Please sign in to iCloud in Settings."
-            
-        // Network Errors
-        case .networkUnavailable:
-            return "No internet connection. Family saved locally and will sync when connected."
-        case .connectionTimeout:
-            return "Connection timed out. Family saved locally and will sync later."
-        case .serverError(let code):
-            return "Server error (\(code)). Family saved locally and will sync later."
-            
-        // System Errors
-        case .maxRetriesExceeded:
-            return "Operation failed after multiple attempts. Please try again."
-        case .operationCancelled:
-            return "Operation was cancelled."
-        case .operationSucceeded:
-            return "Operation completed successfully."
-        case .unknownError(let error):
-            return "An unexpected error occurred: \(error.localizedDescription)"
-            
-        // User Authentication Errors
-        case .userNotAuthenticated:
-            return "Please sign in to create a family."
-        case .insufficientPermissions:
-            return "You don't have permission to perform this action."
-        }
-    }
-    
-    /// Technical error message for logging and debugging
-    var technicalDescription: String {
-        switch self {
-        case .validationFailed(let message):
-            return "Validation failed: \(message)"
-        case .invalidFamilyName(let message):
-            return "Invalid family name: \(message)"
-        case .invalidUserData(let message):
-            return "Invalid user data: \(message)"
-        case .codeGenerationFailed(let codeError):
-            return "Code generation failed: \(codeError.technicalDescription)"
-        case .maxCodeGenerationAttemptsExceeded:
-            return "Maximum code generation attempts exceeded"
-        case .codeCollisionDetected:
-            return "Code collision detected during generation"
-        case .localCreationFailed(let dataError):
-            return "Local creation failed: \(dataError.localizedDescription ?? "Unknown DataService error")"
-        case .databaseUnavailable:
-            return "Database unavailable"
-        case .dataCorruption(let message):
-            return "Data corruption: \(message)"
-        case .constraintViolation(let message):
-            return "Constraint violation: \(message)"
-        case .cloudKitSyncFailed(let cloudKitError):
-            return "CloudKit sync failed: \(cloudKitError.localizedDescription ?? "Unknown CloudKit error")"
-        case .cloudKitUnavailable:
-            return "CloudKit unavailable"
-        case .quotaExceeded:
-            return "CloudKit quota exceeded"
-        case .accountNotAvailable:
-            return "CloudKit account not available"
-        case .networkUnavailable:
-            return "Network unavailable"
-        case .connectionTimeout:
-            return "Connection timeout"
-        case .serverError(let code):
-            return "Server error: HTTP \(code)"
-        case .maxRetriesExceeded:
-            return "Maximum retry attempts exceeded"
-        case .operationCancelled:
-            return "Operation cancelled"
-        case .operationSucceeded:
-            return "Operation succeeded"
-        case .unknownError(let error):
-            return "Unknown error: \(error.localizedDescription)"
-        case .userNotAuthenticated:
-            return "User not authenticated"
-        case .insufficientPermissions:
-            return "Insufficient permissions"
-        }
-    }
-    
-    /// Determines if the error is retryable
-    var isRetryable: Bool {
-        switch self {
-        // Retryable errors
-        case .codeCollisionDetected,
-             .networkUnavailable,
-             .connectionTimeout,
-             .cloudKitUnavailable,
-             .databaseUnavailable:
-            return true
-            
-        // Conditionally retryable errors
-        case .codeGenerationFailed(let codeError):
-            return codeError.isRetryable
-        case .localCreationFailed:
-            return true // DataService errors are generally retryable
-        case .cloudKitSyncFailed:
-            return true // CloudKit errors are generally retryable
-        case .serverError(let code):
-            return code >= 500 // Server errors (5xx) are retryable, client errors (4xx) are not
-            
-        // Non-retryable errors
-        case .validationFailed,
-             .invalidFamilyName,
-             .invalidUserData,
-             .maxCodeGenerationAttemptsExceeded,
-             .dataCorruption,
-             .constraintViolation,
-             .quotaExceeded,
-             .accountNotAvailable,
-             .maxRetriesExceeded,
-             .operationCancelled,
-             .operationSucceeded,
-             .userNotAuthenticated,
-             .insufficientPermissions,
-             .unknownError:
-            return false
-        }
-    }
-    
-    /// Determines the recovery strategy for the error
-    var recoveryStrategy: ErrorRecoveryStrategy {
-        switch self {
-        // Automatic retry strategies
-        case .codeCollisionDetected:
-            return .automaticRetry(delay: 0.1, maxAttempts: 5)
-        case .networkUnavailable, .connectionTimeout:
-            return .automaticRetry(delay: 2.0, maxAttempts: 3)
-        case .cloudKitUnavailable, .databaseUnavailable:
-            return .automaticRetry(delay: 1.0, maxAttempts: 3)
-        case .serverError(let code) where code >= 500:
-            return .automaticRetry(delay: 5.0, maxAttempts: 2)
-            
-        // Fallback strategies
-        case .cloudKitSyncFailed, .quotaExceeded:
-            return .fallbackToLocal
-        case .accountNotAvailable:
-            return .fallbackToLocal
-            
-        // User intervention required
-        case .validationFailed, .invalidFamilyName, .invalidUserData:
-            return .userIntervention
-        case .userNotAuthenticated, .insufficientPermissions:
-            return .userIntervention
-            
-        // No recovery possible
-        case .maxCodeGenerationAttemptsExceeded,
-             .maxRetriesExceeded,
-             .dataCorruption,
-             .operationCancelled,
-             .operationSucceeded,
-             .unknownError:
-            return .noRecovery
-            
-        // Conditional recovery based on nested error
-        case .codeGenerationFailed(let codeError):
-            return codeError.recoveryStrategy
-        case .localCreationFailed:
-            return .automaticRetry(delay: 1.0, maxAttempts: 2)
-        case .constraintViolation:
-            return .userIntervention
-        case .serverError(let code):
-            if code < 500 {
-                return .userIntervention
-            } else {
-                return .automaticRetry(delay: 5.0, maxAttempts: 2)
-            }
-        }
-    }
-    
-    /// Error category for analytics and monitoring
-    var category: ErrorCategory {
-        switch self {
-        case .validationFailed, .invalidFamilyName, .invalidUserData:
-            return .validation
-        case .codeGenerationFailed, .maxCodeGenerationAttemptsExceeded, .codeCollisionDetected:
-            return .codeGeneration
-        case .localCreationFailed, .databaseUnavailable, .dataCorruption, .constraintViolation:
-            return .localDatabase
-        case .cloudKitSyncFailed, .cloudKitUnavailable, .quotaExceeded, .accountNotAvailable:
-            return .cloudKit
-        case .networkUnavailable, .connectionTimeout, .serverError:
-            return .network
-        case .maxRetriesExceeded, .operationCancelled, .operationSucceeded, .unknownError:
-            return .system
-        case .userNotAuthenticated, .insufficientPermissions:
-            return .authentication
-        }
-    }
-    
-    /// Priority level for error handling and user notification
-    var priority: ErrorPriority {
-        switch self {
-        // High priority - blocks user progress
-        case .userNotAuthenticated, .dataCorruption, .maxRetriesExceeded:
-            return .high
-            
-        // Medium priority - affects functionality but has workarounds
-        case .validationFailed, .invalidFamilyName, .invalidUserData,
-             .maxCodeGenerationAttemptsExceeded, .constraintViolation,
-             .quotaExceeded, .accountNotAvailable:
-            return .medium
-            
-        // Low priority - temporary issues or fallback available
-        case .codeCollisionDetected, .networkUnavailable, .connectionTimeout,
-             .cloudKitUnavailable, .cloudKitSyncFailed, .databaseUnavailable,
-             .serverError, .operationCancelled, .operationSucceeded:
-            return .low
-            
-        // Conditional priority based on nested error
-        case .codeGenerationFailed(let codeError):
-            return codeError.priority
-        case .localCreationFailed:
-            return .medium
-        case .unknownError, .insufficientPermissions:
-            return .medium
-        }
-    }
-    
-    // MARK: - Equatable Implementation
-    
-    static func == (lhs: FamilyCreationError, rhs: FamilyCreationError) -> Bool {
+    static func == (lhs: FamilyCloudKitError, rhs: FamilyCloudKitError) -> Bool {
         switch (lhs, rhs) {
-        case (.validationFailed(let lhsMsg), .validationFailed(let rhsMsg)):
-            return lhsMsg == rhsMsg
-        case (.invalidFamilyName(let lhsMsg), .invalidFamilyName(let rhsMsg)):
-            return lhsMsg == rhsMsg
-        case (.invalidUserData(let lhsMsg), .invalidUserData(let rhsMsg)):
-            return lhsMsg == rhsMsg
-        case (.codeGenerationFailed, .codeGenerationFailed):
+        case (.recordNotFound, .recordNotFound),
+             (.conflictResolution, .conflictResolution),
+             (.containerNotFound, .containerNotFound),
+             (.retryLimitExceeded, .retryLimitExceeded),
+             (.invalidRecord, .invalidRecord):
             return true
-        case (.maxCodeGenerationAttemptsExceeded, .maxCodeGenerationAttemptsExceeded):
-            return true
-        case (.codeCollisionDetected, .codeCollisionDetected):
-            return true
-        case (.localCreationFailed, .localCreationFailed):
-            return true
-        case (.databaseUnavailable, .databaseUnavailable):
-            return true
-        case (.dataCorruption(let lhsMsg), .dataCorruption(let rhsMsg)):
-            return lhsMsg == rhsMsg
-        case (.constraintViolation(let lhsMsg), .constraintViolation(let rhsMsg)):
-            return lhsMsg == rhsMsg
-        case (.cloudKitSyncFailed, .cloudKitSyncFailed):
-            return true
-        case (.cloudKitUnavailable, .cloudKitUnavailable):
-            return true
-        case (.quotaExceeded, .quotaExceeded):
-            return true
-        case (.accountNotAvailable, .accountNotAvailable):
-            return true
-        case (.networkUnavailable, .networkUnavailable):
-            return true
-        case (.connectionTimeout, .connectionTimeout):
-            return true
-        case (.serverError(let lhsCode), .serverError(let rhsCode)):
-            return lhsCode == rhsCode
-        case (.maxRetriesExceeded, .maxRetriesExceeded):
-            return true
-        case (.operationCancelled, .operationCancelled):
-            return true
-        case (.operationSucceeded, .operationSucceeded):
-            return true
-        case (.userNotAuthenticated, .userNotAuthenticated):
-            return true
-        case (.insufficientPermissions, .insufficientPermissions):
-            return true
+        case (.syncFailed(let lhsError), .syncFailed(let rhsError)):
+            return lhsError.localizedDescription == rhsError.localizedDescription
         default:
             return false
         }
     }
 }
 
-/// Specific errors for code generation
-enum FamilyCodeGenerationError: LocalizedError {
-    case uniquenessCheckFailed
-    case localCheckFailed(DataServiceError)
-    case remoteCheckFailed(CloudKitError)
-    case formatValidationFailed(String)
-    case maxAttemptsExceeded
-    case generationAlgorithmFailed
-    
-    var errorDescription: String? {
-        return userFriendlyMessage
-    }
-    
-    var userFriendlyMessage: String {
-        switch self {
-        case .uniquenessCheckFailed:
-            return "Unable to verify code uniqueness"
-        case .localCheckFailed:
-            return "Unable to check local codes"
-        case .remoteCheckFailed:
-            return "Unable to check remote codes"
-        case .formatValidationFailed(let message):
-            return "Code format issue: \(message)"
-        case .maxAttemptsExceeded:
-            return "Unable to generate unique code"
-        case .generationAlgorithmFailed:
-            return "Code generation system error"
-        }
-    }
-    
-    var technicalDescription: String {
-        switch self {
-        case .uniquenessCheckFailed:
-            return "Uniqueness check failed"
-        case .localCheckFailed(let error):
-            return "Local check failed: \(error.localizedDescription ?? "Unknown error")"
-        case .remoteCheckFailed(let error):
-            return "Remote check failed: \(error.localizedDescription ?? "Unknown error")"
-        case .formatValidationFailed(let message):
-            return "Format validation failed: \(message)"
-        case .maxAttemptsExceeded:
-            return "Maximum generation attempts exceeded"
-        case .generationAlgorithmFailed:
-            return "Generation algorithm failed"
-        }
-    }
-    
-    var isRetryable: Bool {
-        switch self {
-        case .uniquenessCheckFailed, .localCheckFailed, .remoteCheckFailed:
-            return true
-        case .formatValidationFailed, .maxAttemptsExceeded, .generationAlgorithmFailed:
-            return false
-        }
-    }
-    
-    var recoveryStrategy: ErrorRecoveryStrategy {
-        switch self {
-        case .uniquenessCheckFailed, .localCheckFailed, .remoteCheckFailed:
-            return .automaticRetry(delay: 1.0, maxAttempts: 3)
-        case .formatValidationFailed, .generationAlgorithmFailed:
-            return .noRecovery
-        case .maxAttemptsExceeded:
-            return .userIntervention
-        }
-    }
-    
-    var priority: ErrorPriority {
-        switch self {
-        case .maxAttemptsExceeded, .generationAlgorithmFailed:
-            return .high
-        case .formatValidationFailed:
-            return .medium
-        case .uniquenessCheckFailed, .localCheckFailed, .remoteCheckFailed:
-            return .low
-        }
-    }
-}
-
-/// Recovery strategies for different types of errors
-enum ErrorRecoveryStrategy: Equatable {
+/// Error recovery strategies
+enum ErrorRecoveryStrategy {
     case automaticRetry(delay: TimeInterval, maxAttempts: Int)
     case fallbackToLocal
     case userIntervention
     case noRecovery
+}
+
+enum FamilyCreationError: LocalizedError, Equatable {
+    case invalidFamilyName
+    case emptyFamilyName
+    case codeGenerationFailed
+    case userNotFound
+    case familyAlreadyExists
+    case operationCancelled
+    case unknownError(String?)
     
-    static func == (lhs: ErrorRecoveryStrategy, rhs: ErrorRecoveryStrategy) -> Bool {
-        switch (lhs, rhs) {
-        case (.automaticRetry(let lhsDelay, let lhsAttempts), .automaticRetry(let rhsDelay, let rhsAttempts)):
-            return lhsDelay == rhsDelay && lhsAttempts == rhsAttempts
-        case (.fallbackToLocal, .fallbackToLocal):
-            return true
-        case (.userIntervention, .userIntervention):
-            return true
-        case (.noRecovery, .noRecovery):
-            return true
-        default:
+    // Network-related errors
+    case networkUnavailable
+    case connectionTimeout
+    case serverError(Int)
+    
+    // CloudKit-related errors
+    case cloudKitUnavailable
+    case cloudKitSyncFailed(FamilyCloudKitError)
+    case quotaExceeded
+    case userNotAuthenticated
+    case insufficientPermissions
+    case accountNotAvailable
+    
+    // Validation and data errors
+    case validationFailed(String)
+    case constraintViolation(String)
+    case dataCorruption(String)
+    
+    var errorDescription: String? {
+        switch self {
+        case .invalidFamilyName:
+            return "Family name contains invalid characters"
+        case .emptyFamilyName:
+            return "Family name cannot be empty"
+        case .codeGenerationFailed:
+            return "Failed to generate family code"
+        case .userNotFound:
+            return "User not found"
+        case .familyAlreadyExists:
+            return "A family with this name already exists"
+        case .operationCancelled:
+            return "Operation was cancelled"
+        case .unknownError:
+            return "An unexpected error occurred"
+        case .networkUnavailable:
+            return "Network connection unavailable"
+        case .connectionTimeout:
+            return "Connection timed out"
+        case .serverError(let code):
+            return "Server error (code: \(code))"
+        case .cloudKitUnavailable:
+            return "CloudKit service unavailable"
+        case .cloudKitSyncFailed(let syncError):
+            return "CloudKit sync failed: \(syncError)"
+        case .quotaExceeded:
+            return "iCloud storage quota exceeded"
+        case .userNotAuthenticated:
+            return "User not authenticated with iCloud"
+        case .insufficientPermissions:
+            return "Insufficient permissions"
+        case .accountNotAvailable:
+            return "iCloud account not available"
+        case .validationFailed(let message):
+            return "Validation failed: \(message)"
+        case .constraintViolation(let message):
+            return "Constraint violation: \(message)"
+        case .dataCorruption(let message):
+            return "Data corruption: \(message)"
+        }
+    }
+    
+    var failureReason: String? {
+        switch self {
+        case .invalidFamilyName:
+            return "The family name contains special characters or is too long"
+        case .emptyFamilyName:
+            return "A family name is required to create a family"
+        case .codeGenerationFailed:
+            return "The system was unable to generate a unique family code"
+        case .userNotFound:
+            return "The current user could not be identified"
+        case .familyAlreadyExists:
+            return "Another family with the same name already exists"
+        case .operationCancelled:
+            return "The user cancelled the operation"
+        case .unknownError:
+            return "An internal error occurred while creating the family"
+        case .networkUnavailable:
+            return "No internet connection is available"
+        case .connectionTimeout:
+            return "The request took too long to complete"
+        case .serverError:
+            return "The server encountered an error"
+        case .cloudKitUnavailable:
+            return "CloudKit service is temporarily unavailable"
+        case .cloudKitSyncFailed:
+            return "Failed to sync data with iCloud"
+        case .quotaExceeded:
+            return "Your iCloud storage is full"
+        case .userNotAuthenticated:
+            return "You are not signed in to iCloud"
+        case .insufficientPermissions:
+            return "You don't have permission to perform this action"
+        case .accountNotAvailable:
+            return "iCloud account is not available on this device"
+        case .validationFailed:
+            return "The provided data is invalid"
+        case .constraintViolation:
+            return "The data violates system constraints"
+        case .dataCorruption:
+            return "The data is corrupted or incompatible"
+        }
+    }
+    
+    var recoverySuggestion: String? {
+        switch self {
+        case .invalidFamilyName:
+            return "Please use only letters, numbers, and spaces in the family name"
+        case .emptyFamilyName:
+            return "Please enter a family name"
+        case .codeGenerationFailed:
+            return "Please try again in a moment"
+        case .userNotFound:
+            return "Please restart the app and try again"
+        case .familyAlreadyExists:
+            return "Please choose a different family name"
+        case .operationCancelled:
+            return "You can try again when ready"
+        case .unknownError:
+            return "Please try again or restart the app"
+        case .networkUnavailable:
+            return "Please check your internet connection and try again"
+        case .connectionTimeout:
+            return "Please check your connection and try again"
+        case .serverError:
+            return "Please try again later"
+        case .cloudKitUnavailable:
+            return "Please try again in a few minutes"
+        case .cloudKitSyncFailed:
+            return "Please check your iCloud connection and try again"
+        case .quotaExceeded:
+            return "Please free up iCloud storage or upgrade your plan"
+        case .userNotAuthenticated:
+            return "Please sign in to iCloud in Settings"
+        case .insufficientPermissions:
+            return "Please check your iCloud settings and permissions"
+        case .accountNotAvailable:
+            return "Please sign in to iCloud in Settings"
+        case .validationFailed:
+            return "Please check your input and try again"
+        case .constraintViolation:
+            return "Please modify your input to meet the requirements"
+        case .dataCorruption:
+            return "Please restart the app or contact support"
+        }
+    }
+    
+    var category: ErrorCategory {
+        switch self {
+        case .invalidFamilyName, .emptyFamilyName, .validationFailed:
+            return .validation
+        case .codeGenerationFailed, .unknownError, .userNotFound, .dataCorruption:
+            return .system
+        case .familyAlreadyExists, .constraintViolation:
+            return .data
+        case .operationCancelled:
+            return .user
+        case .networkUnavailable, .connectionTimeout, .serverError:
+            return .network
+        case .cloudKitUnavailable, .cloudKitSyncFailed, .quotaExceeded:
+            return .cloudKit
+        case .userNotAuthenticated, .insufficientPermissions, .accountNotAvailable:
+            return .authentication
+        }
+    }
+    
+    var priority: ErrorPriority {
+        switch self {
+        case .invalidFamilyName, .emptyFamilyName, .validationFailed:
+            return .medium
+        case .codeGenerationFailed, .networkUnavailable, .connectionTimeout:
+            return .high
+        case .familyAlreadyExists, .constraintViolation:
+            return .medium
+        case .operationCancelled:
+            return .low
+        case .unknownError, .userNotFound, .dataCorruption:
+            return .critical
+        case .serverError, .cloudKitUnavailable, .cloudKitSyncFailed:
+            return .high
+        case .quotaExceeded, .userNotAuthenticated, .insufficientPermissions, .accountNotAvailable:
+            return .medium
+        }
+    }
+    
+    var isRetryable: Bool {
+        switch self {
+        case .invalidFamilyName, .emptyFamilyName, .operationCancelled, .validationFailed, .constraintViolation:
             return false
+        case .codeGenerationFailed, .familyAlreadyExists, .unknownError, .userNotFound:
+            return true
+        case .networkUnavailable, .connectionTimeout, .serverError:
+            return true
+        case .cloudKitUnavailable, .cloudKitSyncFailed:
+            return true
+        case .quotaExceeded, .userNotAuthenticated, .insufficientPermissions, .accountNotAvailable:
+            return false
+        case .dataCorruption:
+            return false
+        }
+    }
+    
+    var recoveryStrategy: ErrorRecoveryStrategy {
+        switch self {
+        case .networkUnavailable, .connectionTimeout, .cloudKitUnavailable:
+            return .automaticRetry(delay: 2.0, maxAttempts: 3)
+        case .codeGenerationFailed, .serverError, .cloudKitSyncFailed:
+            return .automaticRetry(delay: 1.0, maxAttempts: 2)
+        case .quotaExceeded, .userNotAuthenticated, .insufficientPermissions, .accountNotAvailable:
+            return .userIntervention
+        case .invalidFamilyName, .emptyFamilyName, .validationFailed, .constraintViolation:
+            return .userIntervention
+        case .operationCancelled:
+            return .noRecovery
+        case .dataCorruption, .unknownError:
+            return .fallbackToLocal
+        case .familyAlreadyExists, .userNotFound:
+            return .userIntervention
+        }
+    }
+    
+    var userFriendlyMessage: String {
+        switch self {
+        case .invalidFamilyName:
+            return "Please use only letters, numbers, and spaces in the family name."
+        case .emptyFamilyName:
+            return "Please enter a family name to continue."
+        case .codeGenerationFailed:
+            return "We're having trouble creating your family code. Please try again."
+        case .userNotFound:
+            return "We couldn't find your user account. Please restart the app."
+        case .familyAlreadyExists:
+            return "A family with this name already exists. Please choose a different name."
+        case .operationCancelled:
+            return "The operation was cancelled."
+        case .unknownError:
+            return "Something went wrong. Please try again."
+        case .networkUnavailable:
+            return "No internet connection. Please check your connection and try again."
+        case .connectionTimeout:
+            return "The request timed out. Please try again."
+        case .serverError:
+            return "Our servers are having issues. Please try again later."
+        case .cloudKitUnavailable:
+            return "iCloud is temporarily unavailable. Please try again in a few minutes."
+        case .cloudKitSyncFailed:
+            return "Failed to sync with iCloud. Please check your connection."
+        case .quotaExceeded:
+            return "Your iCloud storage is full. Please free up space or upgrade your plan."
+        case .userNotAuthenticated:
+            return "Please sign in to iCloud in Settings to continue."
+        case .insufficientPermissions:
+            return "You don't have permission to perform this action."
+        case .accountNotAvailable:
+            return "iCloud account is not available. Please sign in to iCloud in Settings."
+        case .validationFailed(let message):
+            return message
+        case .constraintViolation(let message):
+            return message
+        case .dataCorruption(let message):
+            return "Data error: \(message). Please restart the app."
+        }
+    }
+    
+    var technicalDescription: String {
+        switch self {
+        case .invalidFamilyName:
+            return "FamilyCreationError.invalidFamilyName: Family name validation failed"
+        case .emptyFamilyName:
+            return "FamilyCreationError.emptyFamilyName: Empty family name provided"
+        case .codeGenerationFailed:
+            return "FamilyCreationError.codeGenerationFailed: Family code generation failed"
+        case .userNotFound:
+            return "FamilyCreationError.userNotFound: Current user not found in system"
+        case .familyAlreadyExists:
+            return "FamilyCreationError.familyAlreadyExists: Family name already exists"
+        case .operationCancelled:
+            return "FamilyCreationError.operationCancelled: User cancelled operation"
+        case .unknownError(let message):
+            return "FamilyCreationError.unknownError: \(message ?? "Unknown error")"
+        case .networkUnavailable:
+            return "FamilyCreationError.networkUnavailable: Network connection unavailable"
+        case .connectionTimeout:
+            return "FamilyCreationError.connectionTimeout: Request timed out"
+        case .serverError(let code):
+            return "FamilyCreationError.serverError: Server error with code \(code)"
+        case .cloudKitUnavailable:
+            return "FamilyCreationError.cloudKitUnavailable: CloudKit service unavailable"
+        case .cloudKitSyncFailed(let syncError):
+            return "FamilyCreationError.cloudKitSyncFailed: \(syncError)"
+        case .quotaExceeded:
+            return "FamilyCreationError.quotaExceeded: iCloud storage quota exceeded"
+        case .userNotAuthenticated:
+            return "FamilyCreationError.userNotAuthenticated: User not authenticated with iCloud"
+        case .insufficientPermissions:
+            return "FamilyCreationError.insufficientPermissions: Insufficient permissions"
+        case .accountNotAvailable:
+            return "FamilyCreationError.accountNotAvailable: iCloud account not available"
+        case .validationFailed(let message):
+            return "FamilyCreationError.validationFailed: \(message)"
+        case .constraintViolation(let message):
+            return "FamilyCreationError.constraintViolation: \(message)"
+        case .dataCorruption(let message):
+            return "FamilyCreationError.dataCorruption: \(message)"
         }
     }
 }
 
-/// Categories for error classification
-enum ErrorCategory: String, CaseIterable {
-    case validation = "validation"
-    case codeGeneration = "code_generation"
-    case localDatabase = "local_database"
-    case cloudKit = "cloud_kit"
-    case network = "network"
-    case system = "system"
-    case authentication = "authentication"
+enum FamilyJoinError: LocalizedError, Equatable {
+    case invalidCode
+    case emptyCode
+    case familyNotFound
+    case alreadyMember
+    case userNotFound
+    case unknownError
+    
+    var errorDescription: String? {
+        switch self {
+        case .invalidCode:
+            return "Invalid family code format"
+        case .emptyCode:
+            return "Family code cannot be empty"
+        case .familyNotFound:
+            return "Family not found"
+        case .alreadyMember:
+            return "You are already a member of this family"
+        case .userNotFound:
+            return "User not found"
+        case .unknownError:
+            return "An unexpected error occurred"
+        }
+    }
+    
+    var failureReason: String? {
+        switch self {
+        case .invalidCode:
+            return "The family code must be 6 characters long and contain only letters and numbers"
+        case .emptyCode:
+            return "A family code is required to join a family"
+        case .familyNotFound:
+            return "No family exists with the provided code"
+        case .alreadyMember:
+            return "You have already joined this family"
+        case .userNotFound:
+            return "The current user could not be identified"
+        case .unknownError:
+            return "An internal error occurred while joining the family"
+        }
+    }
+    
+    var recoverySuggestion: String? {
+        switch self {
+        case .invalidCode:
+            return "Please enter a 6-character code with letters and numbers only"
+        case .emptyCode:
+            return "Please enter the family code"
+        case .familyNotFound:
+            return "Please check the code and try again"
+        case .alreadyMember:
+            return "You can view your family from the dashboard"
+        case .userNotFound:
+            return "Please restart the app and try again"
+        case .unknownError:
+            return "Please try again or restart the app"
+        }
+    }
 }
-
-/// Priority levels for error handling
-enum ErrorPriority: Int, CaseIterable {
-    case low = 1
-    case medium = 2
-    case high = 3
-}
-
-// MARK: - Extensions for existing error types
-
-// Extensions removed to avoid compilation issues with existing error types

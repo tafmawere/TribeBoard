@@ -203,7 +203,7 @@ class CodeGenerator {
             print("❌ CodeGenerator: Local uniqueness check failed: \(error.localizedDescription)")
             
             if !config.enableLocalFallback {
-                throw FamilyCodeGenerationError.localCheckFailed(DataServiceError.invalidData(error.localizedDescription))
+                throw FamilyCodeGenerationError.localCheckFailed(error.localizedDescription)
             }
         }
         
@@ -224,7 +224,7 @@ class CodeGenerator {
             print("❌ CodeGenerator: Remote uniqueness check failed: \(error.localizedDescription)")
             
             if !config.enableRemoteFallback {
-                throw FamilyCodeGenerationError.remoteCheckFailed(CloudKitError.syncFailed(error))
+                throw FamilyCodeGenerationError.remoteCheckFailed(error.localizedDescription)
             }
         }
         
@@ -246,9 +246,9 @@ class CodeGenerator {
                 print("❌ CodeGenerator: Both local and remote checks failed")
                 throw FamilyCodeGenerationError.uniquenessCheckFailed
             } else if let localError = localError {
-                throw FamilyCodeGenerationError.localCheckFailed(DataServiceError.invalidData(localError.localizedDescription))
+                throw FamilyCodeGenerationError.localCheckFailed(localError.localizedDescription)
             } else if let remoteError = remoteError {
-                throw FamilyCodeGenerationError.remoteCheckFailed(CloudKitError.syncFailed(remoteError))
+                throw FamilyCodeGenerationError.remoteCheckFailed(remoteError.localizedDescription)
             } else {
                 throw FamilyCodeGenerationError.uniquenessCheckFailed
             }
@@ -268,10 +268,10 @@ class CodeGenerator {
         
         if let codeError = error as? FamilyCodeGenerationError {
             return codeError
-        } else if let dataError = error as? DataServiceError {
-            return FamilyCodeGenerationError.localCheckFailed(dataError)
-        } else if let cloudKitError = error as? CloudKitError {
-            return FamilyCodeGenerationError.remoteCheckFailed(cloudKitError)
+        } else if error.localizedDescription.contains("data") || error.localizedDescription.contains("local") {
+            return FamilyCodeGenerationError.localCheckFailed(error.localizedDescription)
+        } else if error.localizedDescription.contains("CloudKit") || error.localizedDescription.contains("remote") {
+            return FamilyCodeGenerationError.remoteCheckFailed(error.localizedDescription)
         } else {
             return FamilyCodeGenerationError.generationAlgorithmFailed
         }

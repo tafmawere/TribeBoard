@@ -564,7 +564,7 @@ struct MapPlaceholderThumbnail: View {
 
 }
 
-#Preview("Map Placeholder - Interactive") {
+#Preview("Interactive Map") {
     SchoolRunMapPlaceholder(
         currentStop: SchoolRunPreviewProvider.sampleStops[1],
         showCurrentLocation: true,
@@ -573,5 +573,4 @@ struct MapPlaceholderThumbnail: View {
     .frame(height: 300)
     .screenPadding()
     .background(Color(.systemGroupedBackground))
-    .previewDisplayName("Interactive Map")
 }

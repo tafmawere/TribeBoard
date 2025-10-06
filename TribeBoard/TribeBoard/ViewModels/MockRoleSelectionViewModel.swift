@@ -8,7 +8,7 @@ class MockRoleSelectionViewModel: ObservableObject {
     // MARK: - Published Properties
     
     /// Currently selected role
-    @Published var selectedRole: Role = .adult
+    @Published var selectedRole: InMemoryRole = .helper
     
     /// Loading state for role update operations (simulated)
     @Published var isUpdating: Bool = false
@@ -16,8 +16,8 @@ class MockRoleSelectionViewModel: ObservableObject {
     /// Error message for role selection issues
     @Published var errorMessage: String?
     
-    /// Whether Parent Admin role can be selected (mock constraint checking)
-    @Published var canSelectParentAdmin: Bool = true
+    /// Whether Parent role can be selected (mock constraint checking)
+    @Published var canSelectParent: Bool = true
     
     /// Success state after role selection
     @Published var roleSelectionComplete: Bool = false
@@ -57,27 +57,23 @@ class MockRoleSelectionViewModel: ObservableObject {
     // MARK: - Public Methods
     
     /// Set the selected role with mock validation
-    func setRole(_ role: Role) async {
+    func setRole(_ role: InMemoryRole) async {
         selectedRole = role
         clearError()
         
         // Mock validation with instant feedback
-        if role == .parentAdmin && !canSelectParentAdmin {
-            showError("A Parent Admin already exists for this family. Selecting Adult role instead.")
-            selectedRole = .adult
-            HapticManager.shared.warning()
+        if role == .parent && !canSelectParent {
+            showError("A Parent already exists for this family. Selecting Helper role instead.")
+            selectedRole = .helper
             return
         }
-        
-        // Provide instant visual feedback
-        HapticManager.shared.selection()
         
         // Auto-proceed with role update for smooth UX
         await updateRole(selectedRole)
     }
     
     /// Update the user's role with mock instant success
-    func updateRole(_ role: Role) async {
+    func updateRole(_ role: InMemoryRole) async {
         isUpdating = true
         clearError()
         
@@ -85,40 +81,31 @@ class MockRoleSelectionViewModel: ObservableObject {
         try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
         
         // Mock success scenario
-        do {
-            // Create mock membership
-            let mockMembership = createMockMembership(role: role)
-            
-            // Success haptic feedback
-            HapticManager.shared.success()
-            
-            // Show success toast
-            ToastManager.shared.success("Role set to \(role.displayName)")
-            
-            // Update app state with mock membership
-            appState?.setFamily(currentFamily, membership: mockMembership)
-            
-            roleSelectionComplete = true
-            
-        } catch {
-            // Mock error scenarios (rare)
-            if shouldSimulateError() {
-                showError("Failed to update role. Please try again.")
-                HapticManager.shared.error()
-            }
-        }
+        // Create mock membership
+        let mockMembership = createMockMembership(role: role)
+        
+        // Success haptic feedback
+        HapticManager.shared.success()
+        
+        // Show success toast
+        ToastManager.shared.success("Role set to \(role.displayName)")
+        
+        // Update app state with mock membership
+        appState?.setFamily(currentFamily, membership: mockMembership)
+        
+        roleSelectionComplete = true
         
         isUpdating = false
     }
     
     /// Get role card data for UI display with mock constraints
-    func getRoleCardData() -> [RoleCardData] {
-        return Role.allCases.map { role in
-            RoleCardData(
+    func getRoleCardData() -> [InMemoryRoleCardData] {
+        return InMemoryRole.allCases.map { role in
+            InMemoryRoleCardData(
                 role: role,
                 isSelected: role == selectedRole,
                 isEnabled: isRoleEnabled(role),
-                icon: getIconName(for: role),
+                icon: role.iconName,
                 title: role.displayName,
                 description: getEnhancedDescription(for: role)
             )
@@ -130,40 +117,40 @@ class MockRoleSelectionViewModel: ObservableObject {
     private func setupMockConstraints() {
         switch mockScenario {
         case .normalFamily:
-            canSelectParentAdmin = true
+            canSelectParent = true
             
         case .parentAdminExists:
-            canSelectParentAdmin = false
-            if selectedRole == .parentAdmin {
-                selectedRole = .adult
+            canSelectParent = false
+            if selectedRole == .parent {
+                selectedRole = .helper
             }
             
         case .fullFamily:
-            canSelectParentAdmin = false
-            if selectedRole != .visitor {
-                selectedRole = .visitor
+            canSelectParent = false
+            if selectedRole != .helper {
+                selectedRole = .helper
             }
         }
     }
     
-    private func isRoleEnabled(_ role: Role) -> Bool {
+    private func isRoleEnabled(_ role: InMemoryRole) -> Bool {
         switch mockScenario {
         case .normalFamily:
             return true
             
         case .parentAdminExists:
-            return role != .parentAdmin
+            return role != .parent
             
         case .fullFamily:
-            return role == .visitor
+            return role == .helper
         }
     }
     
-    private func createMockMembership(role: Role) -> Membership {
+    private func createMockMembership(role: InMemoryRole) -> Membership {
         let membership = Membership(
             family: currentFamily,
             user: currentUser,
-            role: role
+            role: Role.adult // Convert to old Role type for compatibility
         )
         
         // Set mock sync status
@@ -186,29 +173,18 @@ class MockRoleSelectionViewModel: ObservableObject {
         errorMessage = nil
     }
     
-    private func getIconName(for role: Role) -> String {
-        switch role {
-        case .parentAdmin:
-            return "crown.fill"
-        case .adult:
-            return "person.fill"
-        case .kid:
-            return "figure.child"
-        case .visitor:
-            return "person.badge.clock.fill"
-        }
-    }
+
     
-    private func getEnhancedDescription(for role: Role) -> String {
+    private func getEnhancedDescription(for role: InMemoryRole) -> String {
         switch role {
-        case .parentAdmin:
-            return "Full access to manage family members, settings, and all features"
-        case .adult:
-            return "Standard family member with access to all family features and activities"
-        case .kid:
-            return "Age-appropriate access with parental controls and limited permissions"
-        case .visitor:
-            return "Temporary access with restricted permissions for family guests"
+        case .parent:
+            return "Primary caregiver with full family management access"
+        case .child:
+            return "Family member with age-appropriate access and features"
+        case .guardian:
+            return "Trusted adult with supervisory responsibilities"
+        case .helper:
+            return "Support person who assists with family activities"
         }
     }
 }

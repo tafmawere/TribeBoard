@@ -83,9 +83,9 @@ struct ValidatedTextField: View {
         }
     }
     
-    private var validationState: ValidationState {
+    private var validationState: FormValidationState {
         guard let validation = validation else {
-            return ValidationState(isValid: true, message: nil)
+            return FormValidationState(isValid: true, message: nil)
         }
         return validation.validate(text)
     }
@@ -174,7 +174,7 @@ struct ValidatedTextFieldStyle: TextFieldStyle {
 
 /// Validation feedback component
 struct ValidationFeedbackView: View {
-    let state: ValidationState
+    let state: FormValidationState
     let showSuccess: Bool
     let showInstant: Bool
     
@@ -240,17 +240,17 @@ struct ValidationFeedbackView: View {
 
 /// Validation rule protocol
 protocol ValidationRule {
-    func validate(_ input: String) -> ValidationState
+    func validate(_ input: String) -> FormValidationState
 }
 
-/// Validation state
-struct ValidationState {
+/// Form validation state
+struct FormValidationState {
     let isValid: Bool
     let message: String?
 }
 
-/// Common validation rules
-struct ValidationRules {
+/// Form validation rules
+struct FormValidationRules {
     
     /// Family name validation
     static let familyName = FamilyNameValidation()
@@ -282,57 +282,57 @@ struct PrototypeValidationRules {
 // MARK: - Validation Implementations
 
 struct FamilyNameValidation: ValidationRule {
-    func validate(_ input: String) -> ValidationState {
+    func validate(_ input: String) -> FormValidationState {
         let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
         
         if trimmed.isEmpty {
-            return ValidationState(isValid: false, message: "Family name is required")
+            return FormValidationState(isValid: false, message: "Family name is required")
         }
         
         if trimmed.count < 2 {
-            return ValidationState(isValid: false, message: "Family name must be at least 2 characters")
+            return FormValidationState(isValid: false, message: "Family name must be at least 2 characters")
         }
         
         if trimmed.count > 50 {
-            return ValidationState(isValid: false, message: "Family name must be less than 50 characters")
+            return FormValidationState(isValid: false, message: "Family name must be less than 50 characters")
         }
         
-        return ValidationState(isValid: true, message: "Perfect!")
+        return FormValidationState(isValid: true, message: "Perfect!")
     }
 }
 
 struct FamilyCodeValidation: ValidationRule {
-    func validate(_ input: String) -> ValidationState {
+    func validate(_ input: String) -> FormValidationState {
         let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
         
         if trimmed.isEmpty {
-            return ValidationState(isValid: false, message: "Family code is required")
+            return FormValidationState(isValid: false, message: "Family code is required")
         }
         
         if trimmed.count < 4 || trimmed.count > 8 {
-            return ValidationState(isValid: false, message: "Family code must be 4-8 characters")
+            return FormValidationState(isValid: false, message: "Family code must be 4-8 characters")
         }
         
         let isAlphanumeric = trimmed.allSatisfy { $0.isLetter || $0.isNumber }
         if !isAlphanumeric {
-            return ValidationState(isValid: false, message: "Family code can only contain letters and numbers")
+            return FormValidationState(isValid: false, message: "Family code can only contain letters and numbers")
         }
         
-        return ValidationState(isValid: true, message: "Valid format")
+        return FormValidationState(isValid: true, message: "Valid format")
     }
 }
 
 struct RequiredValidation: ValidationRule {
     let fieldName: String
     
-    func validate(_ input: String) -> ValidationState {
+    func validate(_ input: String) -> FormValidationState {
         let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
         
         if trimmed.isEmpty {
-            return ValidationState(isValid: false, message: "\(fieldName) is required")
+            return FormValidationState(isValid: false, message: "\(fieldName) is required")
         }
         
-        return ValidationState(isValid: true, message: nil)
+        return FormValidationState(isValid: true, message: nil)
     }
 }
 
@@ -341,71 +341,71 @@ struct LengthValidation: ValidationRule {
     let max: Int
     let fieldName: String
     
-    func validate(_ input: String) -> ValidationState {
+    func validate(_ input: String) -> FormValidationState {
         let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
         
         if trimmed.count < min {
-            return ValidationState(isValid: false, message: "\(fieldName) must be at least \(min) characters")
+            return FormValidationState(isValid: false, message: "\(fieldName) must be at least \(min) characters")
         }
         
         if trimmed.count > max {
-            return ValidationState(isValid: false, message: "\(fieldName) must be less than \(max) characters")
+            return FormValidationState(isValid: false, message: "\(fieldName) must be less than \(max) characters")
         }
         
-        return ValidationState(isValid: true, message: nil)
+        return FormValidationState(isValid: true, message: nil)
     }
 }
 
 // MARK: - Prototype Validation Implementations
 
 struct PrototypeFamilyNameValidation: ValidationRule {
-    func validate(_ input: String) -> ValidationState {
+    func validate(_ input: String) -> FormValidationState {
         let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
         
         if trimmed.isEmpty {
-            return ValidationState(isValid: false, message: "Family name is required")
+            return FormValidationState(isValid: false, message: "Family name is required")
         }
         
         // Provide helpful hints for prototype
         if trimmed.lowercased().contains("mawere") {
-            return ValidationState(isValid: true, message: "Perfect! This matches our demo family")
+            return FormValidationState(isValid: true, message: "Perfect! This matches our demo family")
         }
         
         if trimmed.count < 2 {
-            return ValidationState(isValid: false, message: "Family name must be at least 2 characters (try 'Mawere Family')")
+            return FormValidationState(isValid: false, message: "Family name must be at least 2 characters (try 'Mawere Family')")
         }
         
         if trimmed.count > 50 {
-            return ValidationState(isValid: false, message: "Family name must be less than 50 characters")
+            return FormValidationState(isValid: false, message: "Family name must be less than 50 characters")
         }
         
-        return ValidationState(isValid: true, message: "Great choice!")
+        return FormValidationState(isValid: true, message: "Great choice!")
     }
 }
 
 struct PrototypeFamilyCodeValidation: ValidationRule {
-    func validate(_ input: String) -> ValidationState {
+    func validate(_ input: String) -> FormValidationState {
         let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
         
         if trimmed.isEmpty {
-            return ValidationState(isValid: false, message: "Family code is required")
+            return FormValidationState(isValid: false, message: "Family code is required")
         }
         
         // Provide helpful hints for prototype
         if trimmed == "ABC123" || trimmed == "DEMO01" {
-            return ValidationState(isValid: true, message: "Perfect! This is a valid demo code")
+            return FormValidationState(isValid: true, message: "Perfect! This is a valid demo code")
         }
         
         if trimmed.count < 4 || trimmed.count > 8 {
-            return ValidationState(isValid: false, message: "Family code must be 4-8 characters (try 'ABC123')")
+            return FormValidationState(isValid: false, message: "Family code must be 4-8 characters (try 'ABC123')")
         }
         
         let isAlphanumeric = trimmed.allSatisfy { $0.isLetter || $0.isNumber }
         if !isAlphanumeric {
-            return ValidationState(isValid: false, message: "Family code can only contain letters and numbers")
+            return FormValidationState(isValid: false, message: "Family code can only contain letters and numbers")
         }
         
-        return ValidationState(isValid: true, message: "Valid format - try 'ABC123' for demo")
+        return FormValidationState(isValid: true, message: "Valid format - try 'ABC123' for demo")
     }
 }
 
@@ -419,7 +419,7 @@ struct MockValidationScenarios {
             title: "Family Name",
             placeholder: "Enter your family name (try typing 'M' then 'Mawere')",
             text: .constant(""),
-            validation: ValidationRules.familyName
+            validation: FormValidationRules.familyName
         )
     }
     
@@ -429,7 +429,7 @@ struct MockValidationScenarios {
             title: "Family Code",
             placeholder: "Enter 4-8 characters (try 'ABC123')",
             text: .constant(""),
-            validation: ValidationRules.familyCode,
+            validation: FormValidationRules.familyCode,
             textInputAutocapitalization: .characters,
             autocorrectionDisabled: true
         )
@@ -463,14 +463,14 @@ struct MockValidationScenarios {
                 title: "Family Name",
                 placeholder: "Enter your family name",
                 text: .constant("Mawere Family"),
-                validation: ValidationRules.familyName
+                validation: FormValidationRules.familyName
             )
             
             ValidatedTextField(
                 title: "Family Code",
                 placeholder: "Enter family code",
                 text: .constant("ABC123"),
-                validation: ValidationRules.familyCode,
+                validation: FormValidationRules.familyCode,
                 textInputAutocapitalization: .characters,
                 autocorrectionDisabled: true
             )
@@ -484,14 +484,14 @@ struct MockValidationScenarios {
                 title: "Family Name",
                 placeholder: "Enter your family name",
                 text: .constant("M"),
-                validation: ValidationRules.familyName
+                validation: FormValidationRules.familyName
             )
             
             ValidatedTextField(
                 title: "Family Code",
                 placeholder: "Enter family code",
                 text: .constant("AB"),
-                validation: ValidationRules.familyCode,
+                validation: FormValidationRules.familyCode,
                 textInputAutocapitalization: .characters,
                 autocorrectionDisabled: true
             )

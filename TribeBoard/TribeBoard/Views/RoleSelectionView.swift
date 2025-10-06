@@ -7,62 +7,82 @@ struct RoleSelectionView: View {
     
     // MARK: - Initialization
     
-    init(family: Family, user: UserProfile) {
-        // Create temporary services for initialization
-        let tempContainer = try! ModelContainerConfiguration.createInMemory()
-        let dataService = DataService(modelContext: tempContainer.mainContext)
-        let cloudKitService = CloudKitService()
+    init() {
+        // Initialize with current family and user from AppState
+        // The actual family and user will be set when the view appears
+        let placeholderFamily = InMemoryFamily(name: "Loading...", code: "")
+        let placeholderUser = InMemoryUser(name: "Loading...")
         
+        self._viewModel = StateObject(wrappedValue: RoleSelectionViewModel(
+            family: placeholderFamily,
+            user: placeholderUser,
+            dataManager: InMemoryFamilyDataManager.shared
+        ))
+    }
+    
+    init(family: InMemoryFamily, user: InMemoryUser) {
         self._viewModel = StateObject(wrappedValue: RoleSelectionViewModel(
             family: family,
             user: user,
-            dataService: dataService,
-            cloudKitService: cloudKitService
+            dataManager: InMemoryFamilyDataManager.shared
         ))
     }
     
     // MARK: - Body
     
     var body: some View {
-        ScrollView {
-            VStack(spacing: 24) {
-                headerSection
-                roleCardsSection
-                continueButton
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 24) {
+                    headerSection
+                    roleCardsSection
+                    continueButton
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 16)
             }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 16)
-        }
-        .navigationTitle("Select Your Role")
-        .navigationBarTitleDisplayMode(.inline)
-        .navigationBarBackButtonHidden(false)
-        .background(Color(.systemGroupedBackground))
-        .overlay {
-            if viewModel.isUpdating {
-                LoadingStateView(
-                    message: "Updating your role...",
-                    style: .overlay
-                )
+            .navigationTitle("Select Your Role")
+            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarBackButtonHidden(false)
+            .background(Color(.systemGroupedBackground))
+            .overlay {
+                if viewModel.isUpdating {
+                    LoadingStateView(
+                        message: "Updating your role...",
+                        style: .overlay
+                    )
+                    .accessibilityLabel("Updating role")
+                    .accessibilityHint("Please wait while your role is being updated")
+                }
             }
-        }
-        .withToast()
-        .alert("Role Selection Error", isPresented: .constant(viewModel.errorMessage != nil)) {
-            Button("OK") {
-                viewModel.errorMessage = nil
+            .alert("Role Selection Error", isPresented: .constant(viewModel.errorMessage != nil)) {
+                Button("OK") {
+                    viewModel.clearError()
+                }
+                Button("Try Again") {
+                    Task {
+                        await viewModel.updateRole(viewModel.selectedRole)
+                    }
+                }
+            } message: {
+                if let errorMessage = viewModel.errorMessage {
+                    Text(errorMessage)
+                }
             }
-        } message: {
-            if let errorMessage = viewModel.errorMessage {
-                Text(errorMessage)
+            .onAppear {
+                // Inject the actual app state
+                viewModel.setAppState(appState)
             }
-        }
-        .onAppear {
-            // Inject the actual app state
-            viewModel.setAppState(appState)
-        }
-        .onChange(of: viewModel.roleSelectionComplete) { _, isComplete in
-            if isComplete {
-                // Navigation is handled by AppState update in ViewModel
+            .onChange(of: viewModel.roleSelectionComplete) { _, isComplete in
+                if isComplete {
+                    HapticManager.shared.success()
+                    // Navigation is handled by AppState update in ViewModel
+                    appState.navigateTo(.familyDashboard)
+                }
             }
+            .withToast()
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel("Role Selection Screen")
         }
     }
     
@@ -73,19 +93,24 @@ struct RoleSelectionView: View {
             Image(systemName: "person.3.fill")
                 .font(.system(size: 48))
                 .foregroundColor(.brandPrimary)
+                .accessibilityHidden(true)
             
             Text("Choose Your Role")
                 .font(.title2)
                 .fontWeight(.bold)
                 .foregroundColor(.primary)
+                .accessibilityAddTraits([.isHeader])
             
             Text("Select the role that best describes your position in the family. This will determine your permissions and access level.")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
                 .lineLimit(nil)
+                .accessibilityLabel("Select the role that best describes your position in the family. This will determine your permissions and access level.")
         }
         .padding(.top, 8)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Choose Your Role. Select the role that best describes your position in the family. This will determine your permissions and access level.")
     }
     
     // MARK: - Role Cards Section
@@ -116,6 +141,7 @@ struct RoleSelectionView: View {
                 title: "Continue",
                 isLoading: viewModel.isUpdating,
                 action: {
+                    HapticManager.shared.selection()
                     Task {
                         await viewModel.updateRole(viewModel.selectedRole)
                     }
@@ -124,29 +150,38 @@ struct RoleSelectionView: View {
             )
             .accessibilityLabel("Continue with selected role")
             .accessibilityHint("Confirms your role selection and continues to the family dashboard")
+            .accessibilityValue("Selected role: \(viewModel.selectedRole.displayName)")
             
             Text("You can change your role later in family settings")
                 .font(.caption)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
+                .accessibilityLabel("You can change your role later in family settings")
         }
         .padding(.top, 8)
+        .accessibilityElement(children: .contain)
     }
 }
 
 // MARK: - Role Card Component
 
 struct RoleCard: View {
-    let data: RoleCardData
+    let data: InMemoryRoleCardData
     let onTap: () -> Void
     
     var body: some View {
-        Button(action: onTap) {
+        Button(action: {
+            if data.isEnabled {
+                HapticManager.shared.selection()
+                onTap()
+            }
+        }) {
             VStack(spacing: 12) {
                 // Icon
                 Image(systemName: data.icon)
                     .font(.system(size: 32))
                     .foregroundColor(iconColor)
+                    .accessibilityHidden(true)
                 
                 // Title
                 Text(data.title)
@@ -181,6 +216,11 @@ struct RoleCard: View {
         .disabled(!data.isEnabled)
         .scaleEffect(data.isSelected ? 1.02 : 1.0)
         .animation(.easeInOut(duration: 0.2), value: data.isSelected)
+        .accessibilityLabel("\(data.title) role")
+        .accessibilityHint(data.isEnabled ? data.description : "This role is not available")
+        .accessibilityAddTraits(data.isSelected ? [.isSelected] : [])
+        .accessibilityAddTraits(data.isEnabled ? [] : [.isButton])
+        .accessibilityValue(data.isSelected ? "Selected" : "Not selected")
     }
     
     // MARK: - Computed Properties
@@ -256,23 +296,20 @@ struct RoleCard: View {
 
 #Preview("Role Selection") {
     NavigationStack {
-        RoleSelectionView(
-            family: MockDataGenerator.mockFamilyWithMembers().family,
-            user: MockDataGenerator.mockAuthenticatedUser()
-        )
+        RoleSelectionView()
     }
     .environmentObject(AppState())
 }
 
 #Preview("Role Card - Selected") {
     RoleCard(
-        data: RoleCardData(
-            role: .parentAdmin,
+        data: InMemoryRoleCardData(
+            role: .parent,
             isSelected: true,
             isEnabled: true,
-            icon: "crown.fill",
-            title: "Parent Admin",
-            description: "Full access to manage family members and settings"
+            icon: "person.fill",
+            title: "Parent",
+            description: "Primary caregiver with full family management access"
         ),
         onTap: {}
     )
@@ -282,13 +319,13 @@ struct RoleCard: View {
 
 #Preview("Role Card - Disabled") {
     RoleCard(
-        data: RoleCardData(
-            role: .parentAdmin,
+        data: InMemoryRoleCardData(
+            role: .parent,
             isSelected: false,
             isEnabled: false,
-            icon: "crown.fill",
-            title: "Parent Admin",
-            description: "Full access to manage family members and settings"
+            icon: "person.fill",
+            title: "Parent",
+            description: "Primary caregiver with full family management access"
         ),
         onTap: {}
     )

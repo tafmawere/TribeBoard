@@ -143,51 +143,6 @@ struct ErrorStateView: View {
     }
 }
 
-/// Inline error message component for forms and inputs
-struct InlineErrorView: View {
-    let message: String
-    let onDismiss: (() -> Void)?
-    
-    init(message: String, onDismiss: (() -> Void)? = nil) {
-        self.message = message
-        self.onDismiss = onDismiss
-    }
-    
-    var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .font(.caption)
-                .foregroundColor(.red)
-            
-            Text(message)
-                .font(.caption)
-                .foregroundColor(.red)
-                .multilineTextAlignment(.leading)
-                .lineLimit(nil)
-            
-            Spacer()
-            
-            if let onDismiss = onDismiss {
-                Button(action: onDismiss) {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.caption)
-                        .foregroundColor(.red.opacity(0.7))
-                }
-            }
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(
-            RoundedRectangle(cornerRadius: BrandStyle.cornerRadiusSmall)
-                .fill(Color.red.opacity(0.1))
-                .overlay(
-                    RoundedRectangle(cornerRadius: BrandStyle.cornerRadiusSmall)
-                        .stroke(Color.red.opacity(0.3), lineWidth: 1)
-                )
-        )
-        .transition(.scale.combined(with: .opacity))
-    }
-}
 
 /// Success message component
 struct SuccessMessageView: View {

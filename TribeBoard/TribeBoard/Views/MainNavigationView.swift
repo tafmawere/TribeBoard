@@ -12,95 +12,7 @@ struct MainNavigationView: View {
     
     var body: some View {
         ZStack {
-            if showSplashScreen {
-                // Enhanced branded splash screen for prototype
-                SplashScreenView()
-                    .transition(AnimationUtilities.fadeTransition)
-                    .accessibilityElement(children: .ignore)
-                    .accessibilityLabel("TribeBoard app loading")
-                    .accessibilityHint("Please wait while the app loads")
-            } else if !authService.isAuthenticated {
-                // User is not authenticated - show sign-in view
-                SignInView()
-                    .transition(.opacity.combined(with: .scale))
-            } else {
-                // Main app content with mock services
-                NavigationStack(path: $appState.navigationPath) {
-                    Group {
-                        if servicesInitialized {
-                            switch appState.currentFlow {
-                            case .onboarding:
-                                // Enhanced onboarding view with mock authentication
-                                if let mockServices = mockServiceCoordinator {
-                                    MockOnboardingView(mockAuthService: mockServices.mockAuthService)
-                                } else {
-                                    OnboardingPlaceholderView()
-                                        .environmentObject(mockServiceCoordinator ?? MockServiceCoordinator())
-                                }
-                            case .familySelection:
-                                FamilySelectionView()
-                            case .createFamily:
-                                // For prototype, use a placeholder view instead of real CreateFamilyView
-                                CreateFamilyPlaceholderView()
-                                    .environmentObject(mockServiceCoordinator ?? MockServiceCoordinator())
-                            case .joinFamily:
-                                JoinFamilyView()
-                            case .roleSelection:
-                                if let user = appState.currentUser,
-                                   let family = appState.currentFamily {
-                                    MockRoleSelectionView(family: family, user: user)
-                                } else {
-                                    RoleSelectionPlaceholderView()
-                                }
-                            case .familyDashboard:
-                                // Main dashboard content with navigation support
-                                dashboardContent
-                            }
-                        } else {
-                            // Show loading state during mock service initialization
-                            LoadingStateView(
-                                message: "Initializing TribeBoard...",
-                                style: .overlay,
-                                mockScenario: .authentication
-                            )
-                            .fadeTransition()
-                        }
-                    }
-                    .environmentObject(appState)
-                    .environmentObject(mockServiceCoordinator ?? MockServiceCoordinator())
-                    .animation(AnimationUtilities.smooth, value: appState.currentFlow)
-                    // Navigation destinations for bottom navigation
-                    .navigationDestination(for: NavigationTab.self) { tab in
-                        destinationView(for: tab)
-                    }
-                    // Navigation destinations for School Run feature
-                    .navigationDestination(for: SchoolRunRoute.self) { route in
-                        schoolRunDestinationView(for: route)
-                    }
-                }
-                .transition(AnimationUtilities.slideTransition)
-                .overlay(alignment: .bottom) {
-                    // Floating bottom navigation overlay with enhanced animations
-                    if appState.shouldShowBottomNavigation {
-                        FloatingBottomNavigation(
-                            selectedTab: $appState.selectedNavigationTab,
-                            onTabSelected: { tab in
-                                handleTabSelection(tab)
-                            }
-                        )
-                        .transition(
-                            .asymmetric(
-                                insertion: .move(edge: .bottom)
-                                    .combined(with: .opacity)
-                                    .combined(with: .scale(scale: 0.9)),
-                                removal: .move(edge: .bottom)
-                                    .combined(with: .opacity)
-                            )
-                        )
-                        .animation(DesignSystem.Animation.spring, value: appState.shouldShowBottomNavigation)
-                    }
-                }
-            }
+            mainContentBasedOnState
         }
         .onAppear {
             initializePrototypeApp()
@@ -109,36 +21,192 @@ struct MainNavigationView: View {
             handleAuthenticationStateChange(isAuthenticated)
         }
         .overlay {
-            // Enhanced global loading overlay
-            if appState.isLoading {
-                LoadingOverlay(
-                    message: "Processing your request...",
-                    showProgress: false
-                )
-                .transition(AnimationUtilities.fadeTransition)
-            }
+            globalLoadingOverlay
         }
         .alert("Error", isPresented: .constant(appState.errorMessage != nil)) {
-            Button("OK") {
-                appState.clearError()
-            }
+            errorAlertButton
         } message: {
-            if let errorMessage = appState.errorMessage {
-                Text(errorMessage)
-            }
+            errorAlertMessage
         }
         .overlay(alignment: .bottomTrailing) {
-            // Demo control overlay for prototype
-            if let demoManager = appState.getDemoManager() {
-                DemoControlOverlay(demoManager: demoManager)
-                    .transition(.scale.combined(with: .opacity))
-            }
+            demoControlOverlay
         }
         .sheet(isPresented: .constant(false)) {
-            // Demo launcher can be accessed via the floating button
-            DemoLauncherView()
-                .environmentObject(appState)
+            demoLauncherSheet
         }
+    }
+    
+    // MARK: - Main Content Views
+    
+    @ViewBuilder
+    private var mainContentBasedOnState: some View {
+        if showSplashScreen {
+            splashScreenView
+        } else if !authService.isAuthenticated {
+            signInView
+        } else {
+            authenticatedContentView
+        }
+    }
+    
+    @ViewBuilder
+    private var splashScreenView: some View {
+        SplashScreenView()
+            .transition(AnimationUtilities.fadeTransition)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("TribeBoard app loading")
+            .accessibilityHint("Please wait while the app loads")
+    }
+    
+    @ViewBuilder
+    private var signInView: some View {
+        SignInView()
+            .transition(.opacity.combined(with: .scale))
+    }
+    
+    @ViewBuilder
+    private var authenticatedContentView: some View {
+        NavigationStack(path: $appState.navigationPath) {
+            mainNavigationContent
+                .environmentObject(appState)
+                .environmentObject(mockServiceCoordinator ?? MockServiceCoordinator())
+                .animation(AnimationUtilities.smooth, value: appState.currentFlow)
+                .navigationDestination(for: NavigationTab.self) { tab in
+                    destinationView(for: tab)
+                }
+                .navigationDestination(for: SchoolRunRoute.self) { route in
+                    schoolRunDestinationView(for: route)
+                }
+        }
+        .transition(AnimationUtilities.slideTransition)
+        .overlay(alignment: .bottom) {
+            bottomNavigationOverlay
+        }
+    }
+    
+    @ViewBuilder
+    private var mainNavigationContent: some View {
+        Group {
+            if servicesInitialized {
+                currentFlowView
+            } else {
+                serviceInitializationView
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private var currentFlowView: some View {
+        switch appState.currentFlow {
+        case .onboarding:
+            onboardingFlowView
+        case .familySelection:
+            FamilySelectionView()
+        case .createFamily:
+            createFamilyFlowView
+        case .joinFamily:
+            JoinFamilyView()
+        case .roleSelection:
+            roleSelectionFlowView
+        case .familyDashboard:
+            dashboardContent
+        }
+    }
+    
+    @ViewBuilder
+    private var onboardingFlowView: some View {
+        if let mockServices = mockServiceCoordinator {
+            MockOnboardingView(mockAuthService: mockServices.mockAuthService)
+        } else {
+            OnboardingPlaceholderView()
+                .environmentObject(mockServiceCoordinator ?? MockServiceCoordinator())
+        }
+    }
+    
+    @ViewBuilder
+    private var createFamilyFlowView: some View {
+        CreateFamilyPlaceholderView()
+            .environmentObject(mockServiceCoordinator ?? MockServiceCoordinator())
+    }
+    
+    @ViewBuilder
+    private var roleSelectionFlowView: some View {
+        if let user = appState.currentUser,
+           let family = appState.currentFamily {
+            MockRoleSelectionView(family: family, user: user)
+        } else {
+            RoleSelectionPlaceholderView()
+        }
+    }
+    
+    @ViewBuilder
+    private var serviceInitializationView: some View {
+        LoadingStateView(
+            style: .overlay,
+            mockScenario: .authentication
+        )
+        .fadeTransition()
+    }
+    
+    @ViewBuilder
+    private var bottomNavigationOverlay: some View {
+        if appState.shouldShowBottomNavigation {
+            FloatingBottomNavigation(
+                selectedTab: $appState.selectedNavigationTab,
+                onTabSelected: { tab in
+                    handleTabSelection(tab)
+                }
+            )
+            .transition(
+                .asymmetric(
+                    insertion: .move(edge: .bottom)
+                        .combined(with: .opacity)
+                        .combined(with: .scale(scale: 0.9)),
+                    removal: .move(edge: .bottom)
+                        .combined(with: .opacity)
+                )
+            )
+            .animation(DesignSystem.Animation.spring, value: appState.shouldShowBottomNavigation)
+        }
+    }
+    
+    @ViewBuilder
+    private var globalLoadingOverlay: some View {
+        if appState.isLoading {
+            LoadingOverlay(
+                message: "Processing your request...",
+                showProgress: false
+            )
+            .transition(AnimationUtilities.fadeTransition)
+        }
+    }
+    
+    @ViewBuilder
+    private var errorAlertButton: some View {
+        Button("OK") {
+            appState.clearError()
+        }
+    }
+    
+    @ViewBuilder
+    private var errorAlertMessage: some View {
+        if let errorMessage = appState.errorMessage {
+            Text(errorMessage)
+        }
+    }
+    
+    @ViewBuilder
+    private var demoControlOverlay: some View {
+        if let demoManager = appState.getDemoManager() {
+            DemoControlOverlay(demoManager: demoManager)
+                .transition(.scale.combined(with: .opacity))
+        }
+    }
+    
+    @ViewBuilder
+    private var demoLauncherSheet: some View {
+        DemoLauncherView()
+            .environmentObject(appState)
     }
     
     // MARK: - Navigation Support
@@ -491,7 +559,6 @@ struct OnboardingPlaceholderView: View {
                     
                     if isSigningIn {
                         LoadingStateView(
-                            message: "Signing in...",
                             style: .inline,
                             mockScenario: .authentication
                         )
@@ -519,7 +586,7 @@ struct OnboardingPlaceholderView: View {
         }
         
         // Haptic feedback for sign-in start
-        HapticManager.shared.mockAuthSuccess()
+        HapticManager.shared.success()
         
         Task {
             // Simulate sign in delay with realistic timing
@@ -572,7 +639,6 @@ struct CreateFamilyPlaceholderView: View {
                 
                 if isCreating {
                     LoadingStateView(
-                        message: "Creating family...",
                         style: .inline,
                         mockScenario: .familyCreation
                     )
@@ -596,7 +662,7 @@ struct CreateFamilyPlaceholderView: View {
         }
         
         // Haptic feedback for family creation start
-        HapticManager.shared.mockFamilyCreation()
+        HapticManager.shared.success()
         
         Task {
             // Simulate family creation delay with realistic timing
@@ -614,7 +680,7 @@ struct CreateFamilyPlaceholderView: View {
                 }
                 
                 // Success haptic feedback
-                HapticManager.shared.creation()
+                HapticManager.shared.success()
                 
                 // Show success toast with family code
                 ToastManager.shared.showMockFamilyCreated()

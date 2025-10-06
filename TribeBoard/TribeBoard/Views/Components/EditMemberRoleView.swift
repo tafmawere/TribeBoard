@@ -123,7 +123,14 @@ struct EditMemberRoleView: View {
             
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
-                    RoleBadge(role: member.role)
+                    Text(member.role.displayName)
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.blue.opacity(0.2))
+                        .foregroundColor(.blue)
+                        .clipShape(Capsule())
                     
                     Spacer()
                     

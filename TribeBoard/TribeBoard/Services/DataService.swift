@@ -7,6 +7,7 @@ enum DataServiceError: LocalizedError {
     case invalidData(String)
     case notFound(String)
     case constraintViolation(String)
+    case unknownError
     
     var errorDescription: String? {
         switch self {
@@ -18,6 +19,8 @@ enum DataServiceError: LocalizedError {
             return "Not found: \(message)"
         case .constraintViolation(let message):
             return "Constraint violation: \(message)"
+        case .unknownError:
+            return "An unknown error occurred"
         }
     }
 }
@@ -111,8 +114,8 @@ class DataService: ObservableObject {
                 } catch let rollbackError {
                     print("❌ DataService: Rollback failed: \(rollbackError.localizedDescription)")
                     ErrorHandlingUtilities.logError(
-                        .localCreationFailed(.invalidData("Transaction rollback failed")),
-                        context: ErrorContext(error: .localCreationFailed(.invalidData("Rollback failed"))),
+                        .unknownError(rollbackError.localizedDescription),
+                        context: ErrorContext(error: .unknownError(rollbackError.localizedDescription)),
                         additionalInfo: ["rollback_error": rollbackError.localizedDescription, "original_error": error.localizedDescription]
                     )
                 }
@@ -131,10 +134,10 @@ class DataService: ObservableObject {
         
         // Comprehensive input validation
         guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            let error = DataServiceError.validationFailed(["Family name cannot be empty"])
+            let error = DataServiceError.validationFailed(["Invalid family name"])
             ErrorHandlingUtilities.logError(
-                .validationFailed("Empty family name provided"),
-                context: ErrorContext(error: .validationFailed("Empty name")),
+                .invalidFamilyName,
+                context: ErrorContext(error: .invalidFamilyName),
                 additionalInfo: ["operation": "createFamily", "name": name, "code": code]
             )
             throw error
@@ -145,11 +148,11 @@ class DataService: ObservableObject {
         if !validationResult.isValid {
             print("❌ DataService: Family validation failed: \(validationResult.message)")
             ErrorHandlingUtilities.logError(
-                .validationFailed(validationResult.message),
-                context: ErrorContext(error: .validationFailed("Family validation failed")),
+                .invalidFamilyName,
+                context: ErrorContext(error: .invalidFamilyName),
                 additionalInfo: ["operation": "createFamily", "name": name, "code": code, "validation_message": validationResult.message]
             )
-            throw DataServiceError.validationFailed([validationResult.message])
+            throw DataServiceError.validationFailed(["Invalid family name"])
         }
         
         print("✅ DataService: Family validation passed")
@@ -159,8 +162,8 @@ class DataService: ObservableObject {
             try validateDatabaseState()
         } catch {
             ErrorHandlingUtilities.logError(
-                .localCreationFailed(.invalidData("Database validation failed")),
-                context: ErrorContext(error: .localCreationFailed(.invalidData("Database invalid"))),
+                .unknownError(error.localizedDescription),
+                context: ErrorContext(error: .unknownError(error.localizedDescription)),
                 additionalInfo: ["operation": "createFamily", "validation_error": error.localizedDescription]
             )
             throw DataServiceError.invalidData("Database is in invalid state: \(error.localizedDescription)")
@@ -170,10 +173,10 @@ class DataService: ObservableObject {
             // Double-check code uniqueness within transaction
             let existingFamily = try fetchFamily(byCode: code)
             if existingFamily != nil {
-                let error = DataServiceError.constraintViolation("Family code '\(code)' already exists")
+                let error = DataServiceError.invalidData("Family code already exists")
                 ErrorHandlingUtilities.logError(
-                    .constraintViolation("Duplicate family code during creation"),
-                    context: ErrorContext(error: .constraintViolation("Duplicate code")),
+                    .unknownError(error.localizedDescription),
+                    context: ErrorContext(error: .unknownError(error.localizedDescription)),
                     additionalInfo: ["operation": "createFamily", "name": name, "code": code]
                 )
                 throw error
@@ -186,8 +189,8 @@ class DataService: ObservableObject {
             guard family.isFullyValid else {
                 let error = DataServiceError.invalidData("Created family data is invalid")
                 ErrorHandlingUtilities.logError(
-                    .validationFailed("Created family failed validation"),
-                    context: ErrorContext(error: .validationFailed("Invalid family data")),
+                    .invalidFamilyName,
+                    context: ErrorContext(error: .invalidFamilyName),
                     additionalInfo: ["operation": "createFamily", "name": name, "code": code, "family_id": family.id.uuidString]
                 )
                 throw error
@@ -200,8 +203,8 @@ class DataService: ObservableObject {
             guard context.hasChanges else {
                 let error = DataServiceError.invalidData("Family insertion did not register changes")
                 ErrorHandlingUtilities.logError(
-                    .localCreationFailed(.invalidData("Insertion failed")),
-                    context: ErrorContext(error: .localCreationFailed(.invalidData("No changes"))),
+                    .unknownError(error.localizedDescription),
+                    context: ErrorContext(error: .unknownError(error.localizedDescription)),
                     additionalInfo: ["operation": "createFamily", "name": name, "code": code]
                 )
                 throw error
@@ -210,11 +213,7 @@ class DataService: ObservableObject {
             print("✅ DataService: Family created successfully - ID: \(family.id)")
             
             // Log successful creation
-            ErrorHandlingUtilities.logError(
-                .operationSucceeded,
-                context: ErrorContext(error: .operationSucceeded),
-                additionalInfo: ["operation": "createFamily", "name": name, "code": code, "family_id": family.id.uuidString]
-            )
+            print("✅ DataService: Family creation logged - ID: \(family.id.uuidString)")
             
             return family
         }
@@ -228,8 +227,8 @@ class DataService: ObservableObject {
         guard !code.isEmpty else {
             let error = DataServiceError.invalidData("Family code cannot be empty")
             ErrorHandlingUtilities.logError(
-                .validationFailed("Empty family code provided"),
-                context: ErrorContext(error: .validationFailed("Empty family code")),
+                .invalidFamilyName,
+                context: ErrorContext(error: .invalidFamilyName),
                 additionalInfo: ["operation": "fetchFamily", "code": "empty"]
             )
             throw error
@@ -238,8 +237,8 @@ class DataService: ObservableObject {
         guard code.count >= 6 && code.count <= 8 else {
             let error = DataServiceError.invalidData("Family code must be 6-8 characters long")
             ErrorHandlingUtilities.logError(
-                .validationFailed("Invalid family code length: \(code.count)"),
-                context: ErrorContext(error: .validationFailed("Invalid code length")),
+                .invalidFamilyName,
+                context: ErrorContext(error: .invalidFamilyName),
                 additionalInfo: ["operation": "fetchFamily", "code": code, "length": code.count]
             )
             throw error
@@ -250,8 +249,8 @@ class DataService: ObservableObject {
             try validateDatabaseState()
         } catch {
             ErrorHandlingUtilities.logError(
-                .localCreationFailed(.invalidData("Database validation failed")),
-                context: ErrorContext(error: .localCreationFailed(.invalidData("Database invalid"))),
+                .unknownError(error.localizedDescription),
+                context: ErrorContext(error: .unknownError(error.localizedDescription)),
                 additionalInfo: ["operation": "fetchFamily", "validation_error": error.localizedDescription]
             )
             throw DataServiceError.invalidData("Database is in invalid state: \(error.localizedDescription)")
@@ -271,10 +270,10 @@ class DataService: ObservableObject {
                 
                 // Validate results
                 if matchingFamilies.count > 1 {
-                    let error = DataServiceError.constraintViolation("Multiple families found with same code: '\(code)'")
+                    let error = DataServiceError.invalidData("Multiple families found with same code")
                     ErrorHandlingUtilities.logError(
-                        .constraintViolation("Duplicate family codes detected"),
-                        context: ErrorContext(error: .constraintViolation("Duplicate codes")),
+                        .unknownError(error.localizedDescription),
+                        context: ErrorContext(error: .unknownError(error.localizedDescription)),
                         additionalInfo: ["operation": "fetchFamily", "code": code, "count": matchingFamilies.count]
                     )
                     throw error
@@ -340,10 +339,10 @@ class DataService: ObservableObject {
             
             // Validate uniqueness
             if matchingFamilies.count > 1 {
-                let error = DataServiceError.constraintViolation("Multiple families found with same code: '\(code)'")
+                let error = DataServiceError.invalidData("Multiple families found with same code")
                 ErrorHandlingUtilities.logError(
-                    .constraintViolation("Duplicate family codes in manual filter"),
-                    context: ErrorContext(error: .constraintViolation("Duplicate codes")),
+                    .unknownError(error.localizedDescription),
+                    context: ErrorContext(error: .unknownError(error.localizedDescription)),
                     additionalInfo: ["operation": "fetchFamilyManual", "code": code, "count": matchingFamilies.count]
                 )
                 throw error
@@ -361,8 +360,8 @@ class DataService: ObservableObject {
             
         } catch {
             ErrorHandlingUtilities.logError(
-                .localCreationFailed(.invalidData("Manual filtering failed")),
-                context: ErrorContext(error: .localCreationFailed(.invalidData("Manual filter failed"))),
+                .unknownError(error.localizedDescription),
+                context: ErrorContext(error: .unknownError(error.localizedDescription)),
                 additionalInfo: ["operation": "fetchFamilyManual", "code": code, "error": error.localizedDescription]
             )
             throw DataServiceError.invalidData("Failed to fetch family by code '\(code)' using manual filtering: \(error.localizedDescription)")
@@ -378,8 +377,8 @@ class DataService: ObservableObject {
             try validateDatabaseState()
         } catch {
             ErrorHandlingUtilities.logError(
-                .localCreationFailed(.invalidData("Database validation failed")),
-                context: ErrorContext(error: .localCreationFailed(.invalidData("Database invalid"))),
+                .unknownError(error.localizedDescription),
+                context: ErrorContext(error: .unknownError(error.localizedDescription)),
                 additionalInfo: ["operation": "fetchFamilyById", "validation_error": error.localizedDescription]
             )
             throw DataServiceError.invalidData("Database is in invalid state: \(error.localizedDescription)")
@@ -399,10 +398,10 @@ class DataService: ObservableObject {
                 
                 // Validate results
                 if matchingFamilies.count > 1 {
-                    let error = DataServiceError.constraintViolation("Multiple families found with same ID: \(id)")
+                    let error = DataServiceError.invalidData("Multiple families found with same ID")
                     ErrorHandlingUtilities.logError(
-                        .constraintViolation("Duplicate family IDs detected"),
-                        context: ErrorContext(error: .constraintViolation("Duplicate IDs")),
+                        .unknownError(error.localizedDescription),
+                        context: ErrorContext(error: .unknownError(error.localizedDescription)),
                         additionalInfo: ["operation": "fetchFamilyById", "id": id.uuidString, "count": matchingFamilies.count]
                     )
                     throw error
@@ -468,10 +467,10 @@ class DataService: ObservableObject {
             
             // Validate uniqueness
             if matchingFamilies.count > 1 {
-                let error = DataServiceError.constraintViolation("Multiple families found with same ID: \(id)")
+                let error = DataServiceError.invalidData("Multiple families found with same ID")
                 ErrorHandlingUtilities.logError(
-                    .constraintViolation("Duplicate family IDs in manual filter"),
-                    context: ErrorContext(error: .constraintViolation("Duplicate IDs")),
+                    .unknownError(error.localizedDescription),
+                    context: ErrorContext(error: .unknownError(error.localizedDescription)),
                     additionalInfo: ["operation": "fetchFamilyByIdManual", "id": id.uuidString, "count": matchingFamilies.count]
                 )
                 throw error
@@ -489,8 +488,8 @@ class DataService: ObservableObject {
             
         } catch {
             ErrorHandlingUtilities.logError(
-                .localCreationFailed(.invalidData("Manual ID filtering failed")),
-                context: ErrorContext(error: .localCreationFailed(.invalidData("Manual ID filter failed"))),
+                .unknownError(error.localizedDescription),
+                context: ErrorContext(error: .unknownError(error.localizedDescription)),
                 additionalInfo: ["operation": "fetchFamilyByIdManual", "id": id.uuidString, "error": error.localizedDescription]
             )
             throw DataServiceError.invalidData("Failed to fetch family by ID '\(id)' using manual filtering: \(error.localizedDescription)")
@@ -556,7 +555,7 @@ class DataService: ObservableObject {
         // Validate before creation
         let validationResult = validateUserProfile(displayName: displayName, appleUserIdHash: appleUserIdHash)
         if !validationResult.isValid {
-            throw DataServiceError.validationFailed([validationResult.message])
+            throw DataServiceError.validationFailed(["Invalid family name"])
         }
         
         let userProfile = UserProfile(displayName: displayName, appleUserIdHash: appleUserIdHash, avatarUrl: avatarUrl)
@@ -652,14 +651,14 @@ class DataService: ObservableObject {
             .first { $0.family?.id == family.id && $0.status == .active }
         
         if existingMembership != nil {
-            throw DataServiceError.constraintViolation("User is already a member of this family")
+            throw DataServiceError.unknownError
         }
         
         // Check parent admin constraint
         if role == .parentAdmin {
             let hasParentAdmin = try familyHasParentAdmin(family)
             if hasParentAdmin {
-                throw DataServiceError.constraintViolation("A Parent Admin already exists for this family")
+                throw DataServiceError.unknownError
             }
         }
         
@@ -784,7 +783,7 @@ class DataService: ObservableObject {
         // Validate the role change
         let validationResult = try validateRoleChange(membership: membership, newRole: role)
         if !validationResult.isValid {
-            throw DataServiceError.validationFailed([validationResult.message])
+            throw DataServiceError.validationFailed(["Invalid family name"])
         }
         
         membership.updateRole(to: role)
@@ -808,8 +807,8 @@ class DataService: ObservableObject {
             try validateDatabaseState()
         } catch {
             ErrorHandlingUtilities.logError(
-                .localCreationFailed(.invalidData("Database validation failed before save")),
-                context: ErrorContext(error: .localCreationFailed(.invalidData("Database invalid"))),
+                .unknownError(error.localizedDescription),
+                context: ErrorContext(error: .unknownError(error.localizedDescription)),
                 additionalInfo: ["operation": "save", "validation_error": error.localizedDescription]
             )
             throw DataServiceError.invalidData("Database is in invalid state before save: \(error.localizedDescription)")
@@ -831,11 +830,7 @@ class DataService: ObservableObject {
                         print("✅ DataService: ModelContext saved successfully on attempt \(saveAttempts + 1)")
                         
                         // Log successful save
-                        ErrorHandlingUtilities.logError(
-                            .operationSucceeded,
-                            context: ErrorContext(error: .operationSucceeded),
-                            additionalInfo: ["operation": "save", "attempts": saveAttempts + 1]
-                        )
+                        print("✅ DataService: Save successful after \(saveAttempts + 1) attempts")
                         
                         return
                         
@@ -855,8 +850,8 @@ class DataService: ObservableObject {
                 // All save attempts failed
                 if let error = lastError {
                     ErrorHandlingUtilities.logError(
-                        .localCreationFailed(.invalidData("Save failed after retries")),
-                        context: ErrorContext(error: .localCreationFailed(.invalidData("Save failed"))),
+                        .unknownError(error.localizedDescription),
+                        context: ErrorContext(error: .unknownError(error.localizedDescription)),
                         additionalInfo: ["operation": "save", "attempts": saveAttempts, "error": error.localizedDescription]
                     )
                     throw DataServiceError.invalidData("Failed to save context after \(maxSaveAttempts) attempts: \(error.localizedDescription)")
@@ -1070,7 +1065,7 @@ class DataService: ObservableObject {
             attempts += 1
         }
         
-        throw DataServiceError.constraintViolation("Unable to generate unique family code after \(maxAttempts) attempts")
+        throw DataServiceError.invalidData("Failed to generate unique code after maximum attempts")
     }
     
     /// Generates a random 6-8 character alphanumeric code safely

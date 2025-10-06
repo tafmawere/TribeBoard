@@ -2,7 +2,7 @@ import SwiftUI
 
 // MARK: - ToastView Component
 struct ToastView: View {
-    let message: ToastData
+    let message: ToastMessage
     let onDismiss: () -> Void
     
     @State private var isVisible = false
@@ -60,8 +60,10 @@ struct ToastView: View {
 }
 
 // MARK: - Toast Overlay Modifier
+/// View modifier that adds toast notification overlay using proper SwiftUI binding
 struct ToastOverlayModifier: ViewModifier {
-    @ObservedObject var toastManager: ToastManager
+    /// Using @StateObject for the singleton ToastManager to ensure proper SwiftUI binding
+    @StateObject private var toastManager = ToastManager.shared
     
     func body(content: Content) -> some View {
         content
@@ -86,20 +88,19 @@ struct ToastOverlayModifier: ViewModifier {
 // MARK: - View Extension for Easy Integration
 extension View {
     /// Adds toast notification overlay to any view
-    /// - Parameter toastManager: The ToastManager instance to observe
     /// - Returns: View with toast overlay capability
-    func toastOverlay(_ toastManager: ToastManager) -> some View {
-        self.modifier(ToastOverlayModifier(toastManager: toastManager))
+    func toastOverlay() -> some View {
+        self.modifier(ToastOverlayModifier())
     }
 }
 
 // MARK: - Preview
 #Preview {
     VStack(spacing: 20) {
-        ToastView(message: ToastData(message: "Run Started", type: .success, duration: 3.0)) {}
-        ToastView(message: ToastData(message: "Stop Completed", type: .info, duration: 3.0)) {}
-        ToastView(message: ToastData(message: "Run Paused", type: .warning, duration: 3.0)) {}
-        ToastView(message: ToastData(message: "Run Cancelled", type: .error, duration: 3.0)) {}
+        ToastView(message: ToastMessage(message: "Run Started", type: .success)) {}
+        ToastView(message: ToastMessage(message: "Stop Completed", type: .info)) {}
+        ToastView(message: ToastMessage(message: "Run Paused", type: .warning)) {}
+        ToastView(message: ToastMessage(message: "Run Cancelled", type: .error)) {}
     }
     .padding()
     .background(Color(.systemGroupedBackground))

@@ -146,10 +146,12 @@ struct MockOnboardingView: View {
         action: @escaping () -> Void
     ) -> some View {
         AccessibleButton(
-            action: action,
+            action: {
+                HapticManager.shared.mediumImpact()
+                action()
+            },
             label: title,
-            hint: "Authenticates you to access TribeBoard",
-            hapticStyle: .medium
+            hint: "Authenticates you to access TribeBoard"
         ) {
             HStack(spacing: 12) {
                 if viewModel.isLoading {

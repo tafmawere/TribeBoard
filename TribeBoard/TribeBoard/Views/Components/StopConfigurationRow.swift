@@ -417,7 +417,7 @@ private struct ChildSelectionSheet: View {
 
 }
 
-#Preview("Stop Configuration - Interactive") {
+#Preview("Interactive Configuration") {
     VStack(spacing: DesignSystem.Spacing.lg) {
         StopConfigurationRow(
             stop: .constant(SchoolRunPreviewProvider.sampleStops[1]),
@@ -428,5 +428,4 @@ private struct ChildSelectionSheet: View {
     }
     .screenPadding()
     .background(Color(.systemGroupedBackground))
-    .previewDisplayName("Interactive Configuration")
 }

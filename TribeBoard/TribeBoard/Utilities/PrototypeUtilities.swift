@@ -16,7 +16,7 @@ class PrototypeUtilities: ObservableObject {
     
     @MainActor
     func startDemoSequence() {
-        ToastManager.shared.showDemoModeSequence()
+        ToastManager.shared.info("🎭 Demo mode activated")
         
         // Show demo instructions after a delay
         DispatchQueue.main.asyncAfter(deadline: .now() + 6.0) {
@@ -35,7 +35,7 @@ class PrototypeUtilities: ObservableObject {
     func switchDemoScenario(to scenario: DemoScenario) {
         demoScenario = scenario
         ToastManager.shared.info("🎭 Switched to: \(scenario.description)")
-        HapticManager.shared.selection()
+        HapticManager.shared.lightImpact()
     }
     
     @MainActor

@@ -382,9 +382,8 @@ private struct ExecutionControls: View {
 
 }
 
-#Preview("Run Execution - Interactive") {
+#Preview("Interactive Execution") {
     SchoolRunPreviewProvider.previewWithSampleData {
         RunExecutionView(run: SchoolRunPreviewProvider.executionRunStart)
     }
-    .previewDisplayName("Interactive Execution")
 }

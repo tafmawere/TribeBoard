@@ -370,7 +370,6 @@ struct BrandShowcaseView: View {
             
             VStack(spacing: DesignSystem.Spacing.md) {
                 LoadingStateView(
-                    message: "Loading family data...",
                     style: .card,
                     mockScenario: .dataSync
                 )
@@ -517,9 +516,9 @@ struct BrandShowcaseView: View {
                         .foregroundColor(.primary)
                     
                     HStack(spacing: DesignSystem.Spacing.lg) {
-                        LoadingStateView(style: .pulse)
-                        LoadingStateView(style: .shimmer)
-                        LoadingStateView(style: .minimal)
+                        LoadingStateView(message: "Loading...", style: .overlay)
+                        LoadingStateView(message: "Loading...", style: .card)
+                        LoadingStateView(message: "Loading...", style: .inline)
                     }
                 }
                 

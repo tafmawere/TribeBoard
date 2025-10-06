@@ -717,7 +717,7 @@ struct TaskCreationView: View {
                 }
                 
                 // Haptic feedback
-                HapticManager.shared.successImpact()
+                HapticManager.shared.success()
                 
                 // Call completion handler if provided
                 // Note: In a real implementation, we would pass the created task

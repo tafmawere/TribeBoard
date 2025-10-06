@@ -1,164 +1,145 @@
 import SwiftUI
 import Foundation
 
-/// ViewModel for role selection with real validation and Parent Admin constraint checking
+/// ViewModel for role selection with SwiftUI-compatible in-memory storage
 @MainActor
 class RoleSelectionViewModel: ObservableObject {
     
-    // MARK: - Published Properties
+    // MARK: - Published Properties for SwiftUI Binding
     
-    /// Currently selected role
-    @Published var selectedRole: Role = .adult
+    /// Currently selected role for SwiftUI binding
+    @Published var selectedRole: InMemoryRole = .parent
     
-    /// Loading state for role update operations
+    /// Loading state for SwiftUI progress indicators
     @Published var isUpdating: Bool = false
     
-    /// Error message for role selection issues
-    @Published var errorMessage: String?
+    /// Current error, if any
+    @Published var currentError: FamilyJoinError?
     
-    /// Whether Parent Admin role can be selected (based on family constraints)
-    @Published var canSelectParentAdmin: Bool = true
+    /// Whether Parent role can be selected (based on family constraints)
+    @Published var canSelectParent: Bool = true
     
-    /// Success state after role selection
+    /// Success state after role selection for SwiftUI navigation
     @Published var roleSelectionComplete: Bool = false
+    
+    /// Show error alert
+    @Published var showErrorAlert: Bool = false
+    
+    /// Show success alert
+    @Published var showSuccessAlert: Bool = false
     
     // MARK: - Dependencies
     
-    private let dataService: DataService
-    private let cloudKitService: CloudKitService
-    private let currentFamily: Family
-    private let currentUser: UserProfile
+    private let dataManager: InMemoryFamilyDataManager
+    private let currentFamily: InMemoryFamily
+    private let currentUser: InMemoryUser
     private var appState: AppState?
     
     // MARK: - Initialization
     
-    init(family: Family, user: UserProfile, dataService: DataService, cloudKitService: CloudKitService) {
+    init(family: InMemoryFamily, user: InMemoryUser, dataManager: InMemoryFamilyDataManager? = nil) {
         self.currentFamily = family
         self.currentUser = user
-        self.dataService = dataService
-        self.cloudKitService = cloudKitService
+        self.dataManager = dataManager ?? .shared
         
-        // Check Parent Admin availability on initialization
+        // Check Parent role availability on initialization
         Task {
-            await checkParentAdminAvailability()
+            await checkParentAvailability()
         }
     }
     
-    /// Set the app state (called from view)
+    /// Set the app state for SwiftUI navigation (called from view)
     func setAppState(_ appState: AppState) {
         self.appState = appState
     }
     
     // MARK: - Public Methods
     
-    /// Set the selected role and validate constraints
-    func setRole(_ role: Role) async {
+    /// Set the selected role and validate constraints for SwiftUI binding
+    func setRole(_ role: InMemoryRole) async {
         selectedRole = role
         clearError()
         
         // Validate role selection
-        if role == .parentAdmin && !canSelectParentAdmin {
-            showError("A Parent Admin already exists for this family. Selecting Adult role instead.")
-            selectedRole = .adult
-            HapticManager.shared.warning()
+        if role == .parent && !canSelectParent {
+            showError(.alreadyMember) // Using existing error that makes sense
+            selectedRole = .helper
             return
         }
         
         await updateRole(selectedRole)
     }
     
-    /// Update the user's role in the family with real backend integration
-    func updateRole(_ role: Role) async {
+    /// Update the user's role in the family with SwiftUI-compatible in-memory storage
+    func updateRole(_ role: InMemoryRole) async {
         isUpdating = true
         clearError()
         
-        do {
-            // Get or create the user's membership
-            let membership = try await getOrCreateMembership(role: role)
+        // Add user to family with selected role using in-memory data manager
+        let success = dataManager.addMemberToFamily(
+            familyId: currentFamily.id,
+            user: currentUser,
+            role: role
+        )
+        
+        if success {
+            // Success - role assignment completed
+            roleSelectionComplete = true
+            showSuccess()
             
-            // If membership already exists, update the role
-            if membership.role != role {
-                try dataService.updateMembershipRole(membership, to: role)
-                
-                // Sync to CloudKit
-                try await cloudKitService.save(membership)
-                
-                // Mark as synced
-                membership.needsSync = false
-                membership.lastSyncDate = Date()
-                try dataService.save()
-            }
-            
-            // Success haptic feedback
-            HapticManager.shared.success()
+            // Update app state for SwiftUI navigation
+            appState?.setFamily(currentFamily)
             
             // Show success toast
-            ToastManager.shared.success("Role set to \(role.displayName)")
+            ToastManager.shared.success("Role assigned successfully!")
             
-            // Update app state with membership
-            appState?.setFamily(currentFamily, membership: membership)
+        } else {
+            // Check if user is already a member and update their role
+            let updateSuccess = dataManager.updateUserRole(
+                userId: currentUser.id,
+                familyId: currentFamily.id,
+                newRole: role
+            )
             
-            roleSelectionComplete = true
-            
-        } catch {
-            if let dataError = error as? DataServiceError {
-                showError(dataError.localizedDescription)
-            } else if let cloudKitError = error as? CloudKitError {
-                showError("Role updated locally. Sync failed: \(cloudKitError.localizedDescription)")
+            if updateSuccess {
+                roleSelectionComplete = true
+                showSuccess()
+                appState?.setFamily(currentFamily)
+                ToastManager.shared.success("Role updated successfully!")
             } else {
-                showError("Failed to update role: \(error.localizedDescription)")
+                showError(.unknownError)
             }
-            HapticManager.shared.error()
         }
         
         isUpdating = false
     }
     
-    /// Check if Parent Admin role is available in the current family with real backend integration
-    func checkParentAdminAvailability() async {
-        do {
-            // Check local storage first
-            let hasLocalParentAdmin = try dataService.familyHasParentAdmin(currentFamily)
-            
-            if hasLocalParentAdmin {
-                canSelectParentAdmin = false
-            } else {
-                // Check CloudKit for the most up-to-date information
-                let membershipRecords = try await cloudKitService.fetchActiveMemberships(forFamilyId: currentFamily.id.uuidString)
-                
-                let hasCloudKitParentAdmin = membershipRecords.contains { record in
-                    guard let roleString = record[CKFieldName.membershipRole] as? String,
-                          let role = Role(rawValue: roleString) else {
-                        return false
-                    }
-                    return role == .parentAdmin
-                }
-                
-                canSelectParentAdmin = !hasCloudKitParentAdmin
-            }
-            
-            // If Parent Admin is taken and currently selected, default to Adult
-            if !canSelectParentAdmin && selectedRole == .parentAdmin {
-                selectedRole = .adult
-            }
-            
-        } catch {
-            // If check fails, default to not allowing Parent Admin selection for safety
-            canSelectParentAdmin = false
-            if selectedRole == .parentAdmin {
-                selectedRole = .adult
-            }
+    /// Check if Parent role is available in the current family with SwiftUI-compatible in-memory storage
+    func checkParentAvailability() async {
+        // Get family members with user details from in-memory data manager
+        let membersWithUsers = dataManager.getFamilyMembersWithUserDetails(familyId: currentFamily.id)
+        
+        // Check if any member already has the Parent role
+        let hasParent = membersWithUsers.contains { memberWithUser in
+            memberWithUser.member.role == .parent
+        }
+        
+        canSelectParent = !hasParent
+        
+        // If Parent is taken and currently selected, default to Helper
+        if !canSelectParent && selectedRole == .parent {
+            selectedRole = .helper
         }
     }
     
-    /// Get role card data for UI display
-    func getRoleCardData() -> [RoleCardData] {
-        return Role.allCases.map { role in
-            RoleCardData(
+    /// Get role card data for SwiftUI UI display
+    func getRoleCardData() -> [InMemoryRoleCardData] {
+        return InMemoryRole.allCases.map { role in
+            InMemoryRoleCardData(
                 role: role,
                 isSelected: role == selectedRole,
-                isEnabled: role == .parentAdmin ? canSelectParentAdmin : true,
-                icon: getIconName(for: role),
+                isEnabled: role == .parent ? canSelectParent : true,
+                icon: role.iconName,
                 title: role.displayName,
                 description: role.description
             )
@@ -167,51 +148,38 @@ class RoleSelectionViewModel: ObservableObject {
     
     // MARK: - Private Methods
     
-    private func showError(_ message: String) {
-        errorMessage = message
+    /// Show error alert with the specified error
+    private func showError(_ error: FamilyJoinError) {
+        currentError = error
+        showErrorAlert = true
+        HapticManager.shared.error()
+        ToastManager.shared.error(error.localizedDescription)
     }
     
-    private func clearError() {
-        errorMessage = nil
+    /// Show success alert
+    private func showSuccess() {
+        showSuccessAlert = true
+        HapticManager.shared.success()
     }
     
-    /// Get or create membership for the current user
-    private func getOrCreateMembership(role: Role) async throws -> Membership {
-        // Check if user already has a membership in this family
-        let existingMemberships = try dataService.fetchMemberships(forUser: currentUser)
-        
-        if let existingMembership = existingMemberships.first(where: { $0.family?.id == currentFamily.id && $0.status == .active }) {
-            return existingMembership
-        } else {
-            // Create new membership
-            return try dataService.createMembership(
-                family: currentFamily,
-                user: currentUser,
-                role: role
-            )
-        }
+    /// Clear error message and alert state
+    func clearError() {
+        currentError = nil
+        showErrorAlert = false
     }
     
-    private func getIconName(for role: Role) -> String {
-        switch role {
-        case .parentAdmin:
-            return "crown.fill"
-        case .adult:
-            return "person.fill"
-        case .kid:
-            return "figure.child"
-        case .visitor:
-            return "person.badge.clock.fill"
-        }
+    /// Get current error message for display
+    var errorMessage: String? {
+        return currentError?.localizedDescription
     }
 }
 
-// MARK: - Role Card Data Model
+// MARK: - In-Memory Role Card Data Model
 
-/// Data model for role selection cards
-struct RoleCardData: Identifiable {
+/// Data model for role selection cards with SwiftUI compatibility
+struct InMemoryRoleCardData: Identifiable {
     let id = UUID()
-    let role: Role
+    let role: InMemoryRole
     let isSelected: Bool
     let isEnabled: Bool
     let icon: String

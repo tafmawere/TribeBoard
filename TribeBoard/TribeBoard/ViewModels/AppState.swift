@@ -18,11 +18,20 @@ class AppState: ObservableObject {
     /// Current family (nil if not in a family)
     @Published var currentFamily: Family?
     
+    /// Current in-memory family for SwiftUI reactive updates (used during family creation/joining flow)
+    @Published var currentInMemoryFamily: InMemoryFamily?
+    
+    /// Current in-memory user for SwiftUI reactive updates (used during family creation/joining flow)
+    @Published var currentInMemoryUser: InMemoryUser?
+    
     /// Loading state for async operations
     @Published var isLoading: Bool = false
     
     /// Global error message
     @Published var errorMessage: String?
+    
+    /// Family-specific error message for in-memory operations
+    @Published var familyErrorMessage: String?
     
     // MARK: - Navigation State
     
@@ -375,6 +384,155 @@ class AppState: ObservableObject {
         validateNavigationPath()
     }
     
+    /// Set family using in-memory family model for SwiftUI compatibility
+    func setFamily(_ family: InMemoryFamily) {
+        currentInMemoryFamily = family
+        
+        // Navigate to role selection since the user needs to select their role
+        currentFlow = .roleSelection
+        
+        // Ensure navigation state is valid
+        validateNavigationPath()
+    }
+    
+    /// Set in-memory user for SwiftUI reactive updates
+    func setInMemoryUser(_ user: InMemoryUser) {
+        currentInMemoryUser = user
+    }
+    
+    /// Complete family setup after role selection - transitions from in-memory to main app state
+    func completeFamilySetup(withRole role: InMemoryRole) {
+        guard let inMemoryFamily = currentInMemoryFamily,
+              let inMemoryUser = currentInMemoryUser else { return }
+        
+        // Create a membership for the user in the family
+        let member = InMemoryMember(userId: inMemoryUser.id, familyId: inMemoryFamily.id, role: role)
+        inMemoryFamily.addMember(member)
+        
+        // Navigate to family dashboard
+        currentFlow = .familyDashboard
+        
+        // Ensure navigation state is valid
+        validateNavigationPath()
+    }
+    
+    /// Clear in-memory family and user data
+    func clearInMemoryFamilyData() {
+        currentInMemoryFamily = nil
+        currentInMemoryUser = nil
+    }
+    
+    /// Get current in-memory family for SwiftUI binding
+    var inMemoryFamily: InMemoryFamily? {
+        return currentInMemoryFamily
+    }
+    
+    /// Get current in-memory user for SwiftUI binding
+    var inMemoryUser: InMemoryUser? {
+        return currentInMemoryUser
+    }
+    
+    /// Check if user is currently in family creation/joining flow
+    var isInFamilySetupFlow: Bool {
+        switch currentFlow {
+        case .createFamily, .joinFamily, .roleSelection:
+            return true
+        case .onboarding, .familySelection, .familyDashboard:
+            return false
+        }
+    }
+    
+    /// Get family members for current in-memory family
+    var currentFamilyMembers: [InMemoryMember] {
+        return currentInMemoryFamily?.members ?? []
+    }
+    
+    /// Handle successful family creation with SwiftUI state updates
+    func handleFamilyCreated(_ family: InMemoryFamily, user: InMemoryUser) {
+        setFamily(family)
+        setInMemoryUser(user)
+        clearFamilyError()
+        
+        // Navigate to role selection
+        navigateToRoleSelection()
+    }
+    
+    /// Handle successful family join with SwiftUI state updates
+    func handleFamilyJoined(_ family: InMemoryFamily, user: InMemoryUser) {
+        setFamily(family)
+        setInMemoryUser(user)
+        clearFamilyError()
+        
+        // Navigate to role selection
+        navigateToRoleSelection()
+    }
+    
+    /// Handle role selection completion with SwiftUI state updates
+    func handleRoleSelected(_ role: InMemoryRole) {
+        completeFamilySetup(withRole: role)
+        clearFamilyError()
+        
+        // Navigate to family dashboard
+        navigateToFamilyDashboard()
+    }
+    
+    /// Reset family setup flow and return to family selection
+    func resetFamilySetupFlow() {
+        clearInMemoryFamilyData()
+        clearFamilyError()
+        currentFlow = .familySelection
+        resetNavigation()
+    }
+    
+    // MARK: - SwiftUI Computed Properties for @EnvironmentObject Support
+    
+    /// Computed property for SwiftUI binding to current family name
+    var currentFamilyName: String {
+        return currentInMemoryFamily?.name ?? currentFamily?.name ?? ""
+    }
+    
+    /// Computed property for SwiftUI binding to current family code
+    var currentFamilyCode: String {
+        return currentInMemoryFamily?.code ?? currentFamily?.code ?? ""
+    }
+    
+    /// Computed property for SwiftUI binding to current user name
+    var currentUserName: String {
+        return currentInMemoryUser?.name ?? currentUser?.displayName ?? ""
+    }
+    
+    /// Check if family setup is complete and ready for dashboard
+    var isFamilySetupComplete: Bool {
+        return currentInMemoryFamily != nil && 
+               currentInMemoryUser != nil && 
+               !currentFamilyMembers.isEmpty
+    }
+    
+    /// Get current user's role in the in-memory family
+    var currentUserInMemoryRole: InMemoryRole? {
+        guard let user = currentInMemoryUser,
+              let family = currentInMemoryFamily else { return nil }
+        
+        return family.member(withUserId: user.id)?.role
+    }
+    
+    /// Check if current user has admin privileges in in-memory family
+    var isCurrentUserInMemoryAdmin: Bool {
+        return currentUserInMemoryRole == .parent
+    }
+    
+    /// Reset HomeLife state to initial values
+    private func resetHomeLifeState() {
+        homeLifeNavigationPath = NavigationPath()
+        selectedHomeLifeTab = .mealPlan
+        currentMealPlan = nil
+        groceryList = []
+        shoppingTasks = []
+        homeLifeIsLoading = false
+        homeLifeErrorMessage = nil
+        homeLifeSuccessMessage = nil
+    }
+    
     /// Create family using mock services
     func createFamilyMock(name: String, code: String) async -> Bool {
         guard let mockServices = mockServiceCoordinator,
@@ -461,6 +619,23 @@ class AppState: ObservableObject {
         resetNavigationState()
     }
     
+    // MARK: - Error Handling Methods
+    
+    /// Show error message
+    func showError(_ message: String) {
+        errorMessage = message
+    }
+    
+    /// Clear error message
+    func clearError() {
+        errorMessage = nil
+    }
+    
+    /// Clear family-specific error message
+    func clearFamilyError() {
+        familyErrorMessage = nil
+    }
+    
     // MARK: - Navigation Methods
     
     /// Navigate to a specific flow
@@ -471,6 +646,64 @@ class AppState: ObservableObject {
     /// Reset navigation to root
     func resetNavigation() {
         navigationPath = NavigationPath()
+    }
+    
+    /// Navigate programmatically using NavigationPath for SwiftUI
+    func navigateToView<T: Hashable>(_ destination: T) {
+        navigationPath.append(destination)
+    }
+    
+    /// Pop the last view from navigation stack
+    func popView() {
+        guard !navigationPath.isEmpty else { return }
+        navigationPath.removeLast()
+    }
+    
+    /// Pop to root view in navigation stack
+    func popToRoot() {
+        navigationPath = NavigationPath()
+    }
+    
+    /// Navigate with animation support for SwiftUI
+    func navigateWithAnimation<T: Hashable>(_ destination: T) {
+        withAnimation(.easeInOut(duration: 0.3)) {
+            navigationPath.append(destination)
+        }
+    }
+    
+    /// Pop with animation support for SwiftUI
+    func popWithAnimation() {
+        guard !navigationPath.isEmpty else { return }
+        withAnimation(.easeInOut(duration: 0.3)) {
+            navigationPath.removeLast()
+        }
+    }
+    
+    /// Navigate to family creation flow with proper state management
+    func navigateToCreateFamily() {
+        currentFlow = .createFamily
+        resetNavigation()
+    }
+    
+    /// Navigate to join family flow with proper state management
+    func navigateToJoinFamily() {
+        currentFlow = .joinFamily
+        resetNavigation()
+    }
+    
+    /// Navigate to role selection flow with proper state management
+    func navigateToRoleSelection() {
+        currentFlow = .roleSelection
+        resetNavigation()
+    }
+    
+    /// Navigate to family dashboard with proper state management
+    func navigateToFamilyDashboard() {
+        currentFlow = .familyDashboard
+        resetNavigation()
+        
+        // Ensure proper tab selection for dashboard
+        selectedNavigationTab = .dashboard
     }
     
     /// Validate and ensure selectedNavigationTab is appropriate for 5-tab layout
@@ -689,14 +922,9 @@ class AppState: ObservableObject {
     
     // MARK: - Error Handling
     
-    /// Show error message
-    func showError(_ message: String) {
-        errorMessage = message
-    }
-    
-    /// Clear error message
-    func clearError() {
-        errorMessage = nil
+    /// Show family-specific error message
+    func showFamilyError(_ message: String) {
+        familyErrorMessage = message
     }
     
     // MARK: - Demo Helper Methods
@@ -719,7 +947,7 @@ class AppState: ObservableObject {
         isLoading = false
         
         // Reset HomeLife state
-        resetHomeLifeData()
+        resetHomeLifeState()
         
         // Reset demo manager if active
         if let demoManager = demoJourneyManager, demoManager.isDemoModeActive {
