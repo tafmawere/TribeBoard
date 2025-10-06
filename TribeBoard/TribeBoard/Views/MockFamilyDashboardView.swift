@@ -116,15 +116,17 @@ struct MockFamilyDashboardView: View {
         }
         .sheet(isPresented: $viewModel.showRoleChangeSheet) {
             if let member = viewModel.selectedMember {
-                RoleChangeSheet(
-                    member: member,
-                    userProfile: viewModel.userProfile(for: member),
-                    onRoleChange: { newRole in
-                        Task {
-                            await viewModel.changeRole(for: member, to: newRole)
-                        }
+                VStack {
+                    Text("Role Change")
+                        .font(.title2)
+                        .padding()
+                    Text("Role change functionality coming soon")
+                        .padding()
+                    Button("Close") {
+                        viewModel.showRoleChangeSheet = false
                     }
-                )
+                    .padding()
+                }
             }
         }
         .sheet(isPresented: $viewModel.showCalendarView) {
@@ -222,7 +224,14 @@ struct MockFamilyDashboardView: View {
                         .font(.subheadline)
                         .fontWeight(.medium)
                     
-                    RoleBadge(role: viewModel.currentUserRole)
+                    Text(viewModel.currentUserRole.displayName)
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.blue.opacity(0.2))
+                        .foregroundColor(.blue)
+                        .clipShape(Capsule())
                 }
                 
                 Spacer()
@@ -414,17 +423,19 @@ struct MockFamilyDashboardView: View {
             
             LazyVStack(spacing: 8) {
                 ForEach(viewModel.members.prefix(3)) { member in
-                    MemberRowView(
-                        member: member,
-                        userProfile: viewModel.userProfile(for: member),
-                        canManage: viewModel.canManageMembers && member.userId != appState.currentUser?.id,
-                        onRoleChange: {
-                            viewModel.showRoleChange(for: member)
-                        },
-                        onRemove: {
-                            viewModel.showRemovalConfirmation(for: member)
-                        }
-                    )
+                    if let inMemoryMember = TypeConversionUtilities.convertToInMemoryMember(member) {
+                        MemberRowView(
+                            member: inMemoryMember,
+                            user: TypeConversionUtilities.convertToInMemoryUser(viewModel.userProfile(for: member)),
+                            canManage: viewModel.canManageMembers && member.userId != appState.currentUser?.id,
+                            onRoleChange: {
+                                viewModel.showRoleChange(for: member)
+                            },
+                            onRemove: {
+                                viewModel.showRemovalConfirmation(for: member)
+                            }
+                        )
+                    }
                 }
                 
                 if viewModel.members.count > 3 {
