@@ -6,48 +6,6 @@
 	<integer>11</integer>
 	<key>logs</key>
 	<dict>
-		<key>06E963B5-930C-49FA-AEBB-D61C3904E4D1</key>
-		<dict>
-			<key>className</key>
-			<string>IDECommandLineBuildLog</string>
-			<key>documentTypeString</key>
-			<string>&lt;nil&gt;</string>
-			<key>domainType</key>
-			<string>Xcode.IDEActivityLogDomainType.BuildLog</string>
-			<key>fileName</key>
-			<string>06E963B5-930C-49FA-AEBB-D61C3904E4D1.xcactivitylog</string>
-			<key>hasPrimaryLog</key>
-			<true/>
-			<key>primaryObservable</key>
-			<dict>
-				<key>highLevelStatus</key>
-				<string>E</string>
-				<key>totalNumberOfAnalyzerIssues</key>
-				<integer>0</integer>
-				<key>totalNumberOfErrors</key>
-				<integer>4</integer>
-				<key>totalNumberOfTestFailures</key>
-				<integer>0</integer>
-				<key>totalNumberOfWarnings</key>
-				<integer>1</integer>
-			</dict>
-			<key>schemeIdentifier-containerName</key>
-			<string>TribeBoard project</string>
-			<key>schemeIdentifier-schemeName</key>
-			<string>TribeBoard</string>
-			<key>schemeIdentifier-sharedScheme</key>
-			<integer>1</integer>
-			<key>signature</key>
-			<string>Building project TribeBoard with scheme TribeBoard</string>
-			<key>timeStartedRecording</key>
-			<real>779789964.02217495</real>
-			<key>timeStoppedRecording</key>
-			<real>779789967.88344705</real>
-			<key>title</key>
-			<string>Building project TribeBoard with scheme TribeBoard</string>
-			<key>uniqueIdentifier</key>
-			<string>06E963B5-930C-49FA-AEBB-D61C3904E4D1</string>
-		</dict>
 		<key>783B7FA4-E219-45C4-9907-9F4363EB34C1</key>
 		<dict>
 			<key>className</key>

@@ -5,6 +5,9 @@ struct DemoControlPanel: View {
     @ObservedObject var demoManager: DemoJourneyManager
     @State private var showingScenarioSelection = false
     @State private var selectedScenario: DemoScenario?
+    @State private var isGeneratingSampleData = false
+    @State private var sampleDataMessage = ""
+    @State private var showingSampleDataAlert = false
     
     var body: some View {
         VStack(spacing: 16) {
@@ -24,6 +27,11 @@ struct DemoControlPanel: View {
                 selectedScenario: $selectedScenario,
                 isPresented: $showingScenarioSelection
             )
+        }
+        .alert("Sample Family Data", isPresented: $showingSampleDataAlert) {
+            Button("OK") { }
+        } message: {
+            Text(sampleDataMessage)
         }
     }
     
@@ -212,6 +220,35 @@ struct DemoControlPanel: View {
             }
             .foregroundColor(.primary)
             
+            // Sample Data Generation Button
+            Button(action: {
+                Task {
+                    await generateSampleFamilyData()
+                }
+            }) {
+                HStack {
+                    if isGeneratingSampleData {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                        Text("Generating...")
+                            .fontWeight(.medium)
+                    } else {
+                        Text("Generate Sample Family Data")
+                            .fontWeight(.medium)
+                        
+                        Spacer()
+                        
+                        Image(systemName: "person.3.fill")
+                            .font(.caption)
+                    }
+                }
+                .padding()
+                .background(Color(.systemBlue).opacity(0.1))
+                .cornerRadius(8)
+            }
+            .foregroundColor(.blue)
+            .disabled(isGeneratingSampleData)
+            
             // Reset Button
             Button("Reset App to Initial State") {
                 // This will reset the app without starting a demo
@@ -220,6 +257,54 @@ struct DemoControlPanel: View {
             .font(.caption)
             .foregroundColor(.secondary)
         }
+    }
+    
+    // MARK: - Sample Data Generation
+    
+    /// Generates sample family data for testing join family functionality
+    @MainActor
+    private func generateSampleFamilyData() async {
+        guard let appState = demoManager.appState else {
+            sampleDataMessage = "App state not available. Please try again."
+            showingSampleDataAlert = true
+            return
+        }
+        
+        isGeneratingSampleData = true
+        sampleDataMessage = ""
+        
+        do {
+            // Get the data service from app state
+            let dataService = appState.dataService
+            
+            // Create sample family data generator
+            let generator = SampleFamilyDataGenerator(dataService: dataService)
+            
+            // Generate sample families
+            let generatedFamilies = try await generator.generateSampleFamilies()
+            
+            // Success message
+            if generatedFamilies.isEmpty {
+                sampleDataMessage = "Sample families already exist. Check the console for family codes."
+            } else {
+                sampleDataMessage = "Successfully generated \(generatedFamilies.count) sample families! Check the console for family codes to test join family functionality."
+            }
+            
+        } catch {
+            // Handle errors using existing error handling utilities
+            let categorizedError = ErrorHandlingUtilities.categorizeError(error)
+            sampleDataMessage = "Failed to generate sample data: \(categorizedError.userFriendlyMessage)"
+            
+            // Log the error for debugging
+            let context = ErrorContext(error: categorizedError)
+            ErrorHandlingUtilities.logError(categorizedError, context: context, additionalInfo: [
+                "operation": "sample_family_generation",
+                "source": "DemoControlPanel"
+            ])
+        }
+        
+        isGeneratingSampleData = false
+        showingSampleDataAlert = true
     }
 }
 
