@@ -27,6 +27,33 @@ class InMemoryFamilyDataManager: ObservableObject {
     
     private init() {
         // Private initializer to enforce singleton pattern
+        setupDemoFamilies()
+    }
+    
+    /// Setup demo families for testing join functionality
+    private func setupDemoFamilies() {
+        // Create demo families with fixed codes for testing
+        let demoFamily = InMemoryFamily(name: "Demo Family", code: "DEMO12")
+        let testFamily = InMemoryFamily(name: "Test Family", code: "TEST45")
+        let sampleFamily = InMemoryFamily(name: "Sample Family", code: "FAM123")
+        
+        // Add some demo users to these families
+        let demoUser = InMemoryUser(name: "Demo Parent")
+        let testUser = InMemoryUser(name: "Test Parent")
+        let sampleUser = InMemoryUser(name: "Sample Parent")
+        
+        // Add users to families with admin roles
+        let demoMember = InMemoryMember(userId: demoUser.id, familyId: demoFamily.id, role: .parent)
+        let testMember = InMemoryMember(userId: testUser.id, familyId: testFamily.id, role: .parent)
+        let sampleMember = InMemoryMember(userId: sampleUser.id, familyId: sampleFamily.id, role: .parent)
+        
+        demoFamily.addMember(demoMember)
+        testFamily.addMember(testMember)
+        sampleFamily.addMember(sampleMember)
+        
+        // Add to storage
+        families = [demoFamily, testFamily, sampleFamily]
+        users = [demoUser, testUser, sampleUser]
     }
     
     // MARK: - Family Operations

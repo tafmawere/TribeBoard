@@ -400,6 +400,196 @@ class SampleFamilyDataGeneratorTests: TestBase {
         }
     }
     
+    // MARK: - Error Conversion Tests
+    
+    func testErrorConversion_SampleDataErrorToFamilyCreationError_ShouldPreserveContext() {
+        // Test all SampleDataError cases convert to appropriate FamilyCreationError cases
+        let testCases: [(SampleDataError, FamilyCreationError)] = [
+            (.familyAlreadyExists("Test Family"), .familyAlreadyExists),
+            (.codeGenerationFailed, .codeGenerationFailed),
+            (.memberCreationFailed("John Doe"), .validationFailed("Member creation failed: John Doe")),
+            (.partialCreationFailure(["Family 1", "Family 2"]), .validationFailed("Partial creation failure: Family 1, Family 2")),
+            (.dataServiceUnavailable, .unknownError("Data service unavailable")),
+            (.validationFailed("Invalid data"), .validationFailed("Invalid data")),
+            (.databaseError(NSError(domain: "TestDomain", code: 1, userInfo: [NSLocalizedDescriptionKey: "DB Error"])), .unknownError("Database error: DB Error")),
+            (.networkError(NSError(domain: NSURLErrorDomain, code: NSURLErrorNotConnectedToInternet, userInfo: [NSLocalizedDescriptionKey: "Network Error"])), .networkUnavailable),
+            (.unknownError("Test error"), .unknownError("Test error"))
+        ]
+        
+        for (sampleError, expectedFamilyError) in testCases {
+            // When
+            let convertedError = sampleError.toFamilyCreationError()
+            
+            // Then
+            switch (convertedError, expectedFamilyError) {
+            case (.familyAlreadyExists, .familyAlreadyExists),
+                 (.codeGenerationFailed, .codeGenerationFailed),
+                 (.networkUnavailable, .networkUnavailable):
+                // Direct mapping cases
+                XCTAssertTrue(true, "Direct mapping successful for \(sampleError)")
+                
+            case (.validationFailed(let convertedMessage), .validationFailed(let expectedMessage)):
+                XCTAssertEqual(convertedMessage, expectedMessage, "Validation error message should be preserved")
+                
+            case (.unknownError(let convertedMessage), .unknownError(let expectedMessage)):
+                XCTAssertEqual(convertedMessage, expectedMessage, "Unknown error message should be preserved")
+                
+            default:
+                XCTFail("Conversion mismatch: \(sampleError) -> \(convertedError), expected \(expectedFamilyError)")
+            }
+        }
+    }
+    
+    func testErrorConversion_PreservesErrorContext_ForMemberCreationFailed() {
+        // Given
+        let memberName = "Jane Smith"
+        let sampleError = SampleDataError.memberCreationFailed(memberName)
+        
+        // When
+        let convertedError = sampleError.toFamilyCreationError()
+        
+        // Then
+        if case .validationFailed(let message) = convertedError {
+            XCTAssertTrue(message.contains(memberName), "Converted error should preserve member name context")
+            XCTAssertTrue(message.contains("Member creation failed"), "Converted error should preserve operation context")
+        } else {
+            XCTFail("Member creation failed should convert to validationFailed, got: \(convertedError)")
+        }
+    }
+    
+    func testErrorConversion_PreservesErrorContext_ForPartialCreationFailure() {
+        // Given
+        let failures = ["Family A", "Family B", "Family C"]
+        let sampleError = SampleDataError.partialCreationFailure(failures)
+        
+        // When
+        let convertedError = sampleError.toFamilyCreationError()
+        
+        // Then
+        if case .validationFailed(let message) = convertedError {
+            for failure in failures {
+                XCTAssertTrue(message.contains(failure), "Converted error should preserve all failure contexts: \(failure)")
+            }
+            XCTAssertTrue(message.contains("Partial creation failure"), "Converted error should preserve operation context")
+        } else {
+            XCTFail("Partial creation failure should convert to validationFailed, got: \(convertedError)")
+        }
+    }
+    
+    func testErrorConversion_PreservesErrorContext_ForDatabaseError() {
+        // Given
+        let underlyingError = NSError(domain: "CoreDataDomain", code: 500, userInfo: [NSLocalizedDescriptionKey: "Core Data save failed"])
+        let sampleError = SampleDataError.databaseError(underlyingError)
+        
+        // When
+        let convertedError = sampleError.toFamilyCreationError()
+        
+        // Then
+        if case .unknownError(let message) = convertedError {
+            XCTAssertTrue(message.contains("Database error"), "Converted error should preserve error type context")
+            XCTAssertTrue(message.contains("Core Data save failed"), "Converted error should preserve underlying error message")
+        } else {
+            XCTFail("Database error should convert to unknownError, got: \(convertedError)")
+        }
+    }
+    
+    func testErrorConversion_PreservesErrorContext_ForNetworkError() {
+        // Given
+        let underlyingError = NSError(domain: NSURLErrorDomain, code: NSURLErrorTimedOut, userInfo: [NSLocalizedDescriptionKey: "Request timed out"])
+        let sampleError = SampleDataError.networkError(underlyingError)
+        
+        // When
+        let convertedError = sampleError.toFamilyCreationError()
+        
+        // Then
+        XCTAssertEqual(convertedError, .networkUnavailable, "Network errors should convert to networkUnavailable")
+    }
+    
+    func testErrorConversion_AllSampleDataErrorCases_HaveConversionMapping() {
+        // This test ensures all SampleDataError cases have proper conversion mapping
+        let allSampleErrorCases: [SampleDataError] = [
+            .familyAlreadyExists("Test"),
+            .codeGenerationFailed,
+            .memberCreationFailed("Test Member"),
+            .partialCreationFailure(["Test"]),
+            .dataServiceUnavailable,
+            .validationFailed("Test validation"),
+            .databaseError(NSError(domain: "Test", code: 1, userInfo: nil)),
+            .networkError(NSError(domain: "Test", code: 1, userInfo: nil)),
+            .unknownError("Test unknown")
+        ]
+        
+        for sampleError in allSampleErrorCases {
+            // When
+            let convertedError = sampleError.toFamilyCreationError()
+            
+            // Then - Should not crash and should return a valid FamilyCreationError
+            XCTAssertNotNil(convertedError, "All SampleDataError cases should have conversion mapping: \(sampleError)")
+            
+            // Verify the converted error has proper localized description
+            XCTAssertNotNil(convertedError.errorDescription, "Converted error should have error description")
+            XCTAssertFalse(convertedError.errorDescription?.isEmpty ?? true, "Converted error description should not be empty")
+        }
+    }
+    
+    func testErrorConversion_MaintainsErrorProperties_AfterConversion() {
+        // Given
+        let sampleError = SampleDataError.validationFailed("Test validation error")
+        
+        // When
+        let convertedError = sampleError.toFamilyCreationError()
+        
+        // Then - Verify error properties are maintained
+        XCTAssertNotNil(convertedError.errorDescription, "Converted error should have error description")
+        XCTAssertNotNil(convertedError.failureReason, "Converted error should have failure reason")
+        XCTAssertNotNil(convertedError.recoverySuggestion, "Converted error should have recovery suggestion")
+        
+        // Verify the converted error maintains appropriate categorization
+        if case .validationFailed = convertedError {
+            XCTAssertEqual(convertedError.category, .validation, "Validation errors should maintain validation category")
+        } else {
+            XCTFail("Validation error should convert to validationFailed")
+        }
+    }
+    
+    func testErrorConversion_GenerateSampleFamiliesWithFamilyCreationError_ConvertsCorrectly() async {
+        // Given
+        mockDataService.setShouldSucceed(false)
+        mockDataService.setError(.invalidData("Mock validation error"))
+        
+        // When & Then
+        do {
+            _ = try await sampleGenerator.generateSampleFamiliesWithFamilyCreationError()
+            XCTFail("Should throw FamilyCreationError")
+        } catch let error as FamilyCreationError {
+            // Should receive a FamilyCreationError (converted from SampleDataError)
+            XCTAssertEqual(error.category, .validation, "Should convert to validation error category")
+        } catch {
+            XCTFail("Should throw FamilyCreationError, got: \(error)")
+        }
+    }
+    
+    func testErrorConversion_GenerateSampleFamiliesWithFamilyCreationError_HandlesUnexpectedErrors() async {
+        // Given - Use an unknown DataServiceError to simulate unexpected errors
+        mockDataService.setShouldSucceed(false)
+        mockDataService.setError(.unknownError)
+        
+        // When & Then
+        do {
+            _ = try await sampleGenerator.generateSampleFamiliesWithFamilyCreationError()
+            XCTFail("Should throw FamilyCreationError")
+        } catch let error as FamilyCreationError {
+            if case .unknownError(let message) = error {
+                XCTAssertTrue(message?.contains("Unexpected error during sample family generation") ?? false, 
+                             "Should wrap unexpected errors with context")
+            } else {
+                XCTFail("Unexpected errors should convert to unknownError, got: \(error)")
+            }
+        } catch {
+            XCTFail("Should throw FamilyCreationError, got: \(error)")
+        }
+    }
+    
     // MARK: - Edge Case Tests
     
     func testEdgeCase_EmptyFamilyName_ShouldHandleGracefully() async {

@@ -47,7 +47,7 @@ struct PickupCard: View {
             
             // Route information
             VStack(alignment: .leading, spacing: 4) {
-                Text(schoolRun.route)
+                Text(schoolRun.title)
                     .font(.headline)
                     .fontWeight(.semibold)
                     .lineLimit(1)
@@ -57,7 +57,7 @@ struct PickupCard: View {
                         .font(.caption)
                         .foregroundColor(statusColor)
                     
-                    Text(schoolRun.status.displayName)
+                    Text(schoolRun.status.displayText)
                         .font(.caption)
                         .fontWeight(.medium)
                         .foregroundColor(statusColor)
@@ -86,9 +86,9 @@ struct PickupCard: View {
             // Driver and passengers
             participantsSection
             
-            // Notes if available
-            if let notes = schoolRun.notes, !notes.isEmpty {
-                notesSection(notes)
+            // Notes section (using title as notes for now)
+            if !schoolRun.title.isEmpty {
+                notesSection(schoolRun.title)
             }
         }
         .padding(.horizontal, 16)
@@ -102,7 +102,7 @@ struct PickupCard: View {
                 Text("Pickup")
                     .font(.caption)
                     .foregroundColor(.secondary)
-                Text(timeFormatter.string(from: schoolRun.pickupTime))
+                Text(timeFormatter.string(from: schoolRun.pickupStops.first?.time ?? schoolRun.date))
                     .font(.subheadline)
                     .fontWeight(.semibold)
             }
@@ -117,7 +117,7 @@ struct PickupCard: View {
                 Text("Drop-off")
                     .font(.caption)
                     .foregroundColor(.secondary)
-                Text(timeFormatter.string(from: schoolRun.dropoffTime))
+                Text(timeFormatter.string(from: schoolRun.dropoffStops.last?.time ?? schoolRun.date))
                     .font(.subheadline)
                     .fontWeight(.semibold)
             }
@@ -142,7 +142,7 @@ struct PickupCard: View {
             driverSection
             
             // Passengers
-            if !schoolRun.passengers.isEmpty {
+            if !schoolRun.participatingChildren.isEmpty {
                 passengersSection
             }
         }
@@ -284,7 +284,7 @@ struct PickupCard: View {
     // MARK: - Status Badge
     
     private var statusBadge: some View {
-        Text(schoolRun.status.displayName)
+        Text(schoolRun.status.displayText)
             .font(.caption)
             .fontWeight(.medium)
             .padding(.horizontal, 8)
@@ -323,13 +323,12 @@ struct PickupCard: View {
     }
     
     private var driverName: String {
-        userProfiles[schoolRun.driver]?.displayName ?? "Unknown Driver"
+        // Driver not implemented in SchoolRun model yet
+        "Driver TBD"
     }
     
     private var passengersText: String {
-        let passengerNames = schoolRun.passengers.compactMap { passengerId in
-            userProfiles[passengerId]?.displayName
-        }
+        let passengerNames = schoolRun.participatingChildren
         
         if passengerNames.isEmpty {
             return "No passengers"
@@ -343,57 +342,17 @@ struct PickupCard: View {
     }
     
     private var durationText: String {
-        let duration = schoolRun.dropoffTime.timeIntervalSince(schoolRun.pickupTime)
-        let minutes = Int(duration / 60)
-        
-        if minutes < 60 {
-            return "\(minutes)m"
-        } else {
-            let hours = minutes / 60
-            let remainingMinutes = minutes % 60
-            return "\(hours)h \(remainingMinutes)m"
-        }
+        // Use the estimated duration from the SchoolRun model
+        return schoolRun.formattedDuration
     }
 }
 
 // MARK: - Preview
 
 #Preview {
-    let (_, users, _) = MockDataGenerator.mockMawereFamily()
-    let userProfiles = Dictionary(uniqueKeysWithValues: users.map { ($0.id, $0) })
-    
-    let mockSchoolRun = SchoolRun(
-        id: UUID(),
-        route: "Home → Greenwood Elementary",
-        pickupTime: Calendar.current.date(bySettingHour: 7, minute: 30, second: 0, of: Date())!,
-        dropoffTime: Calendar.current.date(bySettingHour: 8, minute: 15, second: 0, of: Date())!,
-        driver: users[0].id,
-        passengers: [users[2].id, users[3].id],
-        status: .scheduled,
-        notes: "Pick up from main entrance"
-    )
-    
-    return VStack(spacing: 16) {
-        PickupCard(
-            schoolRun: mockSchoolRun,
-            userProfiles: userProfiles,
-            onTrackRoute: {}
-        )
-        
-        PickupCard(
-            schoolRun: SchoolRun(
-                id: UUID(),
-                route: "Soccer Practice → Home",
-                pickupTime: Calendar.current.date(bySettingHour: 16, minute: 0, second: 0, of: Date())!,
-                dropoffTime: Calendar.current.date(bySettingHour: 16, minute: 20, second: 0, of: Date())!,
-                driver: users[1].id,
-                passengers: [users[2].id],
-                status: .inProgress,
-                notes: nil
-            ),
-            userProfiles: userProfiles,
-            onTrackRoute: {}
-        )
-    }
-    .padding()
+    // Note: This preview is temporarily disabled due to SchoolRun model changes
+    // The PickupCard component needs to be updated to work with the new SchoolRun structure
+    Text("PickupCard Preview")
+        .foregroundColor(.secondary)
+        .padding()
 }

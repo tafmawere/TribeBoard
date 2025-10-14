@@ -580,7 +580,7 @@ struct TaskCreationView: View {
             // Use existing map placeholder component
             SchoolRunMapPlaceholder(
                 currentStop: viewModel.selectedLocation.map { location in
-                    RunStop(name: location.name, type: .custom, task: "Shopping", estimatedMinutes: 15)
+                    RunStop(name: location.name, time: Date(), note: "Shopping", type: .pickup)
                 },
                 showCurrentLocation: true,
                 mapStyle: .thumbnail

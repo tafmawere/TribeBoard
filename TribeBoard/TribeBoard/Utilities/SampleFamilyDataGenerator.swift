@@ -211,12 +211,112 @@ enum SampleDataError: LocalizedError {
     }
 }
 
+// MARK: - Error Conversion Extension
+
+/// Extension to convert SampleDataError to FamilyCreationError where required
+/// Maintains error context and information during conversion
+extension SampleDataError {
+    /// Converts SampleDataError to FamilyCreationError
+    /// - Returns: Equivalent FamilyCreationError with preserved context
+    func toFamilyCreationError() -> FamilyCreationError {
+        switch self {
+        case .familyAlreadyExists:
+            return .familyAlreadyExists
+        case .codeGenerationFailed:
+            return .codeGenerationFailed
+        case .memberCreationFailed(let message):
+            return .validationFailed("Member creation failed: \(message)")
+        case .partialCreationFailure(let failures):
+            return .validationFailed("Partial creation failure: \(failures.joined(separator: ", "))")
+        case .dataServiceUnavailable:
+            return .unknownError("Data service unavailable")
+        case .validationFailed(let details):
+            return .validationFailed(details)
+        case .databaseError(let error):
+            return .unknownError("Database error: \(error.localizedDescription)")
+        case .networkError(let error):
+            return .networkUnavailable
+        case .unknownError(let message):
+            return .unknownError(message)
+        }
+    }
+}
+
 /// Main utility class for generating sample families for testing
 class SampleFamilyDataGenerator {
-    private let dataService: DataService
+    private let dataService: DataService?
+    private let mockDataService: MockDataService?
     
     init(dataService: DataService) {
         self.dataService = dataService
+        self.mockDataService = nil
+    }
+    
+    init(mockDataService: MockDataService) {
+        self.dataService = nil
+        self.mockDataService = mockDataService
+    }
+    
+    // MARK: - Service Abstraction Helpers
+    
+    private func createFamily(name: String, code: String, createdByUserId: UUID) async throws -> Family {
+        if let dataService = dataService {
+            return try await dataService.createFamily(name: name, code: code, createdByUserId: createdByUserId)
+        } else if let mockDataService = mockDataService {
+            return try await mockDataService.createFamily(name: name, code: code, createdByUserId: createdByUserId)
+        } else {
+            throw SampleDataError.dataServiceUnavailable
+        }
+    }
+    
+    private func fetchUserProfile(byAppleUserIdHash hash: String) async throws -> UserProfile? {
+        if let dataService = dataService {
+            return try await dataService.fetchUserProfile(byAppleUserIdHash: hash)
+        } else if let mockDataService = mockDataService {
+            return try await mockDataService.fetchUserProfile(byAppleUserIdHash: hash)
+        } else {
+            throw SampleDataError.dataServiceUnavailable
+        }
+    }
+    
+    private func createUserProfile(displayName: String, appleUserIdHash: String) async throws -> UserProfile {
+        if let dataService = dataService {
+            return try await dataService.createUserProfile(displayName: displayName, appleUserIdHash: appleUserIdHash)
+        } else if let mockDataService = mockDataService {
+            return try await mockDataService.createUserProfile(displayName: displayName, appleUserIdHash: appleUserIdHash)
+        } else {
+            throw SampleDataError.dataServiceUnavailable
+        }
+    }
+    
+    private func createMembership(family: Family, user: UserProfile, role: Role) async throws -> Membership {
+        if let dataService = dataService {
+            return try await dataService.createMembership(family: family, user: user, role: role)
+        } else if let mockDataService = mockDataService {
+            return try await mockDataService.createMembership(family: family, user: user, role: role)
+        } else {
+            throw SampleDataError.dataServiceUnavailable
+        }
+    }
+    
+    private func fetchFamily(byCode code: String) async throws -> Family? {
+        if let dataService = dataService {
+            return try await dataService.fetchFamily(byCode: code)
+        } else if let mockDataService = mockDataService {
+            return try await mockDataService.fetchFamily(byCode: code)
+        } else {
+            throw SampleDataError.dataServiceUnavailable
+        }
+    }
+    
+    private func fetchAllFamilies() async throws -> [Family] {
+        if let dataService = dataService {
+            return try await dataService.fetchAllFamilies()
+        } else if let mockDataService = mockDataService {
+            return try await mockDataService.fetchAllFamilies()
+        } else {
+            throw SampleDataError.dataServiceUnavailable
+        }
     }
     
     /// Predefined sample family data for consistent testing
@@ -270,17 +370,38 @@ class SampleFamilyDataGenerator {
     /// Main generation method - creates all sample families
     /// - Returns: Array of GeneratedFamilyInfo containing family details and codes
     func generateSampleFamilies() async throws -> [GeneratedFamilyInfo] {
+        return try await generateSampleFamiliesInternal()
+    }
+    
+    /// Alternative generation method that throws FamilyCreationError for integration with family creation systems
+    /// - Returns: Array of GeneratedFamilyInfo containing family details and codes
+    /// - Throws: FamilyCreationError for compatibility with family creation error handling
+    func generateSampleFamiliesWithFamilyCreationError() async throws(FamilyCreationError) -> [GeneratedFamilyInfo] {
+        do {
+            return try await generateSampleFamilies()
+        } catch let error as SampleDataError {
+            throw error.toFamilyCreationError()
+        } catch {
+            throw FamilyCreationError.unknownError("Unexpected error during sample family generation: \(error.localizedDescription)")
+        }
+    }
+    
+    /// Internal implementation of sample family generation
+    /// - Returns: Array of GeneratedFamilyInfo containing family details and codes
+    private func generateSampleFamiliesInternal() async throws -> [GeneratedFamilyInfo] {
         let startTime = Date()
         reportOperationStart()
         
         // Log operation start
+        let startError = SampleDataError.unknownError("Operation started")
         let startContext = ErrorContext(
-            error: SampleDataError.unknownError("Operation started"),
+            error: startError.toFamilyCreationError(),
             retryCount: 0,
             userContext: ["operation": "generateSampleFamilies", "timestamp": startTime.timeIntervalSince1970]
         )
+        let logError = SampleDataError.unknownError("Sample family generation started")
         ErrorHandlingUtilities.logError(
-            SampleDataError.unknownError("Sample family generation started"),
+            logError.toFamilyCreationError(),
             context: startContext,
             additionalInfo: ["target_families": Self.sampleFamilies.count]
         )
@@ -325,7 +446,7 @@ class SampleFamilyDataGenerator {
                 // Log the error with proper categorization
                 let categorizedError = categorizeError(error)
                 let errorContext = ErrorContext(
-                    error: categorizedError,
+                    error: categorizedError.toFamilyCreationError(),
                     retryCount: 0,
                     userContext: [
                         "family_name": familyData.name,
@@ -333,7 +454,7 @@ class SampleFamilyDataGenerator {
                         "operation": "createSampleFamily"
                     ]
                 )
-                ErrorHandlingUtilities.logError(categorizedError, context: errorContext)
+                ErrorHandlingUtilities.logError(categorizedError.toFamilyCreationError(), context: errorContext)
             }
         }
         
@@ -362,8 +483,9 @@ class SampleFamilyDataGenerator {
         }
         
         // Log final operation status
+        let finalError = SampleDataError.unknownError("Operation completed")
         let finalContext = ErrorContext(
-            error: SampleDataError.unknownError("Operation completed"),
+            error: finalError.toFamilyCreationError(),
             retryCount: 0,
             userContext: [
                 "operation": "generateSampleFamilies",
@@ -375,13 +497,15 @@ class SampleFamilyDataGenerator {
         )
         
         if failures.isEmpty {
+            let successError = SampleDataError.unknownError("Sample family generation completed successfully")
             ErrorHandlingUtilities.logError(
-                SampleDataError.unknownError("Sample family generation completed successfully"),
+                successError.toFamilyCreationError(),
                 context: finalContext
             )
         } else {
+            let partialError = SampleDataError.partialCreationFailure(failures)
             ErrorHandlingUtilities.logError(
-                SampleDataError.partialCreationFailure(failures),
+                partialError.toFamilyCreationError(),
                 context: finalContext
             )
         }
@@ -403,16 +527,34 @@ class SampleFamilyDataGenerator {
         // If it's a FamilyCreationError, map to appropriate SampleDataError
         if let familyError = error as? FamilyCreationError {
             switch familyError {
-            case .validationFailed(let message):
-                return .validationFailed(message)
+            case .invalidFamilyName, .emptyFamilyName:
+                return .validationFailed(familyError.localizedDescription)
             case .codeGenerationFailed:
                 return .codeGenerationFailed
+            case .userNotFound:
+                return .dataServiceUnavailable
+            case .familyAlreadyExists:
+                return .familyAlreadyExists(familyError.localizedDescription)
+            case .operationCancelled:
+                return .unknownError("Operation cancelled: \(familyError.localizedDescription)")
+            case .unknownError(let message):
+                return .unknownError(message ?? "Unknown error")
             case .networkUnavailable, .connectionTimeout:
                 return .networkError(error)
+            case .serverError(let code):
+                return .networkError(NSError(domain: "ServerError", code: code, userInfo: [NSLocalizedDescriptionKey: "Server error with code \(code)"]))
             case .cloudKitUnavailable, .cloudKitSyncFailed:
                 return .databaseError(error)
-            default:
-                return .unknownError(familyError.localizedDescription)
+            case .quotaExceeded:
+                return .databaseError(NSError(domain: "CloudKitError", code: -1, userInfo: [NSLocalizedDescriptionKey: "iCloud storage quota exceeded"]))
+            case .userNotAuthenticated, .insufficientPermissions, .accountNotAvailable:
+                return .dataServiceUnavailable
+            case .validationFailed(let message):
+                return .validationFailed(message)
+            case .constraintViolation(let message):
+                return .validationFailed("Constraint violation: \(message)")
+            case .dataCorruption(let message):
+                return .databaseError(NSError(domain: "DataCorruption", code: -1, userInfo: [NSLocalizedDescriptionKey: message]))
             }
         }
         
@@ -450,8 +592,8 @@ class SampleFamilyDataGenerator {
         // Validate family data before creation
         guard !data.name.isEmpty else {
             let error = SampleDataError.validationFailed("Family name cannot be empty")
-            let context = ErrorContext(error: error, userContext: ["family_name": data.name])
-            ErrorHandlingUtilities.logError(error, context: context)
+            let context = ErrorContext(error: error.toFamilyCreationError(), userContext: ["family_name": data.name])
+            ErrorHandlingUtilities.logError(error.toFamilyCreationError(), context: context)
             throw error
         }
         
@@ -466,7 +608,7 @@ class SampleFamilyDataGenerator {
         }
         
         // Generate unique family code using existing utility
-        let familyCode = try generateUniqueFamilyCode()
+        let familyCode = try await generateUniqueFamilyCode()
         
         // Get the admin member for family creation
         guard let adminMember = data.members.first(where: { $0.role == .parentAdmin }) else {
@@ -477,11 +619,32 @@ class SampleFamilyDataGenerator {
         let tempAdminUserId = UUID()
         
         // Create the family using existing DataService patterns
-        let family = try dataService.createFamily(
-            name: data.name,
-            code: familyCode,
-            createdByUserId: tempAdminUserId
-        )
+        let family: Family
+        do {
+            family = try await createFamily(
+                name: data.name,
+                code: familyCode,
+                createdByUserId: tempAdminUserId
+            )
+        } catch {
+            // Convert DataService errors to SampleDataError for consistency
+            if let dataServiceError = error as? DataServiceError {
+                switch dataServiceError {
+                case .validationFailed(let errors):
+                    throw SampleDataError.validationFailed("Family creation validation failed: \(errors.joined(separator: ", "))")
+                case .invalidData(let message):
+                    throw SampleDataError.validationFailed("Invalid family data: \(message)")
+                case .notFound(let message):
+                    throw SampleDataError.dataServiceUnavailable
+                case .constraintViolation(let message):
+                    throw SampleDataError.validationFailed("Constraint violation: \(message)")
+                case .unknownError:
+                    throw SampleDataError.unknownError("DataService unknown error during family creation")
+                }
+            } else {
+                throw SampleDataError.unknownError("Unexpected error during family creation: \(error.localizedDescription)")
+            }
+        }
         
         // Validate family was created successfully
         guard family.isFullyValid else {
@@ -527,13 +690,13 @@ class SampleFamilyDataGenerator {
             
             do {
                 // Check if user already exists with this Apple ID hash
-                let existingUser = try dataService.fetchUserProfile(byAppleUserIdHash: appleUserIdHash)
+                let existingUser = try await fetchUserProfile(byAppleUserIdHash: appleUserIdHash)
                 if existingUser != nil {
                     throw SampleDataError.memberCreationFailed("User with Apple ID hash already exists: '\(memberData.displayName)'")
                 }
                 
                 // Create user using existing DataService patterns
-                let user = try dataService.createUserProfile(
+                let user = try await createUserProfile(
                     displayName: memberData.displayName,
                     appleUserIdHash: appleUserIdHash
                 )
@@ -546,10 +709,29 @@ class SampleFamilyDataGenerator {
                 users.append(user)
                 print("✅ SampleFamilyDataGenerator: Created user '\(memberData.displayName)' with hash '\(appleUserIdHash)'")
                 
+            } catch let error as SampleDataError {
+                // Re-throw SampleDataError as-is
+                throw error
             } catch {
-                let errorMessage = "Failed to create user '\(memberData.displayName)': \(error.localizedDescription)"
-                print("❌ SampleFamilyDataGenerator: \(errorMessage)")
-                throw SampleDataError.memberCreationFailed(errorMessage)
+                // Convert DataService errors to SampleDataError
+                if let dataServiceError = error as? DataServiceError {
+                    switch dataServiceError {
+                    case .validationFailed(let errors):
+                        throw SampleDataError.memberCreationFailed("User validation failed for '\(memberData.displayName)': \(errors.joined(separator: ", "))")
+                    case .invalidData(let message):
+                        throw SampleDataError.memberCreationFailed("Invalid user data for '\(memberData.displayName)': \(message)")
+                    case .notFound(let message):
+                        throw SampleDataError.memberCreationFailed("User creation failed for '\(memberData.displayName)': \(message)")
+                    case .constraintViolation(let message):
+                        throw SampleDataError.memberCreationFailed("Constraint violation for '\(memberData.displayName)': \(message)")
+                    case .unknownError:
+                        throw SampleDataError.memberCreationFailed("Unknown error creating user '\(memberData.displayName)'")
+                    }
+                } else {
+                    let errorMessage = "Failed to create user '\(memberData.displayName)': \(error.localizedDescription)"
+                    print("❌ SampleFamilyDataGenerator: \(errorMessage)")
+                    throw SampleDataError.memberCreationFailed(errorMessage)
+                }
             }
         }
         
@@ -615,7 +797,7 @@ class SampleFamilyDataGenerator {
             
             do {
                 // Use existing DataService membership creation patterns
-                let membership = try dataService.createMembership(
+                let membership = try await createMembership(
                     family: family,
                     user: user,
                     role: memberData.role
@@ -634,10 +816,29 @@ class SampleFamilyDataGenerator {
                 createdMemberships.append(membership)
                 print("✅ SampleFamilyDataGenerator: Created membership for '\(user.displayName)' as '\(memberData.role.displayName)'")
                 
+            } catch let error as SampleDataError {
+                // Re-throw SampleDataError as-is
+                throw error
             } catch {
-                let errorMessage = "Failed to create membership for '\(user.displayName)' with role '\(memberData.role.displayName)': \(error.localizedDescription)"
-                print("❌ SampleFamilyDataGenerator: \(errorMessage)")
-                throw SampleDataError.memberCreationFailed(errorMessage)
+                // Convert DataService errors to SampleDataError
+                if let dataServiceError = error as? DataServiceError {
+                    switch dataServiceError {
+                    case .validationFailed(let errors):
+                        throw SampleDataError.memberCreationFailed("Membership validation failed for '\(user.displayName)': \(errors.joined(separator: ", "))")
+                    case .invalidData(let message):
+                        throw SampleDataError.memberCreationFailed("Invalid membership data for '\(user.displayName)': \(message)")
+                    case .notFound(let message):
+                        throw SampleDataError.memberCreationFailed("Membership creation failed for '\(user.displayName)': \(message)")
+                    case .constraintViolation(let message):
+                        throw SampleDataError.memberCreationFailed("Membership constraint violation for '\(user.displayName)': \(message)")
+                    case .unknownError:
+                        throw SampleDataError.memberCreationFailed("Unknown error creating membership for '\(user.displayName)'")
+                    }
+                } else {
+                    let errorMessage = "Failed to create membership for '\(user.displayName)' with role '\(memberData.role.displayName)': \(error.localizedDescription)"
+                    print("❌ SampleFamilyDataGenerator: \(errorMessage)")
+                    throw SampleDataError.memberCreationFailed(errorMessage)
+                }
             }
         }
         
@@ -654,7 +855,7 @@ class SampleFamilyDataGenerator {
     /// Implements code regeneration logic when conflicts occur with retry mechanism
     /// Uses existing FamilyCodeGenerator and DataService patterns for consistency
     /// - Returns: A unique 6-character family code
-    private func generateUniqueFamilyCode() throws -> String {
+    private func generateUniqueFamilyCode() async throws -> String {
         let maxAttempts = 20 // Increased attempts for better conflict resolution
         var attemptedCodes: Set<String> = []
         
@@ -680,7 +881,7 @@ class SampleFamilyDataGenerator {
             
             do {
                 // Use existing DataService method to check for conflicts
-                let existingFamily = try dataService.fetchFamily(byCode: code)
+                let existingFamily = try await fetchFamily(byCode: code)
                 if existingFamily == nil {
                     print("✅ SampleFamilyDataGenerator: Generated unique code '\(code)' on attempt \(attempt)")
                     return code
@@ -688,17 +889,33 @@ class SampleFamilyDataGenerator {
                     print("⚠️ SampleFamilyDataGenerator: Code '\(code)' conflicts with existing family '\(existingFamily?.name ?? "Unknown")' (attempt \(attempt))")
                 }
             } catch {
-                // If there's an error checking for existing family, log it but be cautious
-                print("⚠️ SampleFamilyDataGenerator: Error checking code '\(code)' on attempt \(attempt): \(error.localizedDescription)")
-                
-                // For database errors, we should be more cautious and not assume uniqueness
-                if error.localizedDescription.contains("database") || error.localizedDescription.contains("context") {
-                    print("🚨 SampleFamilyDataGenerator: Database error detected, being cautious about code uniqueness")
-                    continue
+                // Handle DataService errors appropriately
+                if let dataServiceError = error as? DataServiceError {
+                    switch dataServiceError {
+                    case .invalidData(let message):
+                        print("⚠️ SampleFamilyDataGenerator: Invalid data error checking code '\(code)': \(message)")
+                        continue
+                    case .notFound:
+                        // Not found is actually good - means the code is unique
+                        print("✅ SampleFamilyDataGenerator: Code '\(code)' is unique (not found in database)")
+                        return code
+                    case .validationFailed, .constraintViolation, .unknownError:
+                        print("⚠️ SampleFamilyDataGenerator: Database error checking code '\(code)': \(error.localizedDescription)")
+                        continue
+                    }
+                } else {
+                    // If there's an error checking for existing family, log it but be cautious
+                    print("⚠️ SampleFamilyDataGenerator: Error checking code '\(code)' on attempt \(attempt): \(error.localizedDescription)")
+                    
+                    // For database errors, we should be more cautious and not assume uniqueness
+                    if error.localizedDescription.contains("database") || error.localizedDescription.contains("context") {
+                        print("🚨 SampleFamilyDataGenerator: Database error detected, being cautious about code uniqueness")
+                        continue
+                    }
+                    
+                    // For other errors (like network issues), we might still proceed cautiously
+                    print("⚠️ SampleFamilyDataGenerator: Non-database error, continuing with caution...")
                 }
-                
-                // For other errors (like network issues), we might still proceed cautiously
-                print("⚠️ SampleFamilyDataGenerator: Non-database error, continuing with caution...")
             }
         }
         
@@ -714,7 +931,7 @@ class SampleFamilyDataGenerator {
         ]
         
         do {
-            let allFamilies = try dataService.fetchAllFamilies()
+            let allFamilies = try await fetchAllFamilies()
             let existingCodes = allFamilies.map { $0.code }
             print("📊 SampleFamilyDataGenerator: Existing codes in database: \(existingCodes.count) total")
             print("📊 SampleFamilyDataGenerator: Sample existing codes: \(Array(existingCodes.prefix(10)))")
@@ -722,14 +939,20 @@ class SampleFamilyDataGenerator {
             debugInfo["existing_codes_count"] = existingCodes.count
             debugInfo["sample_existing_codes"] = Array(existingCodes.prefix(10))
         } catch {
-            print("⚠️ SampleFamilyDataGenerator: Could not fetch existing codes for debugging: \(error.localizedDescription)")
-            debugInfo["debug_fetch_error"] = error.localizedDescription
+            // Handle DataService errors for debugging info
+            if let dataServiceError = error as? DataServiceError {
+                print("⚠️ SampleFamilyDataGenerator: DataService error fetching families for debugging: \(dataServiceError.localizedDescription)")
+                debugInfo["debug_fetch_error"] = dataServiceError.localizedDescription
+            } else {
+                print("⚠️ SampleFamilyDataGenerator: Could not fetch existing codes for debugging: \(error.localizedDescription)")
+                debugInfo["debug_fetch_error"] = error.localizedDescription
+            }
         }
         
         // Log the code generation failure with detailed context
         let codeGenError = SampleDataError.codeGenerationFailed
-        let context = ErrorContext(error: codeGenError, userContext: debugInfo)
-        ErrorHandlingUtilities.logError(codeGenError, context: context, additionalInfo: debugInfo)
+        let context = ErrorContext(error: codeGenError.toFamilyCreationError(), userContext: debugInfo)
+        ErrorHandlingUtilities.logError(codeGenError.toFamilyCreationError(), context: context, additionalInfo: debugInfo)
         
         throw codeGenError
     }
@@ -745,7 +968,7 @@ class SampleFamilyDataGenerator {
         
         do {
             // Fetch all families from database
-            let allFamilies = try dataService.fetchAllFamilies()
+            let allFamilies = try await fetchAllFamilies()
             print("📊 SampleFamilyDataGenerator: Found \(allFamilies.count) total families in database")
             
             // Check each sample family name pattern
@@ -795,7 +1018,24 @@ class SampleFamilyDataGenerator {
             print("📋 SampleFamilyDataGenerator: Detection complete - found \(existingFamilies.count) existing sample families")
             
         } catch {
-            print("❌ SampleFamilyDataGenerator: Error during family detection: \(error.localizedDescription)")
+            // Handle DataService errors gracefully
+            if let dataServiceError = error as? DataServiceError {
+                print("❌ SampleFamilyDataGenerator: DataService error during family detection: \(dataServiceError.localizedDescription)")
+                switch dataServiceError {
+                case .validationFailed(let errors):
+                    print("   Validation errors: \(errors.joined(separator: ", "))")
+                case .invalidData(let message):
+                    print("   Invalid data: \(message)")
+                case .notFound(let message):
+                    print("   Not found: \(message)")
+                case .constraintViolation(let message):
+                    print("   Constraint violation: \(message)")
+                case .unknownError:
+                    print("   Unknown DataService error")
+                }
+            } else {
+                print("❌ SampleFamilyDataGenerator: Error during family detection: \(error.localizedDescription)")
+            }
             // Don't throw here - we want to continue with creation if detection fails
             print("⚠️ SampleFamilyDataGenerator: Continuing with creation despite detection error...")
         }
@@ -977,6 +1217,16 @@ class SampleFamilyDataGenerator {
                 print("        💡 Suggestion: Verify user data and database constraints")
             case .partialCreationFailure:
                 print("        💡 Suggestion: Check database connectivity and permissions")
+            case .dataServiceUnavailable:
+                print("        💡 Suggestion: Ensure DataService is properly initialized and available")
+            case .validationFailed:
+                print("        💡 Suggestion: Check input data format and validation requirements")
+            case .databaseError:
+                print("        💡 Suggestion: Check database connection and integrity")
+            case .networkError:
+                print("        💡 Suggestion: Check network connectivity and try again")
+            case .unknownError:
+                print("        💡 Suggestion: Check logs for more details or restart the application")
             }
         }
         print("")

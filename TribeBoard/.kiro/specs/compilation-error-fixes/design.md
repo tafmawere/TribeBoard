@@ -2,130 +2,132 @@
 
 ## Overview
 
-This design addresses the compilation errors in the TribeBoard iOS app by systematically fixing SwiftUI expression complexity issues, correcting component parameter mismatches, resolving type conflicts, and ensuring proper API usage across all affected files.
+This design addresses systematic compilation errors in the TribeBoard project by implementing targeted fixes for duplicate declarations, missing enum cases, parameter mismatches, and SwiftUI syntax issues. The approach prioritizes minimal code changes while ensuring comprehensive error resolution.
 
 ## Architecture
 
-The fix strategy follows a layered approach:
+### Error Categories
+1. **Duplicate Declarations**: Remove redundant method/struct definitions
+2. **Missing Enum Cases**: Add required StopType cases with proper implementations
+3. **Parameter Mismatches**: Fix function calls to match expected signatures
+4. **Main Actor Issues**: Resolve concurrency isolation problems
+5. **SwiftUI Syntax**: Fix ViewBuilder and modifier chain issues
 
-1. **Expression Simplification Layer**: Break down complex SwiftUI expressions into smaller, manageable components
-2. **Type Consistency Layer**: Ensure all type usage is consistent and properly converted where needed
-3. **Component Interface Layer**: Correct all component calls to match their expected signatures
-4. **Validation Layer**: Verify all fixes maintain functionality while resolving compilation issues
+### Fix Strategy
+- **Consolidation**: Merge duplicate functionality into single implementations
+- **Extension**: Add missing enum cases with backward compatibility
+- **Correction**: Fix parameter lists and function signatures
+- **Isolation**: Properly handle main actor requirements
+- **Validation**: Ensure SwiftUI syntax compliance
 
 ## Components and Interfaces
 
-### SwiftUI Expression Simplification
+### 1. Accessibility Utilities Consolidation
+**Purpose**: Remove duplicate accessibility method declarations
+**Implementation**: 
+- Identify conflicting methods in EnhancedAccessibility.swift and AccessibilityHelpers.swift
+- Consolidate into single, comprehensive implementations
+- Maintain existing functionality while removing duplicates
 
-**Affected Files:**
-- `FamilyDashboardView.swift` - Complex body expression causing compiler timeout
-- `MainNavigationView.swift` - Complex body expression causing compiler timeout
+### 2. Error Handling Unification
+**Purpose**: Resolve ErrorCategory redeclaration issues
+**Implementation**:
+- Establish single ErrorCategory definition in ErrorHandlingUtilities.swift
+- Update all references to use unified error categorization
+- Ensure consistent error handling across the codebase
 
-**Strategy:**
-- Extract complex view hierarchies into separate computed properties or private methods
-- Use `@ViewBuilder` functions to break down large view compositions
-- Implement conditional view rendering using separate view components
+### 3. RunStop.StopType Enhancement
+**Purpose**: Add missing enum cases for school run functionality
+**Implementation**:
+- Add `.home`, `.school`, `.pickup`, `.dropoff` cases to StopType enum
+- Implement proper display names and icons for each type
+- Update initializers to handle new cases
 
-### Component Parameter Corrections
+### 4. Function Signature Corrections
+**Purpose**: Fix parameter mismatches in function calls
+**Implementation**:
+- Analyze each compilation error for missing/extra parameters
+- Update function calls to match expected signatures
+- Ensure proper parameter ordering and types
 
-**AccessibleButton Usage:**
-- Current signature: `init(action:label:hint:isEnabled:isLoading:loadingText:content:)`
-- Missing `content` parameter in multiple call sites
-- Incorrect haptic style enum usage
+### 5. Main Actor Isolation Fixes
+**Purpose**: Resolve concurrency issues in ViewModels
+**Implementation**:
+- Add proper @MainActor annotations where needed
+- Use Task.detached for non-main actor operations
+- Ensure UI updates happen on main thread
 
-**Affected Files:**
-- `MockOnboardingView.swift`
-- `OnboardingView.swift`
+### 6. SwiftUI ViewBuilder Corrections
+**Purpose**: Fix ViewBuilder syntax and modifier chain issues
+**Implementation**:
+- Remove invalid return statements in ViewBuilder contexts
+- Fix modifier chains on proper view types
+- Correct preview environment configurations
 
-### Type Mismatch Resolutions
-
-**MockFamilyDashboardView Issues:**
-- `MemberRowView` parameter mismatch: expects `InMemoryMember` but receives `Membership`
-- `userProfile` parameter type conversion: `UserProfile?` to `InMemoryUser?`
-- Argument label correction: `userProfile:` should be `user:`
+### 7. SchoolRunPreviewShowcase ViewBuilder Fixes
+**Purpose**: Fix ViewBuilder closure syntax errors in preview showcase
+**Implementation**:
+- Fix ViewBuilder closures that return function types instead of View types
+- Remove extra trailing closures in function calls
+- Fix environment modifiers applied to array types instead of View types
+- Correct accessibility environment values to use valid enum cases
 
 ## Data Models
 
-### Type Mapping Strategy
-
+### Enhanced StopType Enum
 ```swift
-// Current problematic usage
-MemberRowView(
-    member: member,                    // Membership -> InMemoryMember
-    userProfile: viewModel.userProfile(for: member), // UserProfile? -> InMemoryUser?
-    canManage: canManage,
-    onRoleChange: onRoleChange,
-    onRemove: onRemove
-)
-
-// Corrected usage
-MemberRowView(
-    member: convertToInMemoryMember(member),
-    user: convertToInMemoryUser(viewModel.userProfile(for: member)),
-    canManage: canManage,
-    onRoleChange: onRoleChange,
-    onRemove: onRemove
-)
+enum StopType: String, CaseIterable, Codable {
+    case home = "home"
+    case school = "school" 
+    case pickup = "pickup"
+    case dropoff = "dropoff"
+    case other = "other"
+    
+    var displayName: String { ... }
+    var icon: String { ... }
+}
 ```
 
-### Conversion Functions
-
-Implement helper functions to convert between incompatible types:
-- `Membership` to `InMemoryMember` conversion
-- `UserProfile` to `InMemoryUser` conversion
+### Unified ErrorCategory
+```swift
+enum ErrorCategory: String, CaseIterable {
+    case network = "network"
+    case validation = "validation"
+    case persistence = "persistence"
+    case authentication = "authentication"
+    case unknown = "unknown"
+}
+```
 
 ## Error Handling
 
-### Compilation Error Categories
+### Compilation Error Resolution Process
+1. **Identification**: Categorize each error by type
+2. **Analysis**: Determine root cause and impact
+3. **Resolution**: Apply targeted fix with minimal changes
+4. **Validation**: Ensure fix doesn't introduce new issues
 
-1. **Type-checking timeout errors**: Resolve by expression simplification
-2. **Parameter mismatch errors**: Fix by correcting argument labels and types
-3. **Missing parameter errors**: Add required parameters with appropriate default values
-4. **Type inference errors**: Provide explicit type annotations where needed
-
-### Fallback Strategies
-
-- Use explicit type annotations when compiler inference fails
-- Implement default parameter values for optional components
-- Add type conversion utilities for incompatible but related types
+### Error Prevention
+- Establish clear naming conventions
+- Use proper Swift concurrency patterns
+- Follow SwiftUI best practices
+- Implement comprehensive testing
 
 ## Testing Strategy
 
 ### Compilation Verification
+- Build project after each fix category
+- Verify no new errors introduced
+- Test affected functionality still works
 
-1. **Build Test**: Ensure `xcodebuild` completes without errors
-2. **Incremental Testing**: Fix one file at a time and verify compilation
-3. **Regression Testing**: Ensure fixes don't break existing functionality
-
-### Component Testing
-
-1. **AccessibleButton**: Verify all call sites provide required parameters
-2. **MemberRowView**: Test type conversions work correctly
-3. **SwiftUI Views**: Ensure simplified expressions render correctly
+### Functionality Testing
+- Run existing unit tests
+- Verify UI components render correctly
+- Test school run features work as expected
+- Validate accessibility features function properly
 
 ### Integration Testing
-
-1. **View Rendering**: Verify all fixed views display properly
-2. **User Interaction**: Test that button actions and haptic feedback work
-3. **Navigation Flow**: Ensure view transitions remain functional
-
-## Implementation Phases
-
-### Phase 1: Expression Simplification
-- Fix `FamilyDashboardView.swift` complex expression
-- Fix `MainNavigationView.swift` complex expression
-
-### Phase 2: Component Parameter Fixes
-- Correct `AccessibleButton` usage in `MockOnboardingView.swift`
-- Correct `AccessibleButton` usage in `OnboardingView.swift`
-- Fix haptic style enum references
-
-### Phase 3: Type Mismatch Resolution
-- Implement type conversion functions
-- Fix `MockFamilyDashboardView.swift` parameter issues
-- Correct argument labels
-
-### Phase 4: Validation and Testing
-- Run full build to verify all errors are resolved
-- Test affected views for proper functionality
-- Ensure no regressions in user experience
+- Test complete app build and launch
+- Verify navigation between views
+- Test data persistence and loading
+- Validate error handling scenarios

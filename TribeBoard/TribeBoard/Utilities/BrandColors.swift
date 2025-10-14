@@ -21,6 +21,12 @@ extension Color {
     /// Accent color for interactive elements
     static let brandAccent = brandPrimary
     
+    /// Green accent color for QR scanning and success states
+    static let brandGreen = Color(red: 0.2, green: 0.7, blue: 0.3) // Accessible green
+    
+    /// Green accent color with accessibility support
+    static let brandGreenAccessible = Color(red: 0.15, green: 0.6, blue: 0.25) // Darker green for better contrast
+    
     // MARK: - Accessibility Colors
     
     /// High contrast versions for accessibility
@@ -44,6 +50,17 @@ extension Color {
                 return UIColor(Color.brandSecondaryAccessible)
             } else {
                 return UIColor(Color.brandSecondary)
+            }
+        })
+    }
+    
+    /// Dynamic green color that adapts to accessibility settings
+    static var brandGreenDynamic: Color {
+        Color(UIColor { traitCollection in
+            if traitCollection.accessibilityContrast == .high {
+                return UIColor(Color.brandGreenAccessible)
+            } else {
+                return UIColor(Color.brandGreen)
             }
         })
     }
@@ -112,6 +129,16 @@ extension LinearGradient {
                 .cornerRadius(BrandStyle.cornerRadius)
                 .overlay(
                     Text("Secondary")
+                        .foregroundColor(.white)
+                        .font(.caption)
+                )
+            
+            Rectangle()
+                .fill(Color.brandGreen)
+                .frame(width: 80, height: 80)
+                .cornerRadius(BrandStyle.cornerRadius)
+                .overlay(
+                    Text("Green")
                         .foregroundColor(.white)
                         .font(.caption)
                 )

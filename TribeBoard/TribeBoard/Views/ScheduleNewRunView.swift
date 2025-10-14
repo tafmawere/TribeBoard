@@ -9,7 +9,7 @@ struct ScheduleNewRunView: View {
     
     // MARK: - State Management
     
-    @StateObject private var runManager = ScheduledSchoolRunManager()
+    @StateObject private var runManager = SchoolRunManager()
     
     // MARK: - Form State
     
@@ -257,23 +257,28 @@ struct ScheduleNewRunView: View {
         isSaving = true
         
         // Create the run
-        let newRun = ScheduledSchoolRun(
-            name: runName.trimmingCharacters(in: .whitespacesAndNewlines),
-            scheduledDate: selectedDate,
-            scheduledTime: selectedTime,
-            stops: stops
+        let newRun = SchoolRun(
+            title: runName.trimmingCharacters(in: .whitespacesAndNewlines),
+            date: selectedDate,
+            route: stops
         )
         
         // Simulate save delay for better UX
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            // Save the run
-            runManager.createRun(newRun)
-            
-            // Show success toast
-            ToastManager.shared.success("Run saved successfully!")
-            
-            // Reset saving state
-            isSaving = false
+            do {
+                // Save the run
+                try runManager.createRun(newRun)
+                
+                // Show success toast
+                ToastManager.shared.success("Run saved successfully!")
+                
+                // Reset saving state
+                isSaving = false
+            } catch {
+                // Handle error
+                ToastManager.shared.error("Failed to save run: \(error.localizedDescription)")
+                isSaving = false
+            }
             
             // Navigate back after a short delay to show the toast
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
@@ -286,77 +291,68 @@ struct ScheduleNewRunView: View {
 // MARK: - Preview
 
 #Preview("Schedule New Run - Empty Form") {
-    SchoolRunPreviewProvider.previewWithSampleData {
-        NavigationStack {
-            ScheduleNewRunView()
-        }
+    NavigationStack {
+        ScheduleNewRunView()
+            .previewEnvironment()
     }
 }
 
 #Preview("Schedule New Run - Partial Form") {
-    SchoolRunPreviewProvider.previewWithSampleData {
-        NavigationStack {
-            ScheduleNewRunView()
-                .onAppear {
-                    // This would simulate a partially filled form
-                }
-        }
+    NavigationStack {
+        ScheduleNewRunView()
+            .previewEnvironment()
+            .onAppear {
+                // This would simulate a partially filled form
+            }
     }
 }
 
 #Preview("Schedule New Run - Complete Form") {
-    SchoolRunPreviewProvider.previewWithSampleData {
-        NavigationStack {
-            ScheduleNewRunView()
-                .onAppear {
-                    // This would simulate a completed form
-                }
-        }
+    NavigationStack {
+        ScheduleNewRunView()
+            .previewEnvironment()
+            .onAppear {
+                // This would simulate a completed form
+            }
     }
 }
 
 #Preview("Schedule New Run - Dark Mode") {
-    SchoolRunPreviewProvider.previewWithSampleData {
-        NavigationStack {
-            ScheduleNewRunView()
-        }
+    NavigationStack {
+        ScheduleNewRunView()
+            .previewEnvironment()
     }
     .preferredColorScheme(.dark)
 }
 
 #Preview("Schedule New Run - Large Text") {
-    SchoolRunPreviewProvider.previewWithSampleData {
-        NavigationStack {
-            ScheduleNewRunView()
-        }
+    NavigationStack {
+        ScheduleNewRunView()
+            .previewEnvironment()
     }
     .environment(\.dynamicTypeSize, .accessibility2)
 }
 
 #Preview("Schedule New Run - High Contrast") {
-    SchoolRunPreviewProvider.previewWithSampleData {
-        NavigationStack {
-            ScheduleNewRunView()
-        }
+    NavigationStack {
+        ScheduleNewRunView()
+            .previewEnvironment()
     }
-
 }
 
 #Preview("Schedule New Run - Validation Errors") {
-    SchoolRunPreviewProvider.previewWithSampleData {
-        NavigationStack {
-            ScheduleNewRunView()
-                .onAppear {
-                    // This would simulate validation errors
-                }
-        }
+    NavigationStack {
+        ScheduleNewRunView()
+            .previewEnvironment()
+            .onAppear {
+                // This would simulate validation errors
+            }
     }
 }
 
 #Preview("Interactive Form") {
-    SchoolRunPreviewProvider.previewWithSampleData {
-        NavigationStack {
-            ScheduleNewRunView()
-        }
+    NavigationStack {
+        ScheduleNewRunView()
+            .previewEnvironment()
     }
 }

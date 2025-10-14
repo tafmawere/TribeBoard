@@ -5,8 +5,8 @@ enum SchoolRunRoute: Hashable, Codable {
     case dashboard
     case scheduleNew
     case scheduledList
-    case runDetail(ScheduledSchoolRun)
-    case runExecution(ScheduledSchoolRun)
+    case runDetail(SchoolRun)
+    case runExecution(SchoolRun)
     
     // MARK: - Hashable Conformance
     
@@ -68,21 +68,19 @@ enum SchoolRunRoute: Hashable, Codable {
             // For demo purposes, we'll create a placeholder run
             // In a real app, this would fetch the run from storage
             let runId = try container.decode(UUID.self, forKey: .runId)
-            let placeholderRun = ScheduledSchoolRun(
-                name: "Placeholder Run",
-                scheduledDate: Date(),
-                scheduledTime: Date(),
-                stops: []
+            let placeholderRun = SchoolRun(
+                title: "Placeholder Run",
+                date: Date(),
+                route: []
             )
             self = .runDetail(placeholderRun)
         case "runExecution":
             // For demo purposes, we'll create a placeholder run
             let runId = try container.decode(UUID.self, forKey: .runId)
-            let placeholderRun = ScheduledSchoolRun(
-                name: "Placeholder Run",
-                scheduledDate: Date(),
-                scheduledTime: Date(),
-                stops: []
+            let placeholderRun = SchoolRun(
+                title: "Placeholder Run",
+                date: Date(),
+                route: []
             )
             self = .runExecution(placeholderRun)
         default:

@@ -1,232 +1,349 @@
 import SwiftUI
 import Foundation
 
-/// ViewModel for School Run tracking with mock GPS and navigation data
+/// ViewModel for School Run management and display
 @MainActor
 class SchoolRunViewModel: ObservableObject {
     // MARK: - Published Properties
     
-    /// All school runs for the family
-    @Published var schoolRuns: [SchoolRun] = []
+    /// All school runs managed by the SchoolRunManager
+    @Published var runs: [SchoolRun] = []
     
-    /// User profiles for displaying driver and passenger names
-    @Published var userProfiles: [UUID: UserProfile] = [:]
+    /// Loading state for async operations
+    @Published var isLoading: Bool = false
     
-    /// Loading state
-    @Published var isLoading = false
-    
-    /// Error message
+    /// Error message for display
     @Published var errorMessage: String?
     
-    /// Currently active tracking run
-    @Published var activeTrackingRun: SchoolRun?
+    // MARK: - Private Properties
     
-    /// Mock GPS tracking data
-    @Published var trackingData: RouteTrackingData?
+    /// Manager for school run data operations
+    private let manager: SchoolRunManager
     
-    /// Mock arrival notifications
-    @Published var notifications: [SchoolRunNotification] = []
+    /// Error handler for comprehensive error management
+    private let errorHandler: SchoolRunErrorHandler
     
     // MARK: - Computed Properties
     
     /// Today's school runs
     var todaysRuns: [SchoolRun] {
-        let calendar = Calendar.current
-        let today = Date()
-        
-        return schoolRuns.filter { schoolRun in
-            calendar.isDate(schoolRun.pickupTime, inSameDayAs: today)
-        }
-        .sorted { $0.pickupTime < $1.pickupTime }
+        manager.todaysRuns
     }
     
-    /// Upcoming school runs (next 7 days, excluding today)
+    /// Upcoming school runs (future dates, excluding today)
     var upcomingRuns: [SchoolRun] {
-        let calendar = Calendar.current
-        let today = Date()
-        let nextWeek = calendar.date(byAdding: .day, value: 7, to: today) ?? today
-        
-        return schoolRuns.filter { schoolRun in
-            !calendar.isDate(schoolRun.pickupTime, inSameDayAs: today) &&
-            schoolRun.pickupTime > today &&
-            schoolRun.pickupTime < nextWeek
-        }
-        .sorted { $0.pickupTime < $1.pickupTime }
+        manager.upcomingRuns
+    }
+    
+    /// Completed school runs
+    var completedRuns: [SchoolRun] {
+        manager.completedRuns
+    }
+    
+    /// Scheduled school runs
+    var scheduledRuns: [SchoolRun] {
+        manager.scheduledRuns
+    }
+    
+    /// In-progress school runs
+    var inProgressRuns: [SchoolRun] {
+        manager.inProgressRuns
+    }
+    
+    /// Currently active run
+    var activeRun: SchoolRun? {
+        manager.activeRun
+    }
+    
+    /// Check if there's an active run
+    var hasActiveRun: Bool {
+        manager.hasActiveRun
+    }
+    
+    /// Total number of runs
+    var totalRuns: Int {
+        manager.totalRuns
     }
     
     // MARK: - Initialization
     
-    init() {
-        loadMockData()
+    init(manager: SchoolRunManager? = nil, errorHandler: SchoolRunErrorHandler? = nil) {
+        if let manager = manager {
+            self.manager = manager
+        } else {
+            self.manager = SchoolRunManager()
+        }
+        
+        if let errorHandler = errorHandler {
+            self.errorHandler = errorHandler
+        } else {
+            self.errorHandler = SchoolRunErrorHandler()
+        }
+        
+        setupBindings()
+        loadRuns()
     }
     
     // MARK: - Public Methods
     
-    /// Load school runs with mock data
-    func loadSchoolRuns() {
+    /// Load all school runs from the manager (optimized)
+    func loadRuns() {
+        guard !isLoading else { return } // Prevent multiple simultaneous loads
+        
         isLoading = true
         errorMessage = nil
         
-        // Simulate network delay
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            self.loadMockData()
+        // Load from storage on main actor since manager requires it
+        Task { @MainActor [weak self] in
+            guard let self = self else { return }
+            
+            // Load from manager (which loads from storage) - already on MainActor
+            self.manager.loadFromStorage()
+            
+            // Update UI properties
+            self.runs = self.manager.runs
             self.isLoading = false
         }
     }
     
-    /// Start tracking a school run with mock GPS
-    func startTracking(_ schoolRun: SchoolRun) {
-        activeTrackingRun = schoolRun
-        trackingData = generateMockTrackingData(for: schoolRun)
+    /// Create a new school run with comprehensive error handling
+    func createRun(_ run: SchoolRun) async {
+        isLoading = true
+        errorMessage = nil
+        errorHandler.clearError()
         
-        // Start mock GPS updates
-        startMockGPSUpdates()
-        
-        // Generate arrival notification
-        generateArrivalNotification(for: schoolRun)
-    }
-    
-    /// Stop tracking the current school run
-    func stopTracking() {
-        activeTrackingRun = nil
-        trackingData = nil
-    }
-    
-    /// Mark a school run as completed
-    func completeRun(_ schoolRun: SchoolRun) {
-        if let index = schoolRuns.firstIndex(where: { $0.id == schoolRun.id }) {
-            var updatedRun = schoolRun
-            updatedRun = SchoolRun(
-                id: updatedRun.id,
-                route: updatedRun.route,
-                pickupTime: updatedRun.pickupTime,
-                dropoffTime: updatedRun.dropoffTime,
-                driver: updatedRun.driver,
-                passengers: updatedRun.passengers,
-                status: .completed,
-                notes: updatedRun.notes
+        do {
+            // Validate run before creating
+            let validationResult = SchoolRunValidation.validateRun(
+                title: run.title,
+                date: run.date,
+                stops: run.route
             )
-            schoolRuns[index] = updatedRun
+            
+            if !validationResult.isValid {
+                let validationErrors = validationResult.errors
+                errorHandler.handleErrors(validationErrors, context: "Create Run")
+                throw validationErrors.first ?? SchoolRunError.invalidRunData("Validation failed")
+            }
+            
+            try await manager.createRunAsync(run)
+            runs = manager.runs
+            
+            // Success feedback
+            ToastManager.shared.success("Run '\(run.title)' created successfully!")
+            
+            isLoading = false
+        } catch let error as SchoolRunError {
+            errorHandler.handleError(error, context: "Create Run")
+            errorMessage = error.userFriendlyMessage
+            isLoading = false
+        } catch {
+            let wrappedError = SchoolRunError.unexpectedError(error.localizedDescription)
+            errorHandler.handleError(wrappedError, context: "Create Run")
+            errorMessage = "Failed to create run: \(error.localizedDescription)"
+            isLoading = false
+        }
+    }
+    
+    /// Delete a school run with confirmation and error handling
+    func deleteRun(_ run: SchoolRun) async {
+        isLoading = true
+        errorMessage = nil
+        errorHandler.clearError()
+        
+        do {
+            // Check if run can be deleted
+            if run.status == .inProgress {
+                throw SchoolRunError.invalidRunState(run.status, "delete")
+            }
+            
+            try await manager.deleteRunAsync(id: run.id)
+            runs = manager.runs
+            
+            // Success feedback
+            ToastManager.shared.success("Run '\(run.title)' deleted")
+            
+            isLoading = false
+        } catch let error as SchoolRunError {
+            errorHandler.handleError(error, context: "Delete Run")
+            errorMessage = error.userFriendlyMessage
+            isLoading = false
+        } catch {
+            let wrappedError = SchoolRunError.unexpectedError(error.localizedDescription)
+            errorHandler.handleError(wrappedError, context: "Delete Run")
+            errorMessage = "Failed to delete run: \(error.localizedDescription)"
+            isLoading = false
+        }
+    }
+    
+    /// Delete a run by ID with error handling
+    func deleteRun(id: UUID) async {
+        guard let run = getRun(id: id) else {
+            let error = SchoolRunError.runNotFound(id)
+            errorHandler.handleError(error, context: "Delete Run by ID")
+            errorMessage = error.userFriendlyMessage
+            return
         }
         
-        stopTracking()
+        await deleteRun(run)
+    }
+    
+    /// Start a school run with validation and error handling
+    func startRun(_ run: SchoolRun) async {
+        isLoading = true
+        errorMessage = nil
+        errorHandler.clearError()
+        
+        do {
+            // Check if another run is already active
+            if let activeRun = manager.activeRun, activeRun.id != run.id {
+                throw SchoolRunError.runAlreadyActive(activeRun.title)
+            }
+            
+            // Check if run can be started
+            if run.status != .scheduled {
+                throw SchoolRunError.invalidRunState(run.status, "start")
+            }
+            
+            // Check if run date is today or in the past
+            let calendar = Calendar.current
+            let today = calendar.startOfDay(for: Date())
+            let runDay = calendar.startOfDay(for: run.date)
+            
+            if runDay > today {
+                throw SchoolRunError.operationNotAllowed("Cannot start future runs")
+            }
+            
+            try await manager.startRunAsync(id: run.id)
+            runs = manager.runs
+            
+            // Success feedback
+            ToastManager.shared.success("Run '\(run.title)' started!")
+            
+            isLoading = false
+        } catch let error as SchoolRunError {
+            errorHandler.handleError(error, context: "Start Run")
+            errorMessage = error.userFriendlyMessage
+            isLoading = false
+        } catch {
+            let wrappedError = SchoolRunError.unexpectedError(error.localizedDescription)
+            errorHandler.handleError(wrappedError, context: "Start Run")
+            errorMessage = "Failed to start run: \(error.localizedDescription)"
+            isLoading = false
+        }
+    }
+    
+    /// Complete a school run with validation
+    func completeRun(_ run: SchoolRun) async {
+        isLoading = true
+        errorMessage = nil
+        errorHandler.clearError()
+        
+        do {
+            // Check if run can be completed
+            if run.status != .inProgress {
+                throw SchoolRunError.invalidRunState(run.status, "complete")
+            }
+            
+            try await manager.completeRunAsync(id: run.id)
+            runs = manager.runs
+            
+            // Success feedback
+            ToastManager.shared.success("Run '\(run.title)' completed!")
+            
+            isLoading = false
+        } catch let error as SchoolRunError {
+            errorHandler.handleError(error, context: "Complete Run")
+            errorMessage = error.userFriendlyMessage
+            isLoading = false
+        } catch {
+            let wrappedError = SchoolRunError.unexpectedError(error.localizedDescription)
+            errorHandler.handleError(wrappedError, context: "Complete Run")
+            errorMessage = "Failed to complete run: \(error.localizedDescription)"
+            isLoading = false
+        }
+    }
+    
+    /// Cancel a school run with confirmation
+    func cancelRun(_ run: SchoolRun) async {
+        isLoading = true
+        errorMessage = nil
+        errorHandler.clearError()
+        
+        do {
+            // Check if run can be cancelled
+            if run.status == .completed {
+                throw SchoolRunError.invalidRunState(run.status, "cancel")
+            }
+            
+            try await manager.cancelRunAsync(id: run.id)
+            runs = manager.runs
+            
+            // Warning feedback for cancellation
+            ToastManager.shared.warning("Run '\(run.title)' cancelled")
+            
+            isLoading = false
+        } catch let error as SchoolRunError {
+            errorHandler.handleError(error, context: "Cancel Run")
+            errorMessage = error.userFriendlyMessage
+            isLoading = false
+        } catch {
+            let wrappedError = SchoolRunError.unexpectedError(error.localizedDescription)
+            errorHandler.handleError(wrappedError, context: "Cancel Run")
+            errorMessage = "Failed to cancel run: \(error.localizedDescription)"
+            isLoading = false
+        }
+    }
+    
+    /// Get a specific run by ID
+    func getRun(id: UUID) -> SchoolRun? {
+        return manager.getRun(id: id)
+    }
+    
+    /// Get runs for a specific date
+    func getRuns(for date: Date) -> [SchoolRun] {
+        return manager.getRuns(for: date)
+    }
+    
+    /// Get runs within a date range
+    func getRuns(from startDate: Date, to endDate: Date) -> [SchoolRun] {
+        return manager.getRuns(from: startDate, to: endDate)
+    }
+    
+    /// Clear error message and error handler state
+    func clearError() {
+        errorMessage = nil
+        errorHandler.clearError()
+    }
+    
+    /// Refresh runs data
+    func refresh() {
+        loadRuns()
     }
     
     // MARK: - Private Methods
     
-    private func loadMockData() {
-        // Load extended mock school runs
-        schoolRuns = MockDataGenerator.mockExtendedSchoolRuns()
-        
-        // Load user profiles
-        let (_, users, _) = MockDataGenerator.mockMawereFamily()
-        userProfiles = Dictionary(uniqueKeysWithValues: users.map { ($0.id, $0) })
-        
-        // Load mock notifications
-        notifications = MockDataGenerator.mockSchoolRunNotifications()
-    }
-    
-
-    
-    private func generateMockTrackingData(for schoolRun: SchoolRun) -> RouteTrackingData {
-        return RouteTrackingData(
-            currentLocation: MockLocation(
-                latitude: 34.0522,
-                longitude: -118.2437,
-                address: "Starting location"
-            ),
-            destination: MockLocation(
-                latitude: 34.0622,
-                longitude: -118.2337,
-                address: schoolRun.route.components(separatedBy: " → ").last ?? "Destination"
-            ),
-            estimatedArrival: schoolRun.dropoffTime,
-            distanceRemaining: 2.5,
-            progress: 0.0,
-            isNavigating: true
-        )
-    }
-    
-    private func startMockGPSUpdates() {
-        guard trackingData != nil else { return }
-        
-        // Simulate GPS updates every 5 seconds
-        Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { timer in
-            Task { @MainActor in
-                guard let activeRun = self.activeTrackingRun,
-                      var tracking = self.trackingData else {
-                    timer.invalidate()
-                    return
-                }
-                
-                // Update progress
-                tracking.progress = min(tracking.progress + 0.1, 1.0)
-                tracking.distanceRemaining = max(tracking.distanceRemaining - 0.3, 0.0)
-                
-                // Update current location (mock movement)
-                let progressLat = tracking.destination.latitude - tracking.currentLocation.latitude
-                let progressLng = tracking.destination.longitude - tracking.currentLocation.longitude
-                
-                tracking.currentLocation = MockLocation(
-                    latitude: tracking.currentLocation.latitude + (progressLat * 0.1),
-                    longitude: tracking.currentLocation.longitude + (progressLng * 0.1),
-                    address: "En route"
-                )
-                
-                self.trackingData = tracking
-                
-                // Complete when progress reaches 100%
-                if tracking.progress >= 1.0 {
-                    timer.invalidate()
-                    self.completeRun(activeRun)
-                }
+    /// Setup bindings to observe manager changes (optimized)
+    private func setupBindings() {
+        // Observe manager's runs changes with debouncing to prevent excessive updates
+        manager.$runs
+            .debounce(for: .milliseconds(100), scheduler: DispatchQueue.main)
+            .removeDuplicates { oldRuns, newRuns in
+                // Only update if the runs actually changed
+                oldRuns.count == newRuns.count && 
+                zip(oldRuns, newRuns).allSatisfy { $0.id == $1.id && $0.status == $1.status }
             }
-        }
-    }
-    
-    private func generateArrivalNotification(for schoolRun: SchoolRun) {
-        let notification = SchoolRunNotification(
-            id: UUID(),
-            title: "School Run Started",
-            message: "Navigation started for \(schoolRun.route)",
-            timestamp: Date(),
-            type: .started,
-            schoolRunId: schoolRun.id
-        )
+            .assign(to: &$runs)
         
-        notifications.append(notification)
+        // Observe manager's error messages
+        manager.$errorMessage
+            .receive(on: DispatchQueue.main)
+            .assign(to: &$errorMessage)
         
-        // Generate arrival notification after delay
-        DispatchQueue.main.asyncAfter(deadline: .now() + 30) {
-            let arrivalNotification = SchoolRunNotification(
-                id: UUID(),
-                title: "Arriving Soon",
-                message: "Estimated arrival in 2 minutes",
-                timestamp: Date(),
-                type: .arriving,
-                schoolRunId: schoolRun.id
-            )
-            self.notifications.append(arrivalNotification)
-        }
+        // Observe manager's loading state with debouncing
+        manager.$isLoading
+            .debounce(for: .milliseconds(50), scheduler: DispatchQueue.main)
+            .assign(to: &$isLoading)
     }
-}
-
-// MARK: - Supporting Data Models
-
-/// Mock GPS tracking data for school runs
-struct RouteTrackingData {
-    var currentLocation: MockLocation
-    let destination: MockLocation
-    let estimatedArrival: Date
-    var distanceRemaining: Double // in miles
-    var progress: Double // 0.0 to 1.0
-    var isNavigating: Bool
-}
-
-/// Mock location data
-struct MockLocation {
-    let latitude: Double
-    let longitude: Double
-    let address: String
 }
 

@@ -16,111 +16,116 @@ struct SchoolRunPreviewProvider {
     // MARK: - Sample Stops
     
     static let sampleStops: [RunStop] = [
-        RunStop(
-            name: "Home",
-            type: .home,
-            task: "Pick snacks & guitar",
-            estimatedMinutes: 5
-        ),
-        RunStop(
-            name: "Riverside Elementary",
-            type: .school,
-            assignedChild: sampleChildren[0],
-            task: "Pick up Emma from classroom 3B",
-            estimatedMinutes: 10
-        ),
-        RunStop(
-            name: "OT Clinic",
-            type: .ot,
-            assignedChild: sampleChildren[0],
-            task: "Drop Emma for therapy session",
-            estimatedMinutes: 15
-        ),
-        RunStop(
-            name: "Music Academy",
-            type: .music,
-            assignedChild: sampleChildren[1],
-            task: "Pick up Liam from piano lesson",
-            estimatedMinutes: 10
-        ),
-        RunStop(
-            name: "OT Clinic",
-            type: .ot,
-            assignedChild: sampleChildren[0],
-            task: "Pick up Emma after therapy",
-            estimatedMinutes: 15
-        ),
-        RunStop(
-            name: "Home",
-            type: .home,
-            task: "Return home safely",
-            estimatedMinutes: 10
-        )
+        RunStop(name: "Home", time: Date(), note: "Pick up Emma", type: .pickup, task: "Get ready to go", estimatedMinutes: 5),
+        RunStop(name: "School", time: Date().addingTimeInterval(1800), note: "Drop off at main entrance", type: .dropoff, task: "Drop off at main entrance", estimatedMinutes: 10, assignedChild: sampleChildren[0]),
+        RunStop(name: "Music Academy", time: Date().addingTimeInterval(3600), note: "Piano lesson", type: .music, task: "Drop off for piano lesson", estimatedMinutes: 15, assignedChild: sampleChildren[1]),
+        RunStop(name: "OT Clinic", time: Date().addingTimeInterval(5400), note: "Therapy session", type: .ot, task: "Drop off for therapy", estimatedMinutes: 20, assignedChild: sampleChildren[0]),
+        RunStop(name: "Friend's House", time: Date().addingTimeInterval(7200), note: "Playdate pickup", type: .pickup, task: "Pick up from playdate", estimatedMinutes: 5),
+        RunStop(name: "Home", time: Date().addingTimeInterval(9000), note: "Return home", type: .home, task: "Return home safely", estimatedMinutes: 10)
     ]
     
     // MARK: - Sample Runs
     
-    static let upcomingRun: ScheduledSchoolRun = ScheduledSchoolRun(
-        name: "Thursday School Run",
-        scheduledDate: Date().addingTimeInterval(86400), // Tomorrow
-        scheduledTime: Calendar.current.date(bySettingHour: 15, minute: 30, second: 0, of: Date()) ?? Date(),
-        stops: sampleStops
-    )
-    
-    static let todayRun: ScheduledSchoolRun = ScheduledSchoolRun(
-        name: "Today's Pickup Run",
-        scheduledDate: Date(),
-        scheduledTime: Calendar.current.date(bySettingHour: 16, minute: 0, second: 0, of: Date()) ?? Date(),
-        stops: [
-            RunStop(name: "Home", type: .home, task: "Get ready", estimatedMinutes: 5),
-            RunStop(name: "School", type: .school, assignedChild: sampleChildren[2], task: "Pick up Sophia", estimatedMinutes: 8),
-            RunStop(name: "Home", type: .home, task: "Return home", estimatedMinutes: 12)
+    static let upcomingRun: SchoolRun = SchoolRun(
+        title: "Thursday School Run",
+        date: Date().addingTimeInterval(86400), // Tomorrow
+        route: [
+            RunStop(name: "Home", time: Date(), note: "Pick up Emma", type: .pickup, task: "Get ready to go", estimatedMinutes: 5),
+            RunStop(name: "School", time: Date().addingTimeInterval(1800), note: "Drop off", type: .dropoff, task: "Drop off at main entrance", estimatedMinutes: 10)
         ]
     )
     
-    static let completedRun: ScheduledSchoolRun = ScheduledSchoolRun(
-        name: "Monday Morning Drop-off",
-        scheduledDate: Date().addingTimeInterval(-86400), // Yesterday
-        scheduledTime: Calendar.current.date(bySettingHour: 8, minute: 0, second: 0, of: Date()) ?? Date(),
-        stops: [
-            RunStop(name: "Home", type: .home, task: "Start journey", estimatedMinutes: 5, isCompleted: true),
-            RunStop(name: "School", type: .school, assignedChild: sampleChildren[0], task: "Drop off Emma", estimatedMinutes: 10, isCompleted: true),
-            RunStop(name: "Home", type: .home, task: "Return home", estimatedMinutes: 15, isCompleted: true)
+    static let todayRun: SchoolRun = SchoolRun(
+        title: "Today's Pickup Run",
+        date: Date(),
+        route: [
+            RunStop(name: "School", time: Date(), note: "Pick up", type: .pickup, task: "Pick up from school", estimatedMinutes: 10),
+            RunStop(name: "Home", time: Date().addingTimeInterval(1200), note: "Drop off", type: .dropoff, task: "Return home", estimatedMinutes: 15)
+        ]
+    )
+    
+    static let completedRun: SchoolRun = SchoolRun(
+        title: "Monday Morning Drop-off",
+        date: Date().addingTimeInterval(-86400), // Yesterday
+        route: [
+            RunStop(name: "Home", time: Date().addingTimeInterval(-86400), note: "Pick up", type: .pickup, isCompleted: true, task: "Get ready to go", estimatedMinutes: 5),
+            RunStop(name: "School", time: Date().addingTimeInterval(-86400 + 1800), note: "Drop off", type: .dropoff, isCompleted: true, task: "Drop off at school", estimatedMinutes: 10)
         ],
-        isCompleted: true
+        status: .completed
     )
     
-    static let longRun: ScheduledSchoolRun = ScheduledSchoolRun(
-        name: "Friday Multi-Stop Adventure",
-        scheduledDate: Date().addingTimeInterval(345600), // 4 days from now
-        scheduledTime: Calendar.current.date(bySettingHour: 14, minute: 45, second: 0, of: Date()) ?? Date(),
-        stops: [
-            RunStop(name: "Home", type: .home, task: "Pack everything", estimatedMinutes: 8),
-            RunStop(name: "School", type: .school, assignedChild: sampleChildren[0], task: "Pick up Emma", estimatedMinutes: 12),
-            RunStop(name: "School", type: .school, assignedChild: sampleChildren[1], task: "Pick up Liam", estimatedMinutes: 8),
-            RunStop(name: "Music Academy", type: .music, assignedChild: sampleChildren[1], task: "Drop Liam for lesson", estimatedMinutes: 15),
-            RunStop(name: "OT Clinic", type: .ot, assignedChild: sampleChildren[0], task: "Drop Emma for therapy", estimatedMinutes: 20),
-            RunStop(name: "Grocery Store", type: .custom, task: "Quick grocery run", estimatedMinutes: 25),
-            RunStop(name: "OT Clinic", type: .ot, assignedChild: sampleChildren[0], task: "Pick up Emma", estimatedMinutes: 15),
-            RunStop(name: "Music Academy", type: .music, assignedChild: sampleChildren[1], task: "Pick up Liam", estimatedMinutes: 10),
-            RunStop(name: "Home", type: .home, task: "Finally home!", estimatedMinutes: 18)
+    static let longRun: SchoolRun = SchoolRun(
+        title: "Extended School Run",
+        date: Date(),
+        route: [
+            RunStop(name: "Home", time: Date(), note: "Start", type: .pickup, task: "Get ready to go", estimatedMinutes: 5),
+            RunStop(name: "Friend's House", time: Date().addingTimeInterval(600), note: "Pick up friend", type: .pickup, task: "Pick up friend", estimatedMinutes: 5),
+            RunStop(name: "School", time: Date().addingTimeInterval(1800), note: "Drop off", type: .dropoff, task: "Drop off at school", estimatedMinutes: 10),
+            RunStop(name: "After School Club", time: Date().addingTimeInterval(3600), note: "Pick up", type: .pickup, task: "Pick up from club", estimatedMinutes: 5),
+            RunStop(name: "Home", time: Date().addingTimeInterval(4200), note: "End", type: .dropoff, task: "Return home", estimatedMinutes: 10)
         ]
     )
     
-    static let shortRun: ScheduledSchoolRun = ScheduledSchoolRun(
-        name: "Quick School Pickup",
-        scheduledDate: Date().addingTimeInterval(172800), // 2 days from now
-        scheduledTime: Calendar.current.date(bySettingHour: 15, minute: 15, second: 0, of: Date()) ?? Date(),
-        stops: [
-            RunStop(name: "Home", type: .home, task: "Quick departure", estimatedMinutes: 3),
-            RunStop(name: "School", type: .school, assignedChild: sampleChildren[2], task: "Pick up Sophia", estimatedMinutes: 7),
-            RunStop(name: "Home", type: .home, task: "Back home", estimatedMinutes: 8)
+    static let shortRun: SchoolRun = SchoolRun(
+        title: "Quick Run",
+        date: Date(),
+        route: [
+            RunStop(name: "Home", time: Date(), note: "Start", type: .pickup, task: "Get ready to go", estimatedMinutes: 5),
+            RunStop(name: "School", time: Date().addingTimeInterval(900), note: "Drop off", type: .dropoff, task: "Drop off at school", estimatedMinutes: 10)
         ]
+    )
+    
+    static let accessibilityTestRun: SchoolRun = SchoolRun(
+        title: "Accessibility Test Run",
+        date: Date(),
+        route: [
+            RunStop(name: "Home", time: Date(), note: "Wheelchair accessible pickup", type: .pickup, task: "Wheelchair accessible pickup", estimatedMinutes: 10),
+            RunStop(name: "Special Needs School", time: Date().addingTimeInterval(1800), note: "Accessible drop off", type: .dropoff, task: "Accessible drop off", estimatedMinutes: 15)
+        ]
+    )
+    
+    static let executionRunStart: SchoolRun = SchoolRun(
+        title: "Active Run - Starting",
+        date: Date(),
+        route: [
+            RunStop(name: "Home", time: Date(), note: "Starting point", type: .pickup, task: "Get ready to go", estimatedMinutes: 5),
+            RunStop(name: "School", time: Date().addingTimeInterval(1800), note: "Destination", type: .dropoff, task: "Drop off at school", estimatedMinutes: 10)
+        ],
+        status: .inProgress
+    )
+    
+    static let executionRunMidway: SchoolRun = SchoolRun(
+        title: "Active Run - Midway",
+        date: Date(),
+        route: [
+            RunStop(name: "Home", time: Date().addingTimeInterval(-900), note: "Completed", type: .pickup, isCompleted: true, task: "Get ready to go", estimatedMinutes: 5),
+            RunStop(name: "School", time: Date().addingTimeInterval(900), note: "Next stop", type: .dropoff, task: "Drop off at school", estimatedMinutes: 10)
+        ],
+        status: .inProgress
+    )
+    
+    static let executionRunNearEnd: SchoolRun = SchoolRun(
+        title: "Active Run - Near End",
+        date: Date(),
+        route: [
+            RunStop(name: "Home", time: Date().addingTimeInterval(-1800), note: "Completed", type: .pickup, isCompleted: true, task: "Get ready to go", estimatedMinutes: 5),
+            RunStop(name: "Friend's House", time: Date().addingTimeInterval(-900), note: "Completed", type: .pickup, isCompleted: true, task: "Pick up friend", estimatedMinutes: 5),
+            RunStop(name: "School", time: Date().addingTimeInterval(300), note: "Final stop", type: .dropoff, task: "Drop off at school", estimatedMinutes: 10)
+        ],
+        status: .inProgress
     )
     
     // MARK: - Sample Run Collections
     
-    static let allSampleRuns: [ScheduledSchoolRun] = [
+    static let sampleRuns: [SchoolRun] = [
+        executionRunStart,
+        executionRunMidway,
+        executionRunNearEnd,
+        upcomingRun,
+        todayRun
+    ]
+    
+    static let allSampleRuns: [SchoolRun] = [
         upcomingRun,
         todayRun,
         completedRun,
@@ -128,182 +133,63 @@ struct SchoolRunPreviewProvider {
         shortRun
     ]
     
-    static let upcomingRuns: [ScheduledSchoolRun] = [
+    static let upcomingRuns: [SchoolRun] = [
         upcomingRun,
-        todayRun,
-        longRun,
-        shortRun
+        todayRun
     ]
     
-    static let pastRuns: [ScheduledSchoolRun] = [
+    static let pastRuns: [SchoolRun] = [
         completedRun
     ]
     
-    // MARK: - Execution State Samples
+    // MARK: - Preview Helper Methods
     
-    static let executionRunStart: ScheduledSchoolRun = ScheduledSchoolRun(
-        name: "Execution Demo Run",
-        scheduledDate: Date(),
-        scheduledTime: Date(),
-        stops: [
-            RunStop(name: "Home", type: .home, task: "Get ready to go", estimatedMinutes: 5),
-            RunStop(name: "School", type: .school, assignedChild: sampleChildren[0], task: "Pick up Emma", estimatedMinutes: 10),
-            RunStop(name: "Music School", type: .music, assignedChild: sampleChildren[1], task: "Drop Liam", estimatedMinutes: 15),
-            RunStop(name: "Home", type: .home, task: "Return home", estimatedMinutes: 12)
-        ]
-    )
-    
-    static let executionRunMidway: ScheduledSchoolRun = ScheduledSchoolRun(
-        name: "Execution Demo Run",
-        scheduledDate: Date(),
-        scheduledTime: Date(),
-        stops: [
-            RunStop(name: "Home", type: .home, task: "Get ready to go", estimatedMinutes: 5, isCompleted: true),
-            RunStop(name: "School", type: .school, assignedChild: sampleChildren[0], task: "Pick up Emma", estimatedMinutes: 10, isCompleted: true),
-            RunStop(name: "Music School", type: .music, assignedChild: sampleChildren[1], task: "Drop Liam", estimatedMinutes: 15),
-            RunStop(name: "Home", type: .home, task: "Return home", estimatedMinutes: 12)
-        ]
-    )
-    
-    static let executionRunNearEnd: ScheduledSchoolRun = ScheduledSchoolRun(
-        name: "Execution Demo Run",
-        scheduledDate: Date(),
-        scheduledTime: Date(),
-        stops: [
-            RunStop(name: "Home", type: .home, task: "Get ready to go", estimatedMinutes: 5, isCompleted: true),
-            RunStop(name: "School", type: .school, assignedChild: sampleChildren[0], task: "Pick up Emma", estimatedMinutes: 10, isCompleted: true),
-            RunStop(name: "Music School", type: .music, assignedChild: sampleChildren[1], task: "Drop Liam", estimatedMinutes: 15, isCompleted: true),
-            RunStop(name: "Home", type: .home, task: "Return home", estimatedMinutes: 12)
-        ]
-    )
-    
-    // MARK: - Form State Samples
-    
-    static let emptyFormStops: [RunStop] = [
-        RunStop(name: "", type: .home, task: "", estimatedMinutes: 5)
-    ]
-    
-    static let partialFormStops: [RunStop] = [
-        RunStop(name: "Home", type: .home, task: "Get ready", estimatedMinutes: 5),
-        RunStop(name: "", type: .school, assignedChild: sampleChildren[0], task: "", estimatedMinutes: 10)
-    ]
-    
-    static let completeFormStops: [RunStop] = [
-        RunStop(name: "Home", type: .home, task: "Pack snacks", estimatedMinutes: 5),
-        RunStop(name: "School", type: .school, assignedChild: sampleChildren[0], task: "Pick up Emma", estimatedMinutes: 10),
-        RunStop(name: "Music Academy", type: .music, assignedChild: sampleChildren[1], task: "Drop Liam", estimatedMinutes: 15)
-    ]
-    
-    // MARK: - Accessibility Test Data
-    
-    static let accessibilityTestRun: ScheduledSchoolRun = ScheduledSchoolRun(
-        name: "Accessibility Test Run with Very Long Name That Should Wrap Properly",
-        scheduledDate: Date().addingTimeInterval(86400),
-        scheduledTime: Calendar.current.date(bySettingHour: 15, minute: 30, second: 0, of: Date()) ?? Date(),
-        stops: [
-            RunStop(
-                name: "Home Sweet Home",
-                type: .home,
-                task: "This is a very long task description that should test how well the UI handles longer text content and wrapping behavior",
-                estimatedMinutes: 5
-            ),
-            RunStop(
-                name: "Riverside Elementary School",
-                type: .school,
-                assignedChild: ChildProfile(name: "Emma-Louise", avatar: "person.circle.fill", age: 8),
-                task: "Pick up Emma-Louise from her classroom and collect her art project",
-                estimatedMinutes: 15
-            )
-        ]
-    )
-    
-    // MARK: - Error State Samples
-    
-    static let invalidRun: ScheduledSchoolRun = ScheduledSchoolRun(
-        name: "",
-        scheduledDate: Date(),
-        scheduledTime: Date(),
-        stops: []
-    )
-    
-    // MARK: - Preview Environment Setup
-    
-    /// Sets up a mock environment for previews
-    @MainActor
-    static func setupPreviewEnvironment() -> some View {
-        EmptyView()
-            .previewEnvironment()
-    }
-    
-    /// Creates a preview with sample data using the new preview environment system
-    @MainActor
-    static func previewWithSampleData<Content: View>(@ViewBuilder content: () -> Content) -> some View {
-        content()
-            .previewEnvironment()
-    }
-    
-    /// Creates a preview with specific environment type
-    @MainActor
-    static func previewWithEnvironment<Content: View>(
-        _ environmentType: PreviewEnvironmentType,
-        @ViewBuilder content: () -> Content
-    ) -> some View {
-        content()
-            .previewEnvironment(environmentType)
-    }
-    
-    /// Creates a preview with specific user role
-    @MainActor
-    static func previewWithRole<Content: View>(
-        _ role: Role,
-        @ViewBuilder content: () -> Content
-    ) -> some View {
-        content()
-            .previewEnvironment(role: role)
+    static func previewWithSampleData() -> [SchoolRun] {
+        return allSampleRuns
     }
 }
 
 // MARK: - Preview Extensions
 
-extension ScheduledSchoolRun {
+extension SchoolRun {
     /// Creates a sample run for previews
-    static var previewSample: ScheduledSchoolRun {
+    static var previewSample: SchoolRun {
         SchoolRunPreviewProvider.upcomingRun
     }
     
     /// Creates a completed run for previews
-    static var previewCompleted: ScheduledSchoolRun {
+    static var previewCompleted: SchoolRun {
         SchoolRunPreviewProvider.completedRun
     }
     
     /// Creates a long run for previews
-    static var previewLong: ScheduledSchoolRun {
-        SchoolRunPreviewProvider.longRun
+    static var previewLong: SchoolRun {
+        SchoolRunPreviewProvider.upcomingRun
     }
 }
 
 extension RunStop {
-    /// Creates a sample stop for previews
-    static var previewSample: RunStop {
-        SchoolRunPreviewProvider.sampleStops[1]
-    }
-    
-    /// Creates a completed stop for previews
-    static var previewCompleted: RunStop {
+    /// Creates a sample pickup stop for previews
+    static var previewPickup: RunStop {
         RunStop(
-            name: "School",
-            type: .school,
-            assignedChild: SchoolRunPreviewProvider.sampleChildren[0],
-            task: "Pick up Emma",
-            estimatedMinutes: 10,
-            isCompleted: true
+            name: "Home",
+            time: Date(),
+            note: "Pick up Emma and Liam",
+            type: .pickup,
+            task: "Pick up Emma and Liam",
+            estimatedMinutes: 5
         )
     }
-}
-
-extension ChildProfile {
-    /// Creates a sample child for previews
-    static var previewSample: ChildProfile {
-        SchoolRunPreviewProvider.sampleChildren[0]
+    
+    /// Creates a sample dropoff stop for previews
+    static var previewDropoff: RunStop {
+        RunStop(
+            name: "Greenwood Elementary",
+            time: Date().addingTimeInterval(1200),
+            note: "Drop off at main entrance",
+            type: .dropoff,
+            task: "Drop off at main entrance",
+            estimatedMinutes: 10
+        )
     }
 }

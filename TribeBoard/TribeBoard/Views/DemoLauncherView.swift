@@ -179,29 +179,11 @@ struct DemoLauncherView: View {
                 .font(.title2)
                 .fontWeight(.semibold)
             
-            // Group scenarios by category
-            ForEach(DemoCategory.allCases, id: \.self) { category in
-                let scenariosInCategory = DemoScenario.allCases.filter { $0.category == category }
-                
-                if !scenariosInCategory.isEmpty {
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Image(systemName: category.icon)
-                                .font(.headline)
-                                .foregroundColor(.secondary)
-                            
-                            Text(category.displayName)
-                                .font(.headline)
-                                .foregroundColor(.secondary)
-                        }
-                        
-                        LazyVStack(spacing: 8) {
-                            ForEach(scenariosInCategory, id: \.self) { scenario in
-                                DemoScenarioRow(scenario: scenario) {
-                                    startDemo(scenario)
-                                }
-                            }
-                        }
+            // List all scenarios
+            LazyVStack(spacing: 8) {
+                ForEach(DemoScenario.allCases, id: \.self) { scenario in
+                    DemoScenarioRow(scenario: scenario) {
+                        startDemo(scenario)
                     }
                 }
             }
@@ -312,7 +294,7 @@ struct DemoScenarioRow: View {
                         .font(.headline)
                         .foregroundColor(.primary)
                     
-                    Text(scenario.description)
+                    Text(scenario.displayName)
                         .font(.body)
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.leading)

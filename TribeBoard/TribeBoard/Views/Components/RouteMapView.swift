@@ -1,6 +1,22 @@
 import SwiftUI
 import Foundation
 
+// MARK: - Mock Types for Route Tracking
+struct RouteTrackingData {
+    let currentLocation: MockLocation
+    let destination: MockLocation
+    let estimatedArrival: Date
+    let distanceRemaining: Double
+    let progress: Double
+    let isNavigating: Bool
+}
+
+struct MockLocation {
+    let latitude: Double
+    let longitude: Double
+    let address: String
+}
+
 /// Mock navigation interface showing GPS tracking and route progress
 struct RouteMapView: View {
     let schoolRun: SchoolRun
@@ -407,17 +423,16 @@ struct RouteMapView: View {
     )
     
     let mockSchoolRun = SchoolRun(
-        id: UUID(),
-        route: "Home → Greenwood Elementary",
-        pickupTime: Date(),
-        dropoffTime: Calendar.current.date(byAdding: .minute, value: 45, to: Date())!,
-        driver: UUID(),
-        passengers: [UUID()],
-        status: .inProgress,
-        notes: nil
+        title: "Morning School Run",
+        date: Date(),
+        route: [
+            RunStop(name: "Home", time: Date(), type: .pickup),
+            RunStop(name: "Greenwood Elementary", time: Calendar.current.date(byAdding: .minute, value: 15, to: Date())!, type: .dropoff)
+        ],
+        status: .inProgress
     )
     
-    return RouteMapView(
+    RouteMapView(
         schoolRun: mockSchoolRun,
         trackingData: mockTrackingData,
         onStopTracking: {}

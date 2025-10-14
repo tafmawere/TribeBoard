@@ -2,7 +2,7 @@ import SwiftUI
 
 /// Step-by-step execution interface for school runs with progress tracking and controls
 struct RunExecutionView: View {
-    let run: ScheduledSchoolRun
+    let run: SchoolRun
     
     @State private var currentStopIndex = 0
     @State private var executionState: RunExecutionState = .active
@@ -18,7 +18,7 @@ struct RunExecutionView: View {
             .toolbar(.hidden, for: .navigationBar)
             .accessibilityElement(children: .contain)
             .accessibilityLabel("Run execution view")
-            .accessibilityHint("Step-by-step execution of \(run.name)")
+            .accessibilityHint("Step-by-step execution of \(run.title)")
             .accessibilityIdentifier("RunExecutionView_\(run.id)")
             .onAppear {
                 setupExecution()
@@ -62,7 +62,7 @@ struct RunExecutionView: View {
     }
     
     private var cancelRunAlertMessage: some View {
-        Text("Are you sure you want to cancel this run?\n\nYou've completed \(currentStopIndex) of \(run.stops.count) stops. All progress will be lost and you'll need to start over.")
+        Text("Are you sure you want to cancel this run?\n\nYou've completed \(currentStopIndex) of \(run.route.count) stops. All progress will be lost and you'll need to start over.")
     }
     
     @ViewBuilder
@@ -97,7 +97,7 @@ struct RunExecutionView: View {
     }
     
     private var completeRunAlertMessage: some View {
-        Text("Congratulations! You've completed all \(run.stops.count) stops in your \(run.name).")
+        Text("Congratulations! You've completed all \(run.route.count) stops in your \(run.title).")
     }
     
     private var mapSection: some View {
@@ -127,7 +127,7 @@ struct RunExecutionView: View {
             TribeBoardLogo(size: .small, showBackground: false)
                 .accessibilityHidden(true)
             
-            Text(run.name)
+            Text(run.title)
                 .titleMedium()
                 .foregroundColor(.primary)
                 .dynamicTypeSupport(minSize: 16, maxSize: 28)
@@ -159,14 +159,14 @@ struct RunExecutionView: View {
         VStack(spacing: DesignSystem.Spacing.md) {
             CurrentStopCard(
                 stopNumber: currentStopIndex + 1,
-                totalStops: run.stops.count,
+                totalStops: run.route.count,
                 stop: currentStop,
                 isActive: executionState == .active
             )
             
             ProgressIndicator(
                 current: currentStopIndex + 1,
-                total: run.stops.count
+                total: run.route.count
             )
         }
     }
@@ -183,10 +183,10 @@ struct RunExecutionView: View {
     // MARK: - Computed Properties
     
     private var currentStop: RunStop {
-        guard currentStopIndex < run.stops.count else {
-            return run.stops.last ?? RunStop(name: "Unknown", type: .custom, task: "", estimatedMinutes: 0)
+        guard currentStopIndex < run.route.count else {
+            return run.route.last ?? RunStop(name: "Unknown", time: Date(), note: "", type: .pickup, task: "Unknown", estimatedMinutes: 5)
         }
-        return run.stops[currentStopIndex]
+        return run.route[currentStopIndex]
     }
     
     // MARK: - Actions
@@ -206,13 +206,13 @@ struct RunExecutionView: View {
     }
     
     private func completeCurrentStopConfirmed() {
-        guard currentStopIndex < run.stops.count else { return }
+        guard currentStopIndex < run.route.count else { return }
         
         // Show completion toast
         ToastManager.shared.success("Stop \(currentStopIndex + 1) completed!")
         
         // Check if this was the last stop
-        if currentStopIndex >= run.stops.count - 1 {
+        if currentStopIndex >= run.route.count - 1 {
             // Show run completion alert after a brief delay
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
                 showingCompleteRunAlert = true
@@ -355,35 +355,28 @@ private struct ExecutionControls: View {
 }
 
 #Preview("Run Execution - Dark Mode") {
-    SchoolRunPreviewProvider.previewWithSampleData {
-        RunExecutionView(run: SchoolRunPreviewProvider.executionRunStart)
-    }
-    .preferredColorScheme(.dark)
+    RunExecutionView(run: SchoolRunPreviewProvider.executionRunStart)
+        .previewEnvironment()
+        .preferredColorScheme(.dark)
 }
 
 #Preview("Run Execution - Large Text") {
-    SchoolRunPreviewProvider.previewWithSampleData {
-        RunExecutionView(run: SchoolRunPreviewProvider.executionRunStart)
-    }
-    .environment(\.dynamicTypeSize, .accessibility1)
+    RunExecutionView(run: SchoolRunPreviewProvider.executionRunStart)
+        .previewEnvironment()
+        .environment(\.dynamicTypeSize, .accessibility1)
 }
 
 #Preview("Run Execution - High Contrast") {
-    SchoolRunPreviewProvider.previewWithSampleData {
-        RunExecutionView(run: SchoolRunPreviewProvider.executionRunStart)
-    }
-
+    RunExecutionView(run: SchoolRunPreviewProvider.executionRunStart)
+        .previewEnvironment()
 }
 
 #Preview("Run Execution - Reduced Motion") {
-    SchoolRunPreviewProvider.previewWithSampleData {
-        RunExecutionView(run: SchoolRunPreviewProvider.executionRunStart)
-    }
-
+    RunExecutionView(run: SchoolRunPreviewProvider.executionRunStart)
+        .previewEnvironment()
 }
 
 #Preview("Interactive Execution") {
-    SchoolRunPreviewProvider.previewWithSampleData {
-        RunExecutionView(run: SchoolRunPreviewProvider.executionRunStart)
-    }
+    RunExecutionView(run: SchoolRunPreviewProvider.executionRunStart)
+        .previewEnvironment()
 }

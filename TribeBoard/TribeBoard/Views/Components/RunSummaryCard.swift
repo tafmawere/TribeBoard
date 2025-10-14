@@ -2,109 +2,21 @@ import SwiftUI
 
 /// Reusable card component for displaying run overview with day, time, and stops count
 struct RunSummaryCard: View {
-    let run: ScheduledSchoolRun
+    let run: SchoolRun
     
     // Accessibility environment values
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    @Environment(\.colorSchemeContrast) private var colorSchemeContrast
+    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     
     var body: some View {
         VStack(alignment: .leading, spacing: DesignSystem.Spacing.md) {
-            // Header with run name and status
-            HStack {
-                Text(run.name)
-                    .titleMedium()
-                    .foregroundColor(.primary)
-                    .dynamicTypeSupport(minSize: 14, maxSize: 28)
-                
-                Spacer()
-                
-                if run.isCompleted {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(.green)
-                        .font(.title3)
-                        .accessibilityLabel("Completed")
-                }
-            }
-            
-            // Date and time information
-            HStack(spacing: DesignSystem.Spacing.sm) {
-                Image(systemName: "calendar")
-                    .foregroundColor(colorSchemeContrast == .increased ? .blue : .brandPrimary)
-                    .font(.callout)
-                    .accessibilityHidden(true)
-                
-                Text(formattedDate)
-                    .bodyMedium()
-                    .foregroundColor(.secondary)
-                    .dynamicTypeSupport(minSize: 12, maxSize: 24)
-                
-                Spacer()
-                
-                Image(systemName: "clock")
-                    .foregroundColor(colorSchemeContrast == .increased ? .blue : .brandPrimary)
-                    .font(.callout)
-                    .accessibilityHidden(true)
-                
-                Text(formattedTime)
-                    .bodyMedium()
-                    .foregroundColor(.secondary)
-                    .dynamicTypeSupport(minSize: 12, maxSize: 24)
-            }
-            
-            // Stops and duration summary
-            HStack(spacing: DesignSystem.Spacing.lg) {
-                // Stops count
-                HStack(spacing: DesignSystem.Spacing.xs) {
-                    Image(systemName: "mappin.circle.fill")
-                        .foregroundColor(colorSchemeContrast == .increased ? .indigo : .brandSecondary)
-                        .font(.callout)
-                        .accessibilityHidden(true)
-                    
-                    Text("\(run.stops.count) stops")
-                        .labelMedium()
-                        .foregroundColor(.secondary)
-                        .dynamicTypeSupport(minSize: 10, maxSize: 20)
-                }
-                
-                // Duration
-                HStack(spacing: DesignSystem.Spacing.xs) {
-                    Image(systemName: "timer")
-                        .foregroundColor(colorSchemeContrast == .increased ? .indigo : .brandSecondary)
-                        .font(.callout)
-                        .accessibilityHidden(true)
-                    
-                    Text(formattedDuration)
-                        .labelMedium()
-                        .foregroundColor(.secondary)
-                        .dynamicTypeSupport(minSize: 10, maxSize: 20)
-                }
-                
-                Spacer()
-                
-                // Participating children count
-                if !run.participatingChildren.isEmpty {
-                    HStack(spacing: DesignSystem.Spacing.xs) {
-                        Image(systemName: "person.2.fill")
-                            .foregroundColor(colorSchemeContrast == .increased ? .indigo : .brandSecondary)
-                            .font(.callout)
-                            .accessibilityHidden(true)
-                        
-                        Text("\(run.participatingChildren.count)")
-                            .labelMedium()
-                            .foregroundColor(.secondary)
-                            .dynamicTypeSupport(minSize: 10, maxSize: 20)
-                    }
-                }
-            }
+            headerSection
+            dateTimeSection
+            summarySection
         }
         .cardPadding()
-        .background(
-            RoundedRectangle(cornerRadius: BrandStyle.cornerRadius)
-                .fill(Color(.systemBackground))
-                .mediumShadow()
-        )
+        .background(cardBackground)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityLabel)
         .accessibilityHint(accessibilityHint)
@@ -113,37 +25,182 @@ struct RunSummaryCard: View {
         .accessibilityIdentifier("RunSummaryCard_\(run.id)")
     }
     
+    // MARK: - View Components
+    
+    @ViewBuilder
+    private var headerSection: some View {
+        HStack {
+            Text(run.title)
+                .titleMedium()
+                .foregroundColor(.primary)
+                .dynamicTypeSupport(minSize: 14, maxSize: 28)
+            
+            Spacer()
+            
+            if isCompleted {
+                completionIcon
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private var completionIcon: some View {
+        Image(systemName: "checkmark.circle.fill")
+            .foregroundColor(.green)
+            .font(.title3)
+            .accessibilityLabel("Completed")
+    }
+    
+    @ViewBuilder
+    private var dateTimeSection: some View {
+        HStack(spacing: DesignSystem.Spacing.sm) {
+            dateInfo
+            Spacer()
+            timeInfo
+        }
+    }
+    
+    @ViewBuilder
+    private var dateInfo: some View {
+        HStack(spacing: DesignSystem.Spacing.xs) {
+            Image(systemName: "calendar")
+                .foregroundColor(primaryIconColor)
+                .font(.callout)
+                .accessibilityHidden(true)
+            
+            Text(formattedDate)
+                .bodyMedium()
+                .foregroundColor(.secondary)
+                .dynamicTypeSupport(minSize: 12, maxSize: 24)
+        }
+    }
+    
+    @ViewBuilder
+    private var timeInfo: some View {
+        HStack(spacing: DesignSystem.Spacing.xs) {
+            Image(systemName: "clock")
+                .foregroundColor(primaryIconColor)
+                .font(.callout)
+                .accessibilityHidden(true)
+            
+            Text(formattedTime)
+                .bodyMedium()
+                .foregroundColor(.secondary)
+                .dynamicTypeSupport(minSize: 12, maxSize: 24)
+        }
+    }
+    
+    @ViewBuilder
+    private var summarySection: some View {
+        HStack(spacing: DesignSystem.Spacing.lg) {
+            stopsInfo
+            durationInfo
+            Spacer()
+            if hasParticipatingChildren {
+                childrenInfo
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private var stopsInfo: some View {
+        HStack(spacing: DesignSystem.Spacing.xs) {
+            Image(systemName: "mappin.circle.fill")
+                .foregroundColor(secondaryIconColor)
+                .font(.callout)
+                .accessibilityHidden(true)
+            
+            Text("\(stopsCount) stops")
+                .labelMedium()
+                .foregroundColor(.secondary)
+                .dynamicTypeSupport(minSize: 10, maxSize: 20)
+        }
+    }
+    
+    @ViewBuilder
+    private var durationInfo: some View {
+        HStack(spacing: DesignSystem.Spacing.xs) {
+            Image(systemName: "timer")
+                .foregroundColor(secondaryIconColor)
+                .font(.callout)
+                .accessibilityHidden(true)
+            
+            Text(formattedDuration)
+                .labelMedium()
+                .foregroundColor(.secondary)
+                .dynamicTypeSupport(minSize: 10, maxSize: 20)
+        }
+    }
+    
+    @ViewBuilder
+    private var childrenInfo: some View {
+        HStack(spacing: DesignSystem.Spacing.xs) {
+            Image(systemName: "person.2.fill")
+                .foregroundColor(secondaryIconColor)
+                .font(.callout)
+                .accessibilityHidden(true)
+            
+            Text("\(childrenCount)")
+                .labelMedium()
+                .foregroundColor(.secondary)
+                .dynamicTypeSupport(minSize: 10, maxSize: 20)
+        }
+    }
+    
+    @ViewBuilder
+    private var cardBackground: some View {
+        RoundedRectangle(cornerRadius: BrandStyle.cornerRadius)
+            .fill(Color(.systemBackground))
+            .mediumShadow()
+    }
+    
     // MARK: - Computed Properties
+    
+    private var isCompleted: Bool {
+        run.status == .completed
+    }
+    
+    private var stopsCount: Int {
+        run.route.count
+    }
+    
+    private var childrenCount: Int {
+        run.participatingChildren.count
+    }
+    
+    private var hasParticipatingChildren: Bool {
+        !run.participatingChildren.isEmpty
+    }
+    
+    private var primaryIconColor: Color {
+        colorScheme == .dark ? .blue : .brandPrimary
+    }
+    
+    private var secondaryIconColor: Color {
+        colorScheme == .dark ? .indigo : .brandSecondary
+    }
     
     private var formattedDate: String {
         let formatter = DateFormatter()
         formatter.dateFormat = "MMM d"
-        return formatter.string(from: run.scheduledDate)
+        return formatter.string(from: run.date)
     }
     
     private var formattedTime: String {
         let formatter = DateFormatter()
         formatter.timeStyle = .short
-        return formatter.string(from: run.scheduledTime)
+        return formatter.string(from: run.date)
     }
     
     private var formattedDuration: String {
-        let totalMinutes = Int(run.estimatedDuration / 60)
-        let hours = totalMinutes / 60
-        let minutes = totalMinutes % 60
-        
-        if hours > 0 {
-            return "\(hours)h \(minutes)m"
-        } else {
-            return "\(minutes)m"
-        }
+        run.formattedDuration
     }
     
     // MARK: - Accessibility Properties
     
     private var accessibilityLabel: String {
-        let status = run.isCompleted ? "Completed run" : "Scheduled run"
-        return "\(status): \(run.name)"
+        let status = run.status == .completed ? "Completed run" : "Scheduled run"
+        return "\(status): \(run.title)"
     }
     
     private var accessibilityHint: String {
@@ -152,7 +209,7 @@ struct RunSummaryCard: View {
     
     private var accessibilityValue: String {
         let childrenText = run.participatingChildren.isEmpty ? "No children assigned" : "\(run.participatingChildren.count) children participating"
-        return "Scheduled for \(formattedDate) at \(formattedTime), \(run.stops.count) stops, \(formattedDuration) duration, \(childrenText)"
+        return "Scheduled for \(formattedDate) at \(formattedTime), \(run.route.count) stops, \(formattedDuration) duration, \(childrenText)"
     }
 }
 

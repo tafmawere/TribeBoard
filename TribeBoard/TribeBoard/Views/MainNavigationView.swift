@@ -237,8 +237,8 @@ struct MainNavigationView: View {
                 CalendarView()
                 
             case .schoolRun:
-                // School Run Dashboard view
-                SchoolRunDashboardView()
+                // School Run main view
+                SchoolRunView()
                 
             case .homeLife:
                 // HomeLife navigation hub
@@ -323,7 +323,7 @@ struct MainNavigationView: View {
                 .environmentObject(appState)
             
         case .schoolRun:
-            SchoolRunDashboardView()
+            SchoolRunView()
                 .environmentObject(appState)
             
         case .homeLife:
@@ -360,7 +360,7 @@ struct MainNavigationView: View {
         if authService.isAuthenticated {
             switch route {
         case .dashboard:
-            SchoolRunDashboardView()
+            SchoolRunView()
                 .environmentObject(appState)
             
         case .scheduleNew:

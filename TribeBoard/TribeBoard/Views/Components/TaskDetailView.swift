@@ -279,7 +279,7 @@ struct TaskDetailView: View {
             
             // Map placeholder
             SchoolRunMapPlaceholder(
-                currentStop: RunStop(name: location.name, type: .custom, task: "Shopping", estimatedMinutes: 15),
+                currentStop: RunStop(name: location.name, time: Date(), note: "Shopping", type: .pickup),
                 showCurrentLocation: true,
                 mapStyle: .thumbnail
             )

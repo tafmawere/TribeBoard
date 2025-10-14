@@ -34,7 +34,7 @@ class PrototypeUtilities: ObservableObject {
     @MainActor
     func switchDemoScenario(to scenario: DemoScenario) {
         demoScenario = scenario
-        ToastManager.shared.info("🎭 Switched to: \(scenario.description)")
+        ToastManager.shared.info("🎭 Switched to: \(scenario.displayName)")
         HapticManager.shared.lightImpact()
     }
     

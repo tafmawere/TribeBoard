@@ -5,9 +5,14 @@ import SwiftUI
 /// View for joining an existing family using family code or QR scan
 struct JoinFamilyView: View {
     @StateObject private var viewModel: JoinFamilyViewModel
-    @StateObject private var validationPublisher = ValidationPublisher()
     @EnvironmentObject private var appState: AppState
     @FocusState private var isCodeFieldFocused: Bool
+    
+    // Responsive design environment values
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     
     init() {
         // Initialize with enhanced ViewModel using in-memory data manager
@@ -16,100 +21,100 @@ struct JoinFamilyView: View {
         ))
     }
     
+    // Computed properties for responsive design
+    private var isCompactLayout: Bool {
+        horizontalSizeClass == .compact || verticalSizeClass == .compact
+    }
+    
+    private var contentSpacing: CGFloat {
+        let baseSpacing = BrandStyle.paddingLarge
+        let scaleFactor = min(dynamicTypeSize.customScaleFactor, 1.4)
+        return isCompactLayout ? baseSpacing * 0.8 * scaleFactor : baseSpacing * scaleFactor
+    }
+    
+    private var horizontalPadding: CGFloat {
+        let basePadding = BrandStyle.paddingLarge
+        let compactFactor = isCompactLayout ? 0.8 : 1.0
+        return basePadding * compactFactor
+    }
+    
+    private var verticalPadding: CGFloat {
+        let basePadding = BrandStyle.paddingLarge
+        let scaleFactor = min(dynamicTypeSize.customScaleFactor, 1.3)
+        return isCompactLayout ? basePadding * 0.6 * scaleFactor : basePadding * scaleFactor
+    }
+    
     var body: some View {
         NavigationStack {
-            GeometryReader { geometry in
-                ZStack {
-                    // Background gradient
-                    LinearGradient.brandGradientSubtle
-                        .ignoresSafeArea()
-                    
-                    ScrollView {
-                        VStack(spacing: 32) {
-                            Spacer(minLength: geometry.size.height * 0.05)
-                            
-                            // Header section
-                            VStack(spacing: 16) {
-                                Text("Join Family")
-                                    .font(.largeTitle)
-                                    .fontWeight(.bold)
-                                    .foregroundColor(.primary)
-                                    .accessibilityAddTraits([.isHeader])
-                                
-                                Text("Enter your family code or scan the QR code to join an existing family")
-                                    .font(.body)
-                                    .foregroundColor(.secondary)
-                                    .multilineTextAlignment(.center)
-                                    .padding(.horizontal, 20)
-                                    .accessibilityLabel("Enter your family code or scan the QR code to join an existing family")
-                            }
-                            .accessibilityElement(children: .combine)
-                            .accessibilityLabel("Join Family screen. Enter your family code or scan the QR code to join an existing family")
-                        
-                        // Input section
-                        VStack(spacing: 24) {
-                            // Family code input
-                            FamilyCodeInputSection(
-                                familyCode: $viewModel.familyCode,
-                                isCodeFieldFocused: $isCodeFieldFocused,
-                                isValidFormat: viewModel.isValidCode,
-                                canSearch: viewModel.canSearch,
-                                isSearching: viewModel.isSearching,
-                                onSearch: {
-                                    Task {
-                                        await viewModel.searchFamily(by: viewModel.familyCode)
-                                    }
+            ZStack {
+                // Light system background (replacing gradient)
+                Color(.systemGroupedBackground)
+                    .ignoresSafeArea()
+                
+                ScrollView {
+                    VStack(spacing: contentSpacing) {
+                        // Family Code Card Section
+                        FamilyCodeCard(
+                            familyCode: $viewModel.familyCode,
+                            isCodeFieldFocused: $isCodeFieldFocused,
+                            isValidFormat: viewModel.isValidCode,
+                            canSearch: viewModel.canSearch,
+                            isSearching: viewModel.isSearching,
+                            onSearch: {
+                                Task {
+                                    await viewModel.searchFamily(by: viewModel.familyCode)
                                 }
-                            )
-                            
-                            // Divider with "OR"
-                            HStack {
-                                Rectangle()
-                                    .fill(Color.secondary.opacity(0.3))
-                                    .frame(height: 1)
-                                
-                                Text("OR")
-                                    .font(.caption)
-                                    .fontWeight(.medium)
-                                    .foregroundColor(.secondary)
-                                    .padding(.horizontal, 16)
-                                
-                                Rectangle()
-                                    .fill(Color.secondary.opacity(0.3))
-                                    .frame(height: 1)
-                            }
-                            .padding(.horizontal, 40)
-                            
-                            // QR scan button
-                            QRScanButton(
-                                isScanning: viewModel.isSearching,
-                                onScan: {
-                                    isCodeFieldFocused = false
-                                    Task {
-                                        await viewModel.handleScannedCode("DEMO123") // Placeholder for QR scanning
-                                    }
+                            },
+                            validationMessage: viewModel.codeValidationMessage,
+                            showInlineError: !viewModel.familyCode.isEmpty && !viewModel.isValidCode && !isCodeFieldFocused
+                        )
+                        
+                        // Divider with "or" text
+                        OrDivider()
+                        
+                        // QR Code Section
+                        QRCodeScanSection(
+                            isScanning: viewModel.isSearching,
+                            onScan: {
+                                isCodeFieldFocused = false
+                                Task {
+                                    await viewModel.handleScannedCode("DEMO12") // Placeholder for QR scanning
                                 }
-                            )
-                        }
-                        .padding(.horizontal, 20)
+                            },
+                            errorMessage: viewModel.currentError?.localizedDescription,
+                            showError: viewModel.currentError != nil && !viewModel.showErrorAlert
+                        )
                         
-                        // Error message with enhanced styling
-                        if let errorMessage = viewModel.errorMessage {
-                            InlineErrorView(message: errorMessage) {
-                                viewModel.clearError()
-                            }
-                            .padding(.horizontal, 20)
-                        }
+                        Spacer()
                         
-                        Spacer(minLength: geometry.size.height * 0.1)
+                        // Instructional footer
+                        InstructionalFooter()
                     }
-                    .padding(.vertical, 20)
+                    .padding(.horizontal, horizontalPadding)
+                    .padding(.vertical, verticalPadding)
+                }
+                
+                // Global error message with enhanced styling for card layout
+                if let errorMessage = viewModel.errorMessage, viewModel.showErrorAlert == false {
+                    VStack {
+                        Spacer()
+                        CardLayoutErrorView(message: errorMessage) {
+                            HapticManager.shared.lightImpact()
+                            EnhancedAccessibility.announce("Error message dismissed")
+                            viewModel.clearError()
+                        }
+                        .padding(.horizontal, horizontalPadding)
+                        .padding(.bottom, verticalPadding)
+                    }
                 }
             }
         }
             .navigationTitle("Join Family")
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarTitleDisplayMode(isCompactLayout ? .inline : .large)
             .navigationBarBackButtonHidden(false)
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel("Join Family Screen")
+            .accessibilityHint("Choose between entering a family code or scanning a QR code to join an existing family")
             .confirmationDialog(
                 "Join Family",
                 isPresented: $viewModel.showConfirmation,
@@ -121,6 +126,7 @@ struct JoinFamilyView: View {
                     isJoining: viewModel.isJoining,
                     onJoin: {
                         HapticManager.shared.selection()
+                        EnhancedAccessibility.announce("Joining family")
                         Task {
                             await viewModel.joinFamily(with: appState)
                             // Navigation is handled by the view model
@@ -129,26 +135,42 @@ struct JoinFamilyView: View {
                     },
                     onCancel: {
                         HapticManager.shared.lightImpact()
+                        EnhancedAccessibility.announce("Family join cancelled")
                         viewModel.cancelJoin()
                     }
                 )
             }
             .alert("Error Joining Family", isPresented: $viewModel.showErrorAlert) {
                 Button("OK") {
+                    HapticManager.shared.lightImpact()
+                    EnhancedAccessibility.announce("Error alert dismissed")
                     viewModel.clearError()
                 }
-                Button("Try Again") {
-                    Task {
-                        await viewModel.searchFamily(by: viewModel.familyCode)
+                if viewModel.currentError?.isRetryable == true {
+                    Button("Try Again") {
+                        HapticManager.shared.selection()
+                        EnhancedAccessibility.announce("Retrying family search")
+                        Task {
+                            await viewModel.searchFamily(by: viewModel.familyCode)
+                        }
                     }
                 }
             } message: {
                 if let error = viewModel.currentError {
-                    Text(error.localizedDescription)
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(error.localizedDescription)
+                        if let recoverySuggestion = error.recoverySuggestion {
+                            Text(recoverySuggestion)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
                 }
             }
             .alert("Success!", isPresented: $viewModel.showSuccessAlert) {
                 Button("Continue") {
+                    HapticManager.shared.success()
+                    EnhancedAccessibility.announce("Successfully joined family. Continuing to role selection.")
                     viewModel.showSuccessAlert = false
                     appState.navigateTo(.roleSelection)
                 }
@@ -157,125 +179,18 @@ struct JoinFamilyView: View {
             }
             .onAppear {
                 viewModel.reset()
-                // Set up real-time validation
-                validationPublisher.setupFamilyCodeValidation(for: viewModel.$familyCode)
+                
+                // Announce screen appearance for accessibility
+                EnhancedAccessibility.announceScreenChange()
+                EnhancedAccessibility.announce("Join Family screen. Choose between entering a family code or scanning a QR code.")
             }
             .withToast()
-            .accessibilityElement(children: .contain)
-            .accessibilityLabel("Join Family Screen")
-        }
     }
 }
 
-// MARK: - Family Code Input Section
 
-struct FamilyCodeInputSection: View {
-    @Binding var familyCode: String
-    @FocusState.Binding var isCodeFieldFocused: Bool
-    let isValidFormat: Bool
-    let canSearch: Bool
-    let isSearching: Bool
-    let onSearch: () -> Void
-    
-    var body: some View {
-        VStack(spacing: 16) {
-            // Input field
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Family Code")
-                    .font(.headline)
-                    .foregroundColor(.primary)
-                    .accessibilityAddTraits([.isHeader])
-                
-                HStack {
-                    TextField("Enter family code", text: $familyCode)
-                        .textFieldStyle(CustomTextFieldStyle())
-                        .textInputAutocapitalization(.characters)
-                        .autocorrectionDisabled()
-                        .focused($isCodeFieldFocused)
-                        .validation(ValidationRules.validateFamilyCode(familyCode), showValidation: !familyCode.isEmpty)
-                        .onSubmit {
-                            if canSearch {
-                                HapticManager.shared.selection()
-                                onSearch()
-                            }
-                        }
-                        .accessibilityLabel("Family code")
-                        .accessibilityHint("Enter the 6-character family code to join a family")
-                        .accessibilityValue(familyCode.isEmpty ? "Empty" : familyCode)
-                    
-                    // Search button
-                    Button(action: {
-                        HapticManager.shared.selection()
-                        onSearch()
-                    }) {
-                        Group {
-                            if isSearching {
-                                ProgressView()
-                                    .scaleEffect(0.8)
-                                    .accessibilityLabel("Searching")
-                            } else {
-                                Image(systemName: "magnifyingglass")
-                                    .accessibilityLabel("Search")
-                            }
-                        }
-                        .frame(width: 20, height: 20)
-                    }
-                    .disabled(!canSearch)
-                    .foregroundColor(canSearch ? .brandPrimary : .secondary)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(Color(.systemGray6))
-                    )
-                    .accessibilityLabel("Search for family")
-                    .accessibilityHint(canSearch ? "Searches for a family with the entered code" : "Enter a valid family code to search")
-                    .accessibilityAddTraits(canSearch ? [] : [.isButton])
-                }
-                
-                // Validation feedback is now handled by the validation modifier
-            }
-        }
-        .accessibilityElement(children: .contain)
-    }
-}
 
-// MARK: - QR Scan Button
 
-struct QRScanButton: View {
-    let isScanning: Bool
-    let onScan: () -> Void
-    
-    var body: some View {
-        Button(action: onScan) {
-            HStack(spacing: 12) {
-                if isScanning {
-                    ProgressView()
-                        .scaleEffect(0.9)
-                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                } else {
-                    Image(systemName: "qrcode.viewfinder")
-                        .font(.title2)
-                }
-                
-                Text(isScanning ? "Scanning..." : "Scan QR Code")
-                    .font(.headline)
-                    .fontWeight(.semibold)
-            }
-            .foregroundColor(.white)
-            .frame(maxWidth: .infinity)
-            .frame(height: 56)
-            .background(
-                LinearGradient.brandGradient
-                    .opacity(isScanning ? 0.7 : 1.0)
-            )
-            .cornerRadius(BrandStyle.cornerRadius)
-        }
-        .disabled(isScanning)
-        .scaleEffect(isScanning ? 0.98 : 1.0)
-        .animation(.easeInOut(duration: 0.1), value: isScanning)
-    }
-}
 
 // MARK: - Family Confirmation Dialog
 
@@ -303,41 +218,7 @@ struct FamilyConfirmationDialog: View {
     }
 }
 
-// MARK: - Error Message View
 
-struct ErrorMessageView: View {
-    let message: String
-    let onDismiss: () -> Void
-    
-    var body: some View {
-        HStack {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundColor(.red)
-            
-            Text(message)
-                .font(.subheadline)
-                .foregroundColor(.red)
-                .multilineTextAlignment(.leading)
-            
-            Spacer()
-            
-            Button("Dismiss") {
-                onDismiss()
-            }
-            .font(.caption)
-            .foregroundColor(.red)
-        }
-        .padding()
-        .background(
-            RoundedRectangle(cornerRadius: BrandStyle.cornerRadius)
-                .fill(Color.red.opacity(0.1))
-                .overlay(
-                    RoundedRectangle(cornerRadius: BrandStyle.cornerRadius)
-                        .stroke(Color.red.opacity(0.3), lineWidth: 1)
-                )
-        )
-    }
-}
 
 // MARK: - Preview
 

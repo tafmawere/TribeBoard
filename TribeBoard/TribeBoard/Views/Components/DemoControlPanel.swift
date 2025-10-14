@@ -275,10 +275,14 @@ struct DemoControlPanel: View {
         
         do {
             // Get the data service from app state
-            let dataService = appState.dataService
+            guard let dataService = appState.mockServices?.dataService else {
+                sampleDataMessage = "Data service not available"
+                isGeneratingSampleData = false
+                return
+            }
             
             // Create sample family data generator
-            let generator = SampleFamilyDataGenerator(dataService: dataService)
+            let generator = SampleFamilyDataGenerator(mockDataService: dataService)
             
             // Generate sample families
             let generatedFamilies = try await generator.generateSampleFamilies()
@@ -379,7 +383,7 @@ struct DemoScenarioCard: View {
                 }
                 
                 if !isCompact {
-                    Text(scenario.description)
+                    Text(scenario.displayName)
                         .font(.body)
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.leading)

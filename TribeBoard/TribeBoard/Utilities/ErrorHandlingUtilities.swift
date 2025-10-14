@@ -469,7 +469,7 @@ struct ErrorHandlingUtilities {
 // MARK: - Supporting Types
 
 /// Error categories for classification
-enum ErrorCategory: String {
+enum ErrorCategory: String, CaseIterable {
     case validation
     case network
     case authentication
@@ -479,6 +479,7 @@ enum ErrorCategory: String {
     case cloudKit
     case codeGeneration
     case localDatabase
+    case state
 }
 
 /// Error priority levels

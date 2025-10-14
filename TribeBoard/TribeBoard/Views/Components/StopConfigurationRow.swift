@@ -316,6 +316,7 @@ private struct ChildSelectionSheet: View {
         StopConfigurationRow(
             stop: .constant(RunStop(
                 name: "Home",
+                time: Date(),
                 type: .home,
                 task: "Get ready to go",
                 estimatedMinutes: 5
@@ -329,10 +330,11 @@ private struct ChildSelectionSheet: View {
         StopConfigurationRow(
             stop: .constant(RunStop(
                 name: "School",
+                time: Date(),
                 type: .school,
-                assignedChild: SchoolRunPreviewProvider.sampleChildren[0],
                 task: "Pick up Emma from classroom 3B",
-                estimatedMinutes: 10
+                estimatedMinutes: 10,
+                assignedChild: SchoolRunPreviewProvider.sampleChildren[0]
             )),
             children: SchoolRunPreviewProvider.sampleChildren,
             stopNumber: 2,
@@ -343,6 +345,7 @@ private struct ChildSelectionSheet: View {
         StopConfigurationRow(
             stop: .constant(RunStop(
                 name: "Grocery Store",
+                time: Date(),
                 type: .custom,
                 task: "Quick grocery run",
                 estimatedMinutes: 15
@@ -356,6 +359,7 @@ private struct ChildSelectionSheet: View {
         StopConfigurationRow(
             stop: .constant(RunStop(
                 name: "",
+                time: Date(),
                 type: .home,
                 task: "",
                 estimatedMinutes: 5
@@ -388,10 +392,11 @@ private struct ChildSelectionSheet: View {
         StopConfigurationRow(
             stop: .constant(RunStop(
                 name: "Riverside Elementary School",
+                time: Date(),
                 type: .school,
-                assignedChild: ChildProfile(name: "Emma-Louise", avatar: "person.circle.fill", age: 8),
                 task: "Pick up Emma-Louise from her classroom and collect her art project from the teacher",
-                estimatedMinutes: 15
+                estimatedMinutes: 15,
+                assignedChild: ChildProfile(name: "Emma-Louise", avatar: "person.circle.fill", age: 8)
             )),
             children: SchoolRunPreviewProvider.sampleChildren,
             stopNumber: 1,

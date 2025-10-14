@@ -22,37 +22,7 @@ struct DestinationInfo {
 }
 
 // MARK: - Run Status Enum
-
-/// Represents the current status of a school run with display properties
-enum RunStatus {
-    case notStarted
-    case inProgress
-    case completed
-    
-    /// Display text for the current run status
-    var displayText: String {
-        switch self {
-        case .notStarted:
-            return "Not Started"
-        case .inProgress:
-            return "In Progress"
-        case .completed:
-            return "Completed"
-        }
-    }
-    
-    /// Color associated with the current run status
-    var color: Color {
-        switch self {
-        case .notStarted:
-            return .gray
-        case .inProgress:
-            return Color.brandPrimary
-        case .completed:
-            return .green
-        }
-    }
-}
+// Note: RunStatus enum is now defined in RunStatus.swift for the comprehensive school run scheduler
 
 // MARK: - Static Data Container
 
@@ -89,5 +59,5 @@ struct SchoolRunUIData {
     ]
     
     /// Default run status
-    static let defaultStatus = RunStatus.notStarted
+    static let defaultStatus = RunStatus.scheduled
 }

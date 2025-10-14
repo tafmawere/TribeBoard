@@ -2,7 +2,7 @@ import SwiftUI
 
 /// NavigationView with List displaying all scheduled runs for browsing
 struct ScheduledRunsListView: View {
-    @StateObject private var runManager = ScheduledSchoolRunManager()
+    @StateObject private var runManager = SchoolRunManager()
     @SafeEnvironmentObject(fallback: { AppState.createFallback() }) private var appState: AppState
     
     // Accessibility environment values
@@ -12,14 +12,14 @@ struct ScheduledRunsListView: View {
     
     var body: some View {
         Group {
-            if runManager.allRunsSorted.isEmpty {
+            if runManager.runs.isEmpty {
                 EmptyStateView.noSchoolRuns(onAddRun: {
                     HapticManager.shared.lightImpact()
                     safeNavigate(to: .scheduleNew)
                 })
             } else {
                 List {
-                    ForEach(runManager.allRunsSorted) { run in
+                    ForEach(runManager.runs.sorted { $0.date < $1.date }) { run in
                         Button(action: {
                             HapticManager.shared.lightImpact()
                             safeNavigate(to: .runDetail(run))
@@ -29,7 +29,7 @@ struct ScheduledRunsListView: View {
                         .buttonStyle(PlainButtonStyle())
                         .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
                         .listRowSeparator(.hidden)
-                        .accessibilityLabel("Scheduled run: \(run.name)")
+                        .accessibilityLabel("Scheduled run: \(run.title)")
                         .accessibilityHint("Tap to view details of this run")
                         .accessibilityAddTraits(.isButton)
                     }
@@ -104,7 +104,7 @@ struct ScheduledRunsListView: View {
             print("📝 User attempted to schedule new run - fallback mode active")
             // Could show a toast: "Please restart the app to schedule new runs"
         case .runDetail(let run):
-            print("👁️ User attempted to view run details for: \(run.name) - fallback mode active")
+            print("👁️ User attempted to view run details for: \(run.title) - fallback mode active")
             // Could show a toast: "Please restart the app to view run details"
         default:
             print("🔄 Navigation attempted in fallback mode for: \(route)")
@@ -156,7 +156,7 @@ struct ScheduledRunsListView: View {
 
 /// Component showing run name, day/time, and stop count in a clean row format
 struct RunListRowView: View {
-    let run: ScheduledSchoolRun
+    let run: SchoolRun
     
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.colorSchemeContrast) private var colorSchemeContrast
@@ -181,7 +181,7 @@ struct RunListRowView: View {
             // Main content
             VStack(alignment: .leading, spacing: DesignSystem.Spacing.xs) {
                 // Run name
-                Text(run.name)
+                Text(run.title)
                     .titleMedium()
                     .foregroundColor(.primary)
                     .lineLimit(1)
@@ -219,7 +219,7 @@ struct RunListRowView: View {
                             .font(.caption)
                             .foregroundColor(.brandSecondary)
                         
-                        Text("\(run.stops.count) stops")
+                        Text("\(run.route.count) stops")
                             .labelSmall()
                             .foregroundColor(.secondary)
                     }
@@ -237,7 +237,7 @@ struct RunListRowView: View {
                     Spacer()
                     
                     // Status badge
-                    if run.isCompleted {
+                    if run.status == .completed {
                         HStack(spacing: DesignSystem.Spacing.xs) {
                             Image(systemName: "checkmark.circle.fill")
                                 .font(.caption)
@@ -285,7 +285,7 @@ struct RunListRowView: View {
     // MARK: - Computed Properties
     
     private var statusColor: Color {
-        if run.isCompleted {
+        if run.status == .completed {
             return .green
         } else if isUpcoming {
             return .brandPrimary
@@ -296,20 +296,20 @@ struct RunListRowView: View {
     
     private var isUpcoming: Bool {
         let now = Date()
-        return !run.isCompleted && 
-               Calendar.current.compare(run.scheduledDate, to: now, toGranularity: .day) != .orderedAscending
+        return run.status != .completed && 
+               Calendar.current.compare(run.date, to: now, toGranularity: .day) != .orderedAscending
     }
     
     private var formattedDate: String {
         let formatter = DateFormatter()
         formatter.dateFormat = "MMM d"
-        return formatter.string(from: run.scheduledDate)
+        return formatter.string(from: run.date)
     }
     
     private var formattedTime: String {
         let formatter = DateFormatter()
         formatter.timeStyle = .short
-        return formatter.string(from: run.scheduledTime)
+        return formatter.string(from: run.date)
     }
     
     private var formattedDuration: String {
@@ -325,8 +325,8 @@ struct RunListRowView: View {
     }
     
     private var accessibilityLabel: String {
-        let status = run.isCompleted ? "Completed" : (isUpcoming ? "Upcoming" : "Past")
-        return "\(status) run: \(run.name), \(formattedDate) at \(formattedTime), \(run.stops.count) stops, \(formattedDuration) duration"
+        let status = run.status == .completed ? "Completed" : (isUpcoming ? "Upcoming" : "Past")
+        return "\(status) run: \(run.title), \(formattedDate) at \(formattedTime), \(run.route.count) stops, \(formattedDuration) duration"
     }
 }
 

@@ -355,6 +355,12 @@ extension DynamicTypeSize {
         @unknown default: return 1.0
         }
     }
+    
+    var customScaleFactor: CGFloat {
+        return scaleFactor
+    }
+    
+
 }
 
 // MARK: - Accessibility-Enhanced Components
@@ -584,6 +590,79 @@ extension Color {
         return ratio >= 4.5 ? self : .primary
     }
 }
+
+// MARK: - School Run Specific Accessibility Extensions
+
+extension View {
+    /// Add run card accessibility
+    func runCardAccessibility(run: SchoolRun) -> some View {
+        self
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("School run: \(run.title)")
+            .accessibilityHint("Tap to view run details")
+            .accessibilityValue("\(run.status.displayText), \(run.totalStops) stops, scheduled for \(run.formattedDate)")
+            .accessibilityAddTraits([.isButton])
+    }
+    
+    /// Add stop row accessibility
+    func stopRowAccessibility(stop: RunStop, index: Int? = nil) -> some View {
+        let indexText = index.map { "Stop \($0 + 1): " } ?? ""
+        
+        return self
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("\(indexText)\(stop.name)")
+            .accessibilityHint("Tap to view stop details")
+            .accessibilityValue("\(stop.type.displayName) at \(stop.formattedTime)\(stop.isCompleted ? ", completed" : "")")
+            .accessibilityAddTraits([.isButton])
+    }
+    
+    /// Add status badge accessibility
+    func statusBadgeAccessibility(status: RunStatus) -> some View {
+        self
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Status: \(status.displayText)")
+            .accessibilityAddTraits([.isStaticText])
+    }
+    
+    /// Add action button accessibility
+    func actionButtonAccessibility(
+        action: String,
+        isEnabled: Bool = true,
+        isDestructive: Bool = false
+    ) -> some View {
+        var traits: AccessibilityTraits = [.isButton]
+        
+        return self
+            .accessibilityLabel(action)
+            .accessibilityHint(isEnabled ? "Tap to \(action.lowercased())" : "Button is disabled")
+            .accessibilityAddTraits(traits)
+            .accessibleTouchTarget()
+    }
+    
+    /// Add School Run rotor support
+    func schoolRunRotor(runs: [SchoolRun], onSelection: @escaping (SchoolRun) -> Void) -> some View {
+        self.accessibilityRotor("School Runs") {
+            ForEach(runs) { run in
+                AccessibilityRotorEntry(run.title, id: run.id) {
+                    onSelection(run)
+                }
+            }
+        }
+    }
+    
+    /// Add stops rotor support
+    func stopsRotor(stops: [RunStop], onSelection: @escaping (RunStop) -> Void) -> some View {
+        self.accessibilityRotor("Stops") {
+            ForEach(Array(stops.enumerated()), id: \.element.id) { index, stop in
+                AccessibilityRotorEntry("Stop \(index + 1): \(stop.name)", id: stop.id) {
+                    onSelection(stop)
+                }
+            }
+        }
+    }
+}
+
+
 
 // MARK: - Preview
 

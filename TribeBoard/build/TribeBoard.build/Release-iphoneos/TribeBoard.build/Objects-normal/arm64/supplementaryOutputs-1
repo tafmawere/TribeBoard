@@ -1,0 +1,12 @@
+{
+  "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/TribeBoard/Models/ChildProfile.swift" : {
+    "abi-baseline-json" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/TribeBoard.build/Release-iphoneos/TribeBoard.build/Objects-normal/arm64/TribeBoard.abi.json",
+    "const-values" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/TribeBoard.build/Release-iphoneos/TribeBoard.build/Objects-normal/arm64/TribeBoard-primary.swiftconstvalues",
+    "dependencies" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/TribeBoard.build/Release-iphoneos/TribeBoard.build/Objects-normal/arm64/TribeBoard-primary.d",
+    "diagnostics" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/TribeBoard.build/Release-iphoneos/TribeBoard.build/Objects-normal/arm64/TribeBoard-primary.dia",
+    "objc-header" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/TribeBoard.build/Release-iphoneos/TribeBoard.build/Objects-normal/arm64/TribeBoard-Swift.h",
+    "swiftdoc" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/TribeBoard.build/Release-iphoneos/TribeBoard.build/Objects-normal/arm64/TribeBoard.swiftdoc",
+    "swiftmodule" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/TribeBoard.build/Release-iphoneos/TribeBoard.build/Objects-normal/arm64/TribeBoard.swiftmodule",
+    "swiftsourceinfo" : "/Users/tafmawere/Projects Kiro/TribeBoard/TribeBoard/TribeBoard/build/TribeBoard.build/Release-iphoneos/TribeBoard.build/Objects-normal/arm64/TribeBoard.swiftsourceinfo"
+  }
+}

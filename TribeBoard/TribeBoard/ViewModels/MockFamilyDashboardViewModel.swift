@@ -290,8 +290,8 @@ class MockFamilyDashboardViewModel: ObservableObject {
         
         // Get today's school runs
         todaysSchoolRuns = roleSpecificData.schoolRuns
-            .filter { calendar.isDate($0.pickupTime, inSameDayAs: today) }
-            .sorted { $0.pickupTime < $1.pickupTime }
+            .filter { calendar.isDate($0.date, inSameDayAs: today) }
+            .sorted { $0.date < $1.date }
     }
     
     /// Update activity summary with current data

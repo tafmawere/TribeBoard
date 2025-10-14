@@ -180,11 +180,13 @@ struct StopDetailRow: View {
             totalStops: 6,
             stop: RunStop(
                 name: "OT Clinic",
+                time: Date(),
+                note: "Therapy session",
                 type: .ot,
-                assignedChild: SchoolRunPreviewProvider.sampleChildren[0],
+                isCompleted: true,
                 task: "Drop Emma for therapy session",
                 estimatedMinutes: 15,
-                isCompleted: true
+                assignedChild: SchoolRunPreviewProvider.sampleChildren[0]
             )
         )
         
@@ -201,6 +203,8 @@ struct StopDetailRow: View {
             totalStops: 6,
             stop: RunStop(
                 name: "Grocery Store",
+                time: Date(),
+                note: "Quick stop",
                 type: .custom,
                 task: "Quick grocery run",
                 estimatedMinutes: 20
@@ -237,10 +241,12 @@ struct StopDetailRow: View {
             totalStops: 3,
             stop: RunStop(
                 name: "Home",
+                time: Date(),
+                note: "Final destination",
                 type: .home,
+                isCompleted: true,
                 task: "Return home safely",
-                estimatedMinutes: 10,
-                isCompleted: true
+                estimatedMinutes: 10
             )
         )
     }
@@ -256,10 +262,12 @@ struct StopDetailRow: View {
             totalStops: 2,
             stop: RunStop(
                 name: "Riverside Elementary School",
+                time: Date(),
+                note: "School pickup",
                 type: .school,
-                assignedChild: ChildProfile(name: "Emma-Louise", avatar: "person.circle.fill", age: 8),
                 task: "Pick up Emma-Louise from her classroom and collect her art project from the teacher. Make sure to check with the office about the field trip permission slip.",
-                estimatedMinutes: 15
+                estimatedMinutes: 15,
+                assignedChild: ChildProfile(name: "Emma-Louise", avatar: "person.circle.fill", age: 8)
             )
         )
     }
@@ -281,11 +289,13 @@ struct StopDetailRow: View {
             totalStops: 3,
             stop: RunStop(
                 name: "Music Academy",
+                time: Date(),
+                note: "Piano lesson",
                 type: .music,
-                assignedChild: SchoolRunPreviewProvider.sampleChildren[1],
+                isCompleted: true,
                 task: "Drop off for piano lesson",
                 estimatedMinutes: 15,
-                isCompleted: true
+                assignedChild: SchoolRunPreviewProvider.sampleChildren[1]
             )
         )
     }

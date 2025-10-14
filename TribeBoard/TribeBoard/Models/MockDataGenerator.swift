@@ -165,42 +165,11 @@ struct NoticeboardPost {
     }
 }
 
-/// School run data for prototype
-struct SchoolRun: Codable {
-    let id: UUID
-    let route: String
-    let pickupTime: Date
-    let dropoffTime: Date
-    let driver: UUID
-    let passengers: [UUID]
-    let status: RunStatus
-    let notes: String?
-    
-    enum RunStatus: String, CaseIterable, Codable {
-        case scheduled = "scheduled"
-        case inProgress = "in_progress"
-        case completed = "completed"
-        case cancelled = "cancelled"
-        
-        var displayName: String {
-            switch self {
-            case .scheduled: return "Scheduled"
-            case .inProgress: return "In Progress"
-            case .completed: return "Completed"
-            case .cancelled: return "Cancelled"
-            }
-        }
-        
-        var color: String {
-            switch self {
-            case .scheduled: return "blue"
-            case .inProgress: return "orange"
-            case .completed: return "green"
-            case .cancelled: return "red"
-            }
-        }
-    }
-}
+// Note: SchoolRun and RunStatus types are now defined in their own dedicated files:
+// - SchoolRun.swift
+// - RunStatus.swift
+// - RunStop.swift
+// This provides a more comprehensive implementation for the school run scheduler feature.
 
 /// Family settings for prototype
 struct FamilySettings {
@@ -230,6 +199,81 @@ struct SchoolRunNotification {
         case delayed
     }
 }
+
+/// Demo scenario types for different user experiences
+enum DemoScenario: String, CaseIterable {
+    case newUserOnboarding = "new_user_onboarding"
+    case existingUserLogin = "existing_user_login"
+    case familyAdminTasks = "family_admin_tasks"
+    case childUserExperience = "child_user_experience"
+    case completeFeatureTour = "complete_feature_tour"
+    case homeLifeMealPlanning = "home_life_meal_planning"
+    case homeLifeGroceryShopping = "home_life_grocery_shopping"
+    case homeLifeTaskManagement = "home_life_task_management"
+    case homeLifeCompleteWorkflow = "home_life_complete_workflow"
+    
+    var displayName: String {
+        switch self {
+        case .newUserOnboarding: return "New User Onboarding"
+        case .existingUserLogin: return "Existing User Login"
+        case .familyAdminTasks: return "Family Admin Tasks"
+        case .childUserExperience: return "Child User Experience"
+        case .completeFeatureTour: return "Complete Feature Tour"
+        case .homeLifeMealPlanning: return "Home Life - Meal Planning"
+        case .homeLifeGroceryShopping: return "Home Life - Grocery Shopping"
+        case .homeLifeTaskManagement: return "Home Life - Task Management"
+        case .homeLifeCompleteWorkflow: return "Home Life - Complete Workflow"
+        }
+    }
+    
+    var estimatedDuration: TimeInterval {
+        switch self {
+        case .newUserOnboarding: return 5 * 60 // 5 minutes
+        case .existingUserLogin: return 2 * 60 // 2 minutes
+        case .familyAdminTasks: return 8 * 60 // 8 minutes
+        case .childUserExperience: return 4 * 60 // 4 minutes
+        case .completeFeatureTour: return 15 * 60 // 15 minutes
+        case .homeLifeMealPlanning: return 6 * 60 // 6 minutes
+        case .homeLifeGroceryShopping: return 7 * 60 // 7 minutes
+        case .homeLifeTaskManagement: return 5 * 60 // 5 minutes
+        case .homeLifeCompleteWorkflow: return 20 * 60 // 20 minutes
+        }
+    }
+}
+
+/// Comprehensive demo showcase data structure
+struct DemoShowcaseData {
+    let family: Family
+    let users: [UserProfile]
+    let memberships: [Membership]
+    let calendarEvents: [CalendarEvent]
+    let tasks: [FamilyTask]
+    let messages: [FamilyMessage]
+    let noticeboardPosts: [NoticeboardPost]
+    let schoolRuns: [SchoolRun]
+    let settings: FamilySettings
+}
+
+/// Demo scenario data structure
+struct DemoScenarioData {
+    let family: Family
+    let users: [UserProfile]
+    let memberships: [Membership]
+    let currentUser: UserProfile
+    let calendarEvents: [CalendarEvent]
+    let tasks: [FamilyTask]
+    let messages: [FamilyMessage]
+    let schoolRuns: [SchoolRun]
+}
+
+/// Demo reset data structure
+struct DemoResetData {
+    let shouldClearUserData: Bool
+    let shouldResetToOnboarding: Bool
+    let shouldClearNotifications: Bool
+    let defaultScenario: DemoScenario
+}
+
 
 /// Mock error data structure for prototype
 struct MockErrorData {
@@ -471,7 +515,8 @@ struct MockDataGenerator {
             let filteredEvents = allEvents.filter { $0.participants.contains(childUserId) || $0.type == .familyActivity }
             let filteredTasks = allTasks.filter { $0.assignedTo == childUserId }
             let filteredMessages = allMessages.filter { $0.type != .announcement || $0.sender == childUserId }
-            let filteredSchoolRuns = allSchoolRuns.filter { $0.passengers.contains(childUserId) }
+            // Note: Filtering school runs by passengers not implemented in new structure
+            let filteredSchoolRuns = allSchoolRuns
             
             return (filteredEvents, filteredTasks, filteredMessages, filteredSchoolRuns)
             
@@ -790,6 +835,576 @@ struct MockDataGenerator {
         ]
     }
     
+    // MARK: - School Run Mock Data
+    
+    /// Generates comprehensive mock school runs with diverse scenarios
+    static func mockSchoolRuns() -> [SchoolRun] {
+        let calendar = Calendar.current
+        let today = Date()
+        
+        var runs: [SchoolRun] = []
+        
+        // Today's runs
+        runs.append(contentsOf: mockTodaysRuns(baseDate: today))
+        
+        // Upcoming runs
+        runs.append(contentsOf: mockUpcomingRuns(baseDate: today))
+        
+        // Completed runs
+        runs.append(contentsOf: mockCompletedRuns(baseDate: today))
+        
+        // Edge cases
+        runs.append(contentsOf: mockEdgeCaseRuns(baseDate: today))
+        
+        return runs
+    }
+    
+    /// Generates today's school runs with various statuses
+    static func mockTodaysRuns(baseDate: Date = Date()) -> [SchoolRun] {
+        let calendar = Calendar.current
+        
+        return [
+            // Morning run - in progress
+            SchoolRun(
+                id: UUID(),
+                title: "Morning School Drop-off",
+                date: calendar.date(bySettingHour: 8, minute: 0, second: 0, of: baseDate)!,
+                route: [
+                    RunStop(
+                        name: "Home",
+                        time: calendar.date(bySettingHour: 8, minute: 0, second: 0, of: baseDate)!,
+                        note: "Pick up Ethan and Zoe",
+                        type: .pickup,
+                        isCompleted: true,
+                        task: "Pick up Ethan and Zoe",
+                        estimatedMinutes: 5
+                    ),
+                    RunStop(
+                        name: "Greenwood Elementary",
+                        time: calendar.date(bySettingHour: 8, minute: 15, second: 0, of: baseDate)!,
+                        note: "Drop off Zoe",
+                        type: .dropoff,
+                        isCompleted: true,
+                        task: "Drop off Zoe",
+                        estimatedMinutes: 10
+                    ),
+                    RunStop(
+                        name: "Riverside Middle School",
+                        time: calendar.date(bySettingHour: 8, minute: 30, second: 0, of: baseDate)!,
+                        note: "Drop off Ethan",
+                        type: .dropoff,
+                        isCompleted: false,
+                        task: "Drop off Ethan",
+                        estimatedMinutes: 10
+                    )
+                ],
+                status: .inProgress,
+                createdAt: calendar.date(byAdding: .day, value: -1, to: baseDate)!,
+                estimatedDuration: 30 * 60 // 30 minutes
+            ),
+            
+            // Afternoon pickup - scheduled
+            SchoolRun(
+                id: UUID(),
+                title: "Afternoon School Pickup",
+                date: calendar.date(bySettingHour: 15, minute: 30, second: 0, of: baseDate)!,
+                route: [
+                    RunStop(
+                        name: "Greenwood Elementary",
+                        time: calendar.date(bySettingHour: 15, minute: 30, second: 0, of: baseDate)!,
+                        note: "Pick up Zoe",
+                        type: .pickup,
+                        task: "Pick up Zoe",
+                        estimatedMinutes: 10
+                    ),
+                    RunStop(
+                        name: "Riverside Middle School",
+                        time: calendar.date(bySettingHour: 15, minute: 45, second: 0, of: baseDate)!,
+                        note: "Pick up Ethan",
+                        type: .pickup,
+                        task: "Pick up Ethan",
+                        estimatedMinutes: 10
+                    ),
+                    RunStop(
+                        name: "Home",
+                        time: calendar.date(bySettingHour: 16, minute: 0, second: 0, of: baseDate)!,
+                        note: "Drop off kids",
+                        type: .dropoff,
+                        task: "Drop off kids",
+                        estimatedMinutes: 5
+                    )
+                ],
+                status: .scheduled,
+                createdAt: calendar.date(byAdding: .day, value: -1, to: baseDate)!,
+                estimatedDuration: 30 * 60 // 30 minutes
+            )
+        ]
+    }
+    
+    /// Generates upcoming school runs for the next few days
+    static func mockUpcomingRuns(baseDate: Date = Date()) -> [SchoolRun] {
+        let calendar = Calendar.current
+        
+        return [
+            // Tomorrow's morning run
+            SchoolRun(
+                id: UUID(),
+                title: "Morning School Run",
+                date: calendar.date(byAdding: .day, value: 1, to: baseDate)!,
+                route: mockStandardMorningRoute(for: calendar.date(byAdding: .day, value: 1, to: baseDate)!),
+                status: .scheduled,
+                createdAt: baseDate,
+                estimatedDuration: 35 * 60
+            ),
+            
+            // Day after tomorrow - early dismissal
+            SchoolRun(
+                id: UUID(),
+                title: "Early Dismissal Pickup",
+                date: calendar.date(byAdding: .day, value: 2, to: baseDate)!,
+                route: [
+                    RunStop(
+                        name: "Riverside Middle School",
+                        time: calendar.date(byAdding: .day, value: 2, to: calendar.date(bySettingHour: 13, minute: 0, second: 0, of: baseDate)!)!,
+                        note: "Early dismissal - pick up Ethan",
+                        type: .pickup,
+                        task: "Early dismissal - pick up Ethan",
+                        estimatedMinutes: 10
+                    ),
+                    RunStop(
+                        name: "Greenwood Elementary",
+                        time: calendar.date(byAdding: .day, value: 2, to: calendar.date(bySettingHour: 13, minute: 15, second: 0, of: baseDate)!)!,
+                        note: "Pick up Zoe",
+                        type: .pickup,
+                        task: "Pick up Zoe",
+                        estimatedMinutes: 10
+                    ),
+                    RunStop(
+                        name: "Home",
+                        time: calendar.date(byAdding: .day, value: 2, to: calendar.date(bySettingHour: 13, minute: 30, second: 0, of: baseDate)!)!,
+                        note: "Home for lunch",
+                        type: .dropoff,
+                        task: "Home for lunch",
+                        estimatedMinutes: 5
+                    )
+                ],
+                status: .scheduled,
+                createdAt: baseDate,
+                estimatedDuration: 30 * 60
+            ),
+            
+            // Weekend activity run
+            SchoolRun(
+                id: UUID(),
+                title: "Soccer Practice & Piano Lesson",
+                date: calendar.date(byAdding: .day, value: 5, to: baseDate)!,
+                route: [
+                    RunStop(
+                        name: "Home",
+                        time: calendar.date(byAdding: .day, value: 5, to: calendar.date(bySettingHour: 9, minute: 0, second: 0, of: baseDate)!)!,
+                        note: "Pick up Ethan for soccer",
+                        type: .pickup,
+                        task: "Pick up Ethan for soccer",
+                        estimatedMinutes: 5
+                    ),
+                    RunStop(
+                        name: "Riverside Soccer Fields",
+                        time: calendar.date(byAdding: .day, value: 5, to: calendar.date(bySettingHour: 9, minute: 15, second: 0, of: baseDate)!)!,
+                        note: "Drop off Ethan for practice",
+                        type: .dropoff,
+                        task: "Drop off Ethan for practice",
+                        estimatedMinutes: 10
+                    ),
+                    RunStop(
+                        name: "Home",
+                        time: calendar.date(byAdding: .day, value: 5, to: calendar.date(bySettingHour: 9, minute: 30, second: 0, of: baseDate)!)!,
+                        note: "Pick up Zoe for piano",
+                        type: .pickup,
+                        task: "Pick up Zoe for piano",
+                        estimatedMinutes: 5
+                    ),
+                    RunStop(
+                        name: "Music Academy",
+                        time: calendar.date(byAdding: .day, value: 5, to: calendar.date(bySettingHour: 9, minute: 45, second: 0, of: baseDate)!)!,
+                        note: "Drop off Zoe for lesson",
+                        type: .dropoff,
+                        task: "Drop off Zoe for lesson",
+                        estimatedMinutes: 10
+                    ),
+                    RunStop(
+                        name: "Riverside Soccer Fields",
+                        time: calendar.date(byAdding: .day, value: 5, to: calendar.date(bySettingHour: 10, minute: 30, second: 0, of: baseDate)!)!,
+                        note: "Pick up Ethan",
+                        type: .pickup,
+                        task: "Pick up Ethan",
+                        estimatedMinutes: 5
+                    ),
+                    RunStop(
+                        name: "Music Academy",
+                        time: calendar.date(byAdding: .day, value: 5, to: calendar.date(bySettingHour: 10, minute: 45, second: 0, of: baseDate)!)!,
+                        note: "Pick up Zoe",
+                        type: .pickup,
+                        task: "Pick up Zoe",
+                        estimatedMinutes: 5
+                    ),
+                    RunStop(
+                        name: "Home",
+                        time: calendar.date(byAdding: .day, value: 5, to: calendar.date(bySettingHour: 11, minute: 0, second: 0, of: baseDate)!)!,
+                        note: "Back home",
+                        type: .dropoff,
+                        task: "Back home",
+                        estimatedMinutes: 10
+                    )
+                ],
+                status: .scheduled,
+                createdAt: baseDate,
+                estimatedDuration: 120 * 60 // 2 hours
+            )
+        ]
+    }
+    
+    /// Generates completed school runs from recent past
+    static func mockCompletedRuns(baseDate: Date = Date()) -> [SchoolRun] {
+        let calendar = Calendar.current
+        
+        return [
+            // Yesterday's completed runs
+            SchoolRun(
+                id: UUID(),
+                title: "Morning School Drop-off",
+                date: calendar.date(byAdding: .day, value: -1, to: baseDate)!,
+                route: mockCompletedRoute(for: calendar.date(byAdding: .day, value: -1, to: baseDate)!),
+                status: .completed,
+                createdAt: calendar.date(byAdding: .day, value: -2, to: baseDate)!,
+                estimatedDuration: 30 * 60
+            ),
+            
+            SchoolRun(
+                id: UUID(),
+                title: "Afternoon School Pickup",
+                date: calendar.date(byAdding: .day, value: -1, to: baseDate)!,
+                route: mockCompletedRoute(for: calendar.date(byAdding: .day, value: -1, to: baseDate)!, isAfternoon: true),
+                status: .completed,
+                createdAt: calendar.date(byAdding: .day, value: -2, to: baseDate)!,
+                estimatedDuration: 25 * 60
+            ),
+            
+            // Last week's special run
+            SchoolRun(
+                id: UUID(),
+                title: "Field Trip Pickup",
+                date: calendar.date(byAdding: .day, value: -7, to: baseDate)!,
+                route: [
+                    RunStop(
+                        name: "Science Museum",
+                        time: calendar.date(byAdding: .day, value: -7, to: calendar.date(bySettingHour: 14, minute: 30, second: 0, of: baseDate)!)!,
+                        note: "Pick up Ethan from field trip",
+                        type: .pickup,
+                        isCompleted: true,
+                        task: "Pick up Ethan from field trip",
+                        estimatedMinutes: 15
+                    ),
+                    RunStop(
+                        name: "Home",
+                        time: calendar.date(byAdding: .day, value: -7, to: calendar.date(bySettingHour: 15, minute: 0, second: 0, of: baseDate)!)!,
+                        note: "Drop off at home",
+                        type: .dropoff,
+                        isCompleted: true,
+                        task: "Drop off at home",
+                        estimatedMinutes: 10
+                    )
+                ],
+                status: .completed,
+                createdAt: calendar.date(byAdding: .day, value: -8, to: baseDate)!,
+                estimatedDuration: 30 * 60
+            )
+        ]
+    }
+    
+    /// Generates edge case runs for testing various scenarios
+    static func mockEdgeCaseRuns(baseDate: Date = Date()) -> [SchoolRun] {
+        let calendar = Calendar.current
+        
+        return [
+            // Empty run (no stops)
+            SchoolRun(
+                id: UUID(),
+                title: "Empty Test Run",
+                date: calendar.date(byAdding: .day, value: 3, to: baseDate)!,
+                route: [],
+                status: .scheduled,
+                createdAt: baseDate,
+                estimatedDuration: 0
+            ),
+            
+            // Cancelled run
+            SchoolRun(
+                id: UUID(),
+                title: "Cancelled Doctor Appointment",
+                date: calendar.date(byAdding: .day, value: -2, to: baseDate)!,
+                route: [
+                    RunStop(
+                        name: "Home",
+                        time: calendar.date(byAdding: .day, value: -2, to: calendar.date(bySettingHour: 10, minute: 0, second: 0, of: baseDate)!)!,
+                        note: "Pick up Zoe",
+                        type: .pickup,
+                        task: "Pick up Zoe",
+                        estimatedMinutes: 5
+                    ),
+                    RunStop(
+                        name: "Pediatric Clinic",
+                        time: calendar.date(byAdding: .day, value: -2, to: calendar.date(bySettingHour: 10, minute: 15, second: 0, of: baseDate)!)!,
+                        note: "Doctor appointment",
+                        type: .dropoff,
+                        task: "Doctor appointment",
+                        estimatedMinutes: 60
+                    )
+                ],
+                status: .cancelled,
+                createdAt: calendar.date(byAdding: .day, value: -3, to: baseDate)!,
+                estimatedDuration: 60 * 60
+            ),
+            
+            // Single stop run
+            SchoolRun(
+                id: UUID(),
+                title: "Quick Library Drop-off",
+                date: calendar.date(byAdding: .day, value: 4, to: baseDate)!,
+                route: [
+                    RunStop(
+                        name: "Public Library",
+                        time: calendar.date(byAdding: .day, value: 4, to: calendar.date(bySettingHour: 16, minute: 0, second: 0, of: baseDate)!)!,
+                        note: "Return books",
+                        type: .dropoff,
+                        task: "Return books",
+                        estimatedMinutes: 15
+                    )
+                ],
+                status: .scheduled,
+                createdAt: baseDate,
+                estimatedDuration: 15 * 60
+            ),
+            
+            // Past date run (should not normally happen)
+            SchoolRun(
+                id: UUID(),
+                title: "Old Scheduled Run",
+                date: calendar.date(byAdding: .day, value: -10, to: baseDate)!,
+                route: mockStandardMorningRoute(for: calendar.date(byAdding: .day, value: -10, to: baseDate)!),
+                status: .scheduled,
+                createdAt: calendar.date(byAdding: .day, value: -11, to: baseDate)!,
+                estimatedDuration: 30 * 60
+            ),
+            
+            // Long duration run with many stops
+            SchoolRun(
+                id: UUID(),
+                title: "Multi-Activity Saturday",
+                date: calendar.date(byAdding: .day, value: 6, to: baseDate)!,
+                route: mockComplexRoute(for: calendar.date(byAdding: .day, value: 6, to: baseDate)!),
+                status: .scheduled,
+                createdAt: baseDate,
+                estimatedDuration: 180 * 60 // 3 hours
+            )
+        ]
+    }
+    
+    /// Generates a standard morning school route
+    static func mockStandardMorningRoute(for date: Date) -> [RunStop] {
+        let calendar = Calendar.current
+        
+        return [
+            RunStop(
+                name: "Home",
+                time: calendar.date(bySettingHour: 8, minute: 0, second: 0, of: date)!,
+                note: "Pick up kids",
+                type: .pickup,
+                task: "Pick up kids",
+                estimatedMinutes: 5
+            ),
+            RunStop(
+                name: "Greenwood Elementary",
+                time: calendar.date(bySettingHour: 8, minute: 15, second: 0, of: date)!,
+                note: "Drop off Zoe",
+                type: .dropoff,
+                task: "Drop off Zoe",
+                estimatedMinutes: 10
+            ),
+            RunStop(
+                name: "Riverside Middle School",
+                time: calendar.date(bySettingHour: 8, minute: 30, second: 0, of: date)!,
+                note: "Drop off Ethan",
+                type: .dropoff,
+                task: "Drop off Ethan",
+                estimatedMinutes: 10
+            )
+        ]
+    }
+    
+    /// Generates a completed route with all stops marked as completed
+    static func mockCompletedRoute(for date: Date, isAfternoon: Bool = false) -> [RunStop] {
+        let calendar = Calendar.current
+        let baseHour = isAfternoon ? 15 : 8
+        
+        return [
+            RunStop(
+                name: isAfternoon ? "Greenwood Elementary" : "Home",
+                time: calendar.date(bySettingHour: baseHour, minute: 30, second: 0, of: date)!,
+                note: isAfternoon ? "Pick up Zoe" : "Pick up kids",
+                type: isAfternoon ? .pickup : .pickup,
+                isCompleted: true,
+                task: isAfternoon ? "Pick up Zoe" : "Pick up kids",
+                estimatedMinutes: isAfternoon ? 10 : 5
+            ),
+            RunStop(
+                name: isAfternoon ? "Riverside Middle School" : "Greenwood Elementary",
+                time: calendar.date(bySettingHour: baseHour, minute: 45, second: 0, of: date)!,
+                note: isAfternoon ? "Pick up Ethan" : "Drop off Zoe",
+                type: isAfternoon ? .pickup : .dropoff,
+                isCompleted: true,
+                task: isAfternoon ? "Pick up Ethan" : "Drop off Zoe",
+                estimatedMinutes: 10
+            ),
+            RunStop(
+                name: isAfternoon ? "Home" : "Riverside Middle School",
+                time: calendar.date(bySettingHour: baseHour + (isAfternoon ? 1 : 0), minute: 0, second: 0, of: date)!,
+                note: isAfternoon ? "Drop off kids" : "Drop off Ethan",
+                type: .dropoff,
+                isCompleted: true,
+                task: isAfternoon ? "Drop off kids" : "Drop off Ethan",
+                estimatedMinutes: isAfternoon ? 5 : 10
+            )
+        ]
+    }
+    
+    /// Generates a complex route with many stops for testing
+    static func mockComplexRoute(for date: Date) -> [RunStop] {
+        let calendar = Calendar.current
+        
+        return [
+            RunStop(
+                name: "Home",
+                time: calendar.date(bySettingHour: 9, minute: 0, second: 0, of: date)!,
+                note: "Start of busy day",
+                type: .pickup,
+                task: "Start of busy day",
+                estimatedMinutes: 5
+            ),
+            RunStop(
+                name: "Soccer Fields",
+                time: calendar.date(bySettingHour: 9, minute: 15, second: 0, of: date)!,
+                note: "Ethan's soccer practice",
+                type: .dropoff,
+                task: "Ethan's soccer practice",
+                estimatedMinutes: 10
+            ),
+            RunStop(
+                name: "Dance Studio",
+                time: calendar.date(bySettingHour: 9, minute: 30, second: 0, of: date)!,
+                note: "Zoe's dance class",
+                type: .dropoff,
+                task: "Zoe's dance class",
+                estimatedMinutes: 10
+            ),
+            RunStop(
+                name: "Grocery Store",
+                time: calendar.date(bySettingHour: 10, minute: 0, second: 0, of: date)!,
+                note: "Quick shopping",
+                type: .dropoff,
+                task: "Quick shopping",
+                estimatedMinutes: 30
+            ),
+            RunStop(
+                name: "Soccer Fields",
+                time: calendar.date(bySettingHour: 10, minute: 30, second: 0, of: date)!,
+                note: "Pick up Ethan",
+                type: .pickup,
+                task: "Pick up Ethan",
+                estimatedMinutes: 5
+            ),
+            RunStop(
+                name: "Dance Studio",
+                time: calendar.date(bySettingHour: 10, minute: 45, second: 0, of: date)!,
+                note: "Pick up Zoe",
+                type: .pickup,
+                task: "Pick up Zoe",
+                estimatedMinutes: 5
+            ),
+            RunStop(
+                name: "Park",
+                time: calendar.date(bySettingHour: 11, minute: 0, second: 0, of: date)!,
+                note: "Family picnic",
+                type: .dropoff,
+                task: "Family picnic",
+                estimatedMinutes: 60
+            ),
+            RunStop(
+                name: "Home",
+                time: calendar.date(bySettingHour: 12, minute: 0, second: 0, of: date)!,
+                note: "Back home for lunch",
+                type: .dropoff,
+                task: "Back home for lunch",
+                estimatedMinutes: 10
+            )
+        ]
+    }
+    
+    /// Generates school run scenarios for different family roles
+    static func mockSchoolRunsForRole(_ role: Role) -> [SchoolRun] {
+        let allRuns = mockSchoolRuns()
+        
+        switch role {
+        case .parentAdmin, .adult:
+            // Parents see all runs
+            return allRuns
+            
+        case .kid:
+            // Kids see only runs that involve them (simplified - show all for demo)
+            return allRuns.filter { run in
+                // In a real implementation, this would filter by child assignment
+                !run.route.isEmpty
+            }
+            
+        case .visitor:
+            // Visitors see no school runs
+            return []
+        }
+    }
+    
+    /// Generates school run notifications for testing
+    static func mockSchoolRunNotifications() -> [SchoolRunNotification] {
+        let runs = mockSchoolRuns()
+        let calendar = Calendar.current
+        let now = Date()
+        
+        return [
+            SchoolRunNotification(
+                id: UUID(),
+                title: "School Run Started",
+                message: "Morning school drop-off has begun",
+                timestamp: calendar.date(byAdding: .minute, value: -15, to: now)!,
+                type: .started,
+                schoolRunId: runs.first?.id ?? UUID()
+            ),
+            SchoolRunNotification(
+                id: UUID(),
+                title: "Arriving Soon",
+                message: "Arriving at Greenwood Elementary in 5 minutes",
+                timestamp: calendar.date(byAdding: .minute, value: -5, to: now)!,
+                type: .arriving,
+                schoolRunId: runs.first?.id ?? UUID()
+            ),
+            SchoolRunNotification(
+                id: UUID(),
+                title: "Run Completed",
+                message: "Afternoon pickup completed successfully",
+                timestamp: calendar.date(byAdding: .hour, value: -2, to: now)!,
+                type: .completed,
+                schoolRunId: runs.first?.id ?? UUID()
+            )
+        ]
+    }
+    
     // MARK: - Family Messages Mock Data
     
     /// Generates mock family messages for the Mawere Family
@@ -928,192 +1543,7 @@ struct MockDataGenerator {
         ]
     }
     
-    // MARK: - School Run Mock Data
-    
-    /// Generates mock school run data for the Mawere Family
-    static func mockSchoolRuns() -> [SchoolRun] {
-        let (_, users, _) = mockMawereFamily()
-        let calendar = Calendar.current
-        let today = Date()
-        
-        // Create times for school runs
-        let morningPickup = calendar.date(bySettingHour: 7, minute: 30, second: 0, of: today)!
-        let morningDropoff = calendar.date(bySettingHour: 8, minute: 15, second: 0, of: today)!
-        let afternoonPickup = calendar.date(bySettingHour: 15, minute: 0, second: 0, of: today)!
-        let afternoonDropoff = calendar.date(bySettingHour: 15, minute: 45, second: 0, of: today)!
-        
-        return [
-            SchoolRun(
-                id: UUID(),
-                route: "Home → Greenwood Elementary",
-                pickupTime: morningPickup,
-                dropoffTime: morningDropoff,
-                driver: users[0].id, // Tafadzwa
-                passengers: [users[2].id, users[3].id], // Ethan and Zoe
-                status: .completed,
-                notes: "Both kids dropped off safely"
-            ),
-            SchoolRun(
-                id: UUID(),
-                route: "Greenwood Elementary → Home",
-                pickupTime: afternoonPickup,
-                dropoffTime: afternoonDropoff,
-                driver: users[1].id, // Grace
-                passengers: [users[2].id, users[3].id], // Ethan and Zoe
-                status: .scheduled,
-                notes: "Pick up from main entrance"
-            ),
-            SchoolRun(
-                id: UUID(),
-                route: "Home → Soccer Practice",
-                pickupTime: calendar.date(byAdding: .day, value: 1, to: calendar.date(bySettingHour: 16, minute: 0, second: 0, of: today)!)!,
-                dropoffTime: calendar.date(byAdding: .day, value: 1, to: calendar.date(bySettingHour: 16, minute: 20, second: 0, of: today)!)!,
-                driver: users[0].id, // Tafadzwa
-                passengers: [users[2].id], // Ethan
-                status: .scheduled,
-                notes: "Soccer practice at community center"
-            )
-        ]
-    }
-    
-    /// Generates extended school run data with various scenarios for comprehensive testing
-    static func mockExtendedSchoolRuns() -> [SchoolRun] {
-        let (_, users, _) = mockMawereFamily()
-        let calendar = Calendar.current
-        let today = Date()
-        
-        var schoolRuns: [SchoolRun] = []
-        
-        // Today's runs
-        schoolRuns.append(contentsOf: [
-            SchoolRun(
-                id: UUID(),
-                route: "Home → Greenwood Elementary",
-                pickupTime: calendar.date(bySettingHour: 7, minute: 30, second: 0, of: today)!,
-                dropoffTime: calendar.date(bySettingHour: 8, minute: 15, second: 0, of: today)!,
-                driver: users[0].id, // Tafadzwa
-                passengers: [users[2].id, users[3].id], // Ethan and Zoe
-                status: .completed,
-                notes: "Both kids dropped off safely"
-            ),
-            SchoolRun(
-                id: UUID(),
-                route: "Greenwood Elementary → Home",
-                pickupTime: calendar.date(bySettingHour: 15, minute: 0, second: 0, of: today)!,
-                dropoffTime: calendar.date(bySettingHour: 15, minute: 45, second: 0, of: today)!,
-                driver: users[1].id, // Grace
-                passengers: [users[2].id, users[3].id], // Ethan and Zoe
-                status: .scheduled,
-                notes: "Pick up from main entrance"
-            ),
-            SchoolRun(
-                id: UUID(),
-                route: "Home → Piano Lessons",
-                pickupTime: calendar.date(bySettingHour: 16, minute: 30, second: 0, of: today)!,
-                dropoffTime: calendar.date(bySettingHour: 16, minute: 45, second: 0, of: today)!,
-                driver: users[1].id, // Grace
-                passengers: [users[3].id], // Zoe
-                status: .scheduled,
-                notes: "Weekly piano lesson at music center"
-            )
-        ])
-        
-        // Tomorrow's runs
-        let tomorrow = calendar.date(byAdding: .day, value: 1, to: today)!
-        schoolRuns.append(contentsOf: [
-            SchoolRun(
-                id: UUID(),
-                route: "Home → Greenwood Elementary",
-                pickupTime: calendar.date(bySettingHour: 7, minute: 30, second: 0, of: tomorrow)!,
-                dropoffTime: calendar.date(bySettingHour: 8, minute: 15, second: 0, of: tomorrow)!,
-                driver: users[1].id, // Grace
-                passengers: [users[2].id, users[3].id], // Ethan and Zoe
-                status: .scheduled,
-                notes: "Tomorrow's morning drop-off"
-            ),
-            SchoolRun(
-                id: UUID(),
-                route: "Greenwood Elementary → Soccer Practice",
-                pickupTime: calendar.date(bySettingHour: 15, minute: 0, second: 0, of: tomorrow)!,
-                dropoffTime: calendar.date(bySettingHour: 15, minute: 30, second: 0, of: tomorrow)!,
-                driver: users[0].id, // Tafadzwa
-                passengers: [users[2].id], // Ethan
-                status: .scheduled,
-                notes: "Direct to soccer practice after school"
-            ),
-            SchoolRun(
-                id: UUID(),
-                route: "Soccer Practice → Home",
-                pickupTime: calendar.date(bySettingHour: 17, minute: 0, second: 0, of: tomorrow)!,
-                dropoffTime: calendar.date(bySettingHour: 17, minute: 20, second: 0, of: tomorrow)!,
-                driver: users[0].id, // Tafadzwa
-                passengers: [users[2].id], // Ethan
-                status: .scheduled,
-                notes: "Pick up after soccer practice"
-            )
-        ])
-        
-        // Day after tomorrow's runs
-        let dayAfterTomorrow = calendar.date(byAdding: .day, value: 2, to: today)!
-        schoolRuns.append(contentsOf: [
-            SchoolRun(
-                id: UUID(),
-                route: "Home → Greenwood Elementary",
-                pickupTime: calendar.date(bySettingHour: 7, minute: 30, second: 0, of: dayAfterTomorrow)!,
-                dropoffTime: calendar.date(bySettingHour: 8, minute: 15, second: 0, of: dayAfterTomorrow)!,
-                driver: users[0].id, // Tafadzwa
-                passengers: [users[2].id, users[3].id], // Ethan and Zoe
-                status: .scheduled,
-                notes: "Regular morning drop-off"
-            ),
-            SchoolRun(
-                id: UUID(),
-                route: "Greenwood Elementary → Dentist",
-                pickupTime: calendar.date(bySettingHour: 14, minute: 30, second: 0, of: dayAfterTomorrow)!,
-                dropoffTime: calendar.date(bySettingHour: 15, minute: 0, second: 0, of: dayAfterTomorrow)!,
-                driver: users[1].id, // Grace
-                passengers: [users[3].id], // Zoe
-                status: .scheduled,
-                notes: "Early pickup for dentist appointment"
-            )
-        ])
-        
-        return schoolRuns
-    }
-    
-    /// Generates mock GPS tracking notifications for school runs
-    static func mockSchoolRunNotifications() -> [SchoolRunNotification] {
-        let schoolRuns = mockSchoolRuns()
-        let now = Date()
-        let calendar = Calendar.current
-        
-        return [
-            SchoolRunNotification(
-                id: UUID(),
-                title: "School Run Started",
-                message: "Navigation started for Home → Greenwood Elementary",
-                timestamp: calendar.date(byAdding: .minute, value: -10, to: now)!,
-                type: .started,
-                schoolRunId: schoolRuns[0].id
-            ),
-            SchoolRunNotification(
-                id: UUID(),
-                title: "Arriving Soon",
-                message: "You'll arrive at Greenwood Elementary in 2 minutes",
-                timestamp: calendar.date(byAdding: .minute, value: -2, to: now)!,
-                type: .arriving,
-                schoolRunId: schoolRuns[0].id
-            ),
-            SchoolRunNotification(
-                id: UUID(),
-                title: "Drop-off Complete",
-                message: "Successfully dropped off Ethan and Zoe at school",
-                timestamp: now,
-                type: .completed,
-                schoolRunId: schoolRuns[0].id
-            )
-        ]
-    }
+
     
     // MARK: - Family Settings Mock Data
     
@@ -1206,160 +1636,3 @@ extension MockDataGenerator {
 }
 #endif
 
-// MARK: - Demo Data Structures
-
-/// Comprehensive demo data that showcases all app features
-struct DemoShowcaseData {
-    let family: Family
-    let users: [UserProfile]
-    let memberships: [Membership]
-    let calendarEvents: [CalendarEvent]
-    let tasks: [FamilyTask]
-    let messages: [FamilyMessage]
-    let noticeboardPosts: [NoticeboardPost]
-    let schoolRuns: [SchoolRun]
-    let settings: FamilySettings
-}
-
-/// Demo scenario-specific data
-struct DemoScenarioData {
-    let family: Family
-    let users: [UserProfile]
-    let memberships: [Membership]
-    let currentUser: UserProfile
-    let calendarEvents: [CalendarEvent]
-    let tasks: [FamilyTask]
-    let messages: [FamilyMessage]
-    let schoolRuns: [SchoolRun]
-}
-
-/// Demo reset configuration
-struct DemoResetData {
-    let shouldClearUserData: Bool
-    let shouldResetToOnboarding: Bool
-    let shouldClearNotifications: Bool
-    let defaultScenario: DemoScenario
-}
-
-/// Demo scenario types for guided tours
-enum DemoScenario: String, CaseIterable {
-    case newUserOnboarding = "new_user_onboarding"
-    case existingUserLogin = "existing_user_login"
-    case familyAdminTasks = "family_admin_tasks"
-    case childUserExperience = "child_user_experience"
-    case completeFeatureTour = "complete_feature_tour"
-    
-    // HomeLife Demo Scenarios
-    case homeLifeMealPlanning = "homelife_meal_planning"
-    case homeLifeGroceryShopping = "homelife_grocery_shopping"
-    case homeLifeTaskManagement = "homelife_task_management"
-    case homeLifeCompleteWorkflow = "homelife_complete_workflow"
-    
-    var displayName: String {
-        switch self {
-        case .newUserOnboarding:
-            return "New User Onboarding"
-        case .existingUserLogin:
-            return "Existing User Login"
-        case .familyAdminTasks:
-            return "Family Admin Tasks"
-        case .childUserExperience:
-            return "Child User Experience"
-        case .completeFeatureTour:
-            return "Complete Feature Tour"
-        case .homeLifeMealPlanning:
-            return "HomeLife: Meal Planning"
-        case .homeLifeGroceryShopping:
-            return "HomeLife: Grocery Shopping"
-        case .homeLifeTaskManagement:
-            return "HomeLife: Task Management"
-        case .homeLifeCompleteWorkflow:
-            return "HomeLife: Complete Workflow"
-        }
-    }
-    
-    var description: String {
-        switch self {
-        case .newUserOnboarding:
-            return "Experience the complete onboarding flow for first-time users, from sign-in to family creation."
-        case .existingUserLogin:
-            return "See how returning users quickly access their family dashboard with existing data."
-        case .familyAdminTasks:
-            return "Explore admin features for managing family members, settings, and permissions."
-        case .childUserExperience:
-            return "View the app from a child's perspective with age-appropriate features and restrictions."
-        case .completeFeatureTour:
-            return "Tour all major features and modules of the TribeBoard app in a comprehensive walkthrough."
-        case .homeLifeMealPlanning:
-            return "Discover how families plan meals, check pantry inventory, and organize weekly menus."
-        case .homeLifeGroceryShopping:
-            return "Learn to manage grocery lists, add urgent items, and order from delivery platforms."
-        case .homeLifeTaskManagement:
-            return "See how shopping tasks are created, assigned to family members, and tracked to completion."
-        case .homeLifeCompleteWorkflow:
-            return "Experience the full HomeLife workflow from meal planning to grocery delivery and task completion."
-        }
-    }
-    
-    var estimatedDuration: TimeInterval {
-        switch self {
-        case .newUserOnboarding:
-            return 120 // 2 minutes
-        case .existingUserLogin:
-            return 30 // 30 seconds
-        case .familyAdminTasks:
-            return 180 // 3 minutes
-        case .childUserExperience:
-            return 150 // 2.5 minutes
-        case .completeFeatureTour:
-            return 300 // 5 minutes
-        case .homeLifeMealPlanning:
-            return 90 // 1.5 minutes
-        case .homeLifeGroceryShopping:
-            return 120 // 2 minutes
-        case .homeLifeTaskManagement:
-            return 90 // 1.5 minutes
-        case .homeLifeCompleteWorkflow:
-            return 240 // 4 minutes
-        }
-    }
-    
-    /// Category for organizing demo scenarios
-    var category: DemoCategory {
-        switch self {
-        case .newUserOnboarding, .existingUserLogin:
-            return .onboarding
-        case .familyAdminTasks, .childUserExperience:
-            return .userExperience
-        case .completeFeatureTour:
-            return .comprehensive
-        case .homeLifeMealPlanning, .homeLifeGroceryShopping, .homeLifeTaskManagement, .homeLifeCompleteWorkflow:
-            return .homeLife
-        }
-    }
-}
-
-/// Categories for organizing demo scenarios
-enum DemoCategory: String, CaseIterable {
-    case onboarding = "Onboarding"
-    case userExperience = "User Experience"
-    case homeLife = "HomeLife Features"
-    case comprehensive = "Comprehensive Tours"
-    
-    var displayName: String {
-        return rawValue
-    }
-    
-    var icon: String {
-        switch self {
-        case .onboarding:
-            return "person.badge.plus"
-        case .userExperience:
-            return "person.3.sequence"
-        case .homeLife:
-            return "house.heart"
-        case .comprehensive:
-            return "map"
-        }
-    }
-}

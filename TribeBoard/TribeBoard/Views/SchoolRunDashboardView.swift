@@ -2,7 +2,7 @@ import SwiftUI
 
 /// Main entry point for School Run feature providing overview and navigation to all run-related screens
 struct SchoolRunDashboardView: View {
-    @StateObject private var runManager = ScheduledSchoolRunManager()
+    @StateObject private var runManager = SchoolRunManager()
     @SafeEnvironmentObject(fallback: { AppState.createFallback() }) private var appState: AppState
     
     // Accessibility environment values
@@ -23,7 +23,7 @@ struct SchoolRunDashboardView: View {
                 UpcomingRunsSection(runs: runManager.upcomingRuns)
                 
                 // Past runs section
-                PastRunsSection(runs: runManager.pastRuns)
+                PastRunsSection(runs: runManager.completedRuns)
             }
             .screenPadding()
         }
@@ -144,7 +144,7 @@ struct ActionButtonsSection: View {
 
 /// Upcoming runs section displaying list of scheduled runs using RunSummaryCard
 struct UpcomingRunsSection: View {
-    let runs: [ScheduledSchoolRun]
+    let runs: [SchoolRun]
     @SafeEnvironmentObject(fallback: { AppState.createFallback() }) private var appState: AppState
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     
@@ -188,7 +188,7 @@ struct UpcomingRunsSection: View {
                             RunSummaryCard(run: run)
                         }
                         .buttonStyle(CardButtonStyle())
-                        .accessibilityLabel("Upcoming run: \(run.name)")
+                        .accessibilityLabel("Upcoming run: \(run.title)")
                         .accessibilityHint("Tap to view details and start this run")
                         .accessibilityAddTraits(.isButton)
                     }
@@ -205,7 +205,7 @@ struct UpcomingRunsSection: View {
 
 /// Past runs section showing completed runs for reference
 struct PastRunsSection: View {
-    let runs: [ScheduledSchoolRun]
+    let runs: [SchoolRun]
     @SafeEnvironmentObject(fallback: { AppState.createFallback() }) private var appState: AppState
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     
@@ -249,7 +249,7 @@ struct PastRunsSection: View {
                             RunSummaryCard(run: run)
                         }
                         .buttonStyle(CardButtonStyle())
-                        .accessibilityLabel("Past run: \(run.name)")
+                        .accessibilityLabel("Past run: \(run.title)")
                         .accessibilityHint("Tap to view details of this completed run")
                         .accessibilityAddTraits(.isButton)
                     }
@@ -406,7 +406,7 @@ struct ScheduleNewRunPlaceholderView: View {
 
 /// Placeholder for Run Detail view
 struct RunDetailPlaceholderView: View {
-    let run: ScheduledSchoolRun
+    let run: SchoolRun
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
@@ -420,7 +420,7 @@ struct RunDetailPlaceholderView: View {
                     .headlineMedium()
                     .foregroundColor(.primary)
                 
-                Text("Details for: \(run.name)")
+                Text("Details for: \(run.title)")
                     .bodyMedium()
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
@@ -433,7 +433,7 @@ struct RunDetailPlaceholderView: View {
                 Spacer()
             }
             .padding()
-            .navigationTitle(run.name)
+            .navigationTitle(run.title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -453,64 +453,52 @@ struct RunDetailPlaceholderView: View {
 // MARK: - Preview
 
 #Preview("Dashboard - Default State") {
-    SchoolRunPreviewProvider.previewWithSampleData {
-        NavigationStack {
-            SchoolRunDashboardView()
-        }
+    NavigationStack {
+        SchoolRunDashboardView()
+            .previewEnvironment()
     }
 }
 
 #Preview("Dashboard - Empty State") {
-    SchoolRunPreviewProvider.previewWithSampleData {
-        NavigationStack {
-            SchoolRunDashboardView()
-                .onAppear {
-                    // This would show empty state if no runs exist
-                }
-        }
+    NavigationStack {
+        SchoolRunDashboardView()
+            .previewEnvironment()
     }
 }
 
 #Preview("Dashboard - Dark Mode") {
-    SchoolRunPreviewProvider.previewWithSampleData {
-        NavigationStack {
-            SchoolRunDashboardView()
-        }
+    NavigationStack {
+        SchoolRunDashboardView()
+            .previewEnvironment()
     }
     .preferredColorScheme(.dark)
 }
 
 #Preview("Dashboard - High Contrast") {
-    SchoolRunPreviewProvider.previewWithSampleData {
-        NavigationStack {
-            SchoolRunDashboardView()
-        }
+    NavigationStack {
+        SchoolRunDashboardView()
+            .previewEnvironment()
     }
-
 }
 
 #Preview("Dashboard - Large Text") {
-    SchoolRunPreviewProvider.previewWithSampleData {
-        NavigationStack {
-            SchoolRunDashboardView()
-        }
+    NavigationStack {
+        SchoolRunDashboardView()
+            .previewEnvironment()
     }
     .environment(\.dynamicTypeSize, .accessibility3)
 }
 
 #Preview("Dashboard - Reduced Motion") {
-    SchoolRunPreviewProvider.previewWithSampleData {
-        NavigationStack {
-            SchoolRunDashboardView()
-        }
+    NavigationStack {
+        SchoolRunDashboardView()
+            .previewEnvironment()
     }
-
 }
 
 #Preview("Interactive Dashboard") {
-    SchoolRunPreviewProvider.previewWithSampleData {
-        NavigationStack {
-            SchoolRunDashboardView()
-        }
+    NavigationStack {
+        SchoolRunDashboardView()
+            .previewEnvironment()
     }
 }

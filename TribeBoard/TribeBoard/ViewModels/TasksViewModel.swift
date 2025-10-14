@@ -98,11 +98,13 @@ class TasksViewModel: ObservableObject {
         isLoading = true
         
         // Simulate loading delay for realistic experience
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            self.loadTasks()
-            self.loadUserProfiles()
-            self.updateOverdueTasks()
-            self.isLoading = false
+        Task {
+            try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+            
+            loadTasks()
+            loadUserProfiles()
+            updateOverdueTasks()
+            isLoading = false
         }
     }
     
@@ -270,9 +272,10 @@ class TasksViewModel: ObservableObject {
     }
     
     private func clearMessageAfterDelay() {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-            self.successMessage = nil
-            self.errorMessage = nil
+        Task {
+            try? await Task.sleep(nanoseconds: 3_000_000_000) // 3 seconds
+            successMessage = nil
+            errorMessage = nil
         }
     }
     

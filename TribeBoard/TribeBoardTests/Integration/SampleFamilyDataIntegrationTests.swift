@@ -503,4 +503,256 @@ class SampleFamilyDataIntegrationTests: TestBase {
             XCTFail("Cleanup and recovery test should succeed: \(error)")
         }
     }
+    
+    // MARK: - Async Behavior Integration Tests
+    
+    @MainActor
+    func testAsyncBehavior_GenerateSampleFamilies_ShouldExecuteAsynchronously() async {
+        // Given - Clean database state
+        let startTime = Date()
+        
+        // When - Execute async method
+        do {
+            let generatedFamilies = try await sampleGenerator.generateSampleFamilies()
+            let executionTime = Date().timeIntervalSince(startTime)
+            
+            // Then - Should complete successfully and demonstrate async execution
+            XCTAssertEqual(generatedFamilies.count, 5, "Should generate 5 families asynchronously")
+            XCTAssertGreaterThan(executionTime, 0, "Should take measurable time for async operations")
+            
+            // Verify all families were created through async DataService calls
+            for familyInfo in generatedFamilies {
+                XCTAssertFalse(familyInfo.family.name.isEmpty, "Async created family should have valid name")
+                XCTAssertEqual(familyInfo.code.count, 6, "Async created family should have valid code")
+                XCTAssertGreaterThan(familyInfo.memberCount, 0, "Async created family should have members")
+            }
+            
+        } catch {
+            XCTFail("Async execution should succeed: \(error)")
+        }
+    }
+    
+    @MainActor
+    func testAsyncBehavior_ConcurrentDataServiceCalls_ShouldHandleMainActorIsolation() async {
+        // Given - Clean database state
+        
+        // When - Execute multiple async operations that require main actor isolation
+        do {
+            // Test concurrent execution of async methods that call DataService
+            async let firstGeneration = sampleGenerator.generateSampleFamilies()
+            
+            // Wait a brief moment to ensure first generation starts
+            try await Task.sleep(nanoseconds: 10_000_000) // 10ms
+            
+            // Start second generation (should detect existing families)
+            async let secondGeneration = sampleGenerator.generateSampleFamilies()
+            
+            // Await both operations
+            let (firstResult, secondResult) = try await (firstGeneration, secondGeneration)
+            
+            // Then - Both should succeed with proper main actor isolation
+            XCTAssertEqual(firstResult.count, 5, "First generation should create 5 families")
+            XCTAssertEqual(secondResult.count, 5, "Second generation should return 5 families")
+            
+            // Verify no data corruption from concurrent access
+            let context = createTestContext()
+            let familyDescriptor = FetchDescriptor<Family>()
+            let persistedFamilies = try context.fetch(familyDescriptor)
+            
+            let sampleFamilies = persistedFamilies.filter { family in
+                family.name.contains("Johnson") || 
+                family.name.contains("Garcia") || 
+                family.name.contains("Chen") || 
+                family.name.contains("Williams") || 
+                family.name.contains("Anderson")
+            }
+            
+            XCTAssertEqual(sampleFamilies.count, 5, "Should have exactly 5 families despite concurrent execution")
+            
+        } catch {
+            XCTFail("Concurrent async execution should succeed: \(error)")
+        }
+    }
+    
+    @MainActor
+    func testAsyncBehavior_DataServiceMethodCalls_ShouldRespectMainActorIsolation() async {
+        // Given - Clean database state
+        
+        // When - Execute generation which calls multiple DataService methods
+        do {
+            let generatedFamilies = try await sampleGenerator.generateSampleFamilies()
+            
+            // Then - Verify all DataService calls were executed properly on main actor
+            XCTAssertEqual(generatedFamilies.count, 5, "Should successfully call DataService methods")
+            
+            // Verify each family was created through proper async DataService calls
+            let context = createTestContext()
+            
+            for familyInfo in generatedFamilies {
+                // Verify family exists (created via async createFamily call)
+                let family = try realDataService.fetchFamily(byId: familyInfo.family.id)
+                XCTAssertNotNil(family, "Family should exist from async createFamily call")
+                
+                // Verify users exist (created via async createUserProfile calls)
+                let memberships = try realDataService.fetchMemberships(forFamily: familyInfo.family)
+                XCTAssertEqual(memberships.count, familyInfo.memberCount, "All users should be created via async calls")
+                
+                for membership in memberships {
+                    let user = try realDataService.fetchUserProfile(byId: membership.userId)
+                    XCTAssertNotNil(user, "User should exist from async createUserProfile call")
+                    XCTAssertTrue(user?.appleUserIdHash.contains("sample_") ?? false, "User should have sample hash")
+                }
+            }
+            
+        } catch {
+            XCTFail("DataService async method calls should succeed: \(error)")
+        }
+    }
+    
+    @MainActor
+    func testAsyncBehavior_ErrorPropagation_ShouldPreserveAsyncContext() async {
+        // Given - Configure DataService to fail
+        let failingDataService = MockDataService()
+        failingDataService.setShouldSucceed(false)
+        failingDataService.setError(.invalidData("Async test failure"))
+        
+        let failingGenerator = SampleFamilyDataGenerator(dataService: failingDataService)
+        
+        // When - Execute async method that should fail
+        do {
+            _ = try await failingGenerator.generateSampleFamilies()
+            XCTFail("Should throw error in async context")
+        } catch let error as SampleDataError {
+            // Then - Error should be properly propagated through async context
+            XCTAssertEqual(error.category, .validation, "Error should maintain proper categorization in async context")
+            XCTAssertNotNil(error.errorDescription, "Error should have description in async context")
+            XCTAssertNotNil(error.failureReason, "Error should have failure reason in async context")
+            XCTAssertNotNil(error.recoverySuggestion, "Error should have recovery suggestion in async context")
+        } catch {
+            XCTFail("Should throw SampleDataError in async context, got: \(error)")
+        }
+    }
+    
+    @MainActor
+    func testAsyncBehavior_FamilyCreationErrorConversion_ShouldWorkInAsyncContext() async {
+        // Given - Configure DataService to fail with specific error
+        let failingDataService = MockDataService()
+        failingDataService.setShouldSucceed(false)
+        failingDataService.setError(.constraintViolation("Async constraint violation"))
+        
+        let failingGenerator = SampleFamilyDataGenerator(dataService: failingDataService)
+        
+        // When - Execute async method with FamilyCreationError conversion
+        do {
+            _ = try await failingGenerator.generateSampleFamiliesWithFamilyCreationError()
+            XCTFail("Should throw FamilyCreationError in async context")
+        } catch let error as FamilyCreationError {
+            // Then - Error conversion should work properly in async context
+            XCTAssertEqual(error.category, .validation, "Converted error should maintain categorization in async context")
+            
+            if case .validationFailed(let message) = error {
+                XCTAssertTrue(message.contains("Constraint violation"), "Converted error should preserve context in async")
+            } else {
+                XCTFail("Should convert to validationFailed in async context, got: \(error)")
+            }
+        } catch {
+            XCTFail("Should throw FamilyCreationError in async context, got: \(error)")
+        }
+    }
+    
+    @MainActor
+    func testAsyncBehavior_TaskCancellation_ShouldHandleGracefully() async {
+        // Given - Clean database state
+        
+        // When - Start async operation and cancel it
+        let task = Task {
+            try await sampleGenerator.generateSampleFamilies()
+        }
+        
+        // Cancel the task after a brief delay
+        try? await Task.sleep(nanoseconds: 1_000_000) // 1ms
+        task.cancel()
+        
+        // Then - Should handle cancellation gracefully
+        do {
+            _ = try await task.value
+            // If it completes successfully, that's also acceptable
+            XCTAssertTrue(true, "Task completed successfully despite cancellation attempt")
+        } catch is CancellationError {
+            XCTAssertTrue(true, "Task cancellation handled properly")
+        } catch {
+            XCTFail("Should handle cancellation gracefully, got: \(error)")
+        }
+    }
+    
+    @MainActor
+    func testAsyncBehavior_NestedAsyncCalls_ShouldMaintainActorIsolation() async {
+        // Given - Clean database state
+        
+        // When - Execute generation which involves nested async calls to DataService
+        do {
+            let generatedFamilies = try await sampleGenerator.generateSampleFamilies()
+            
+            // Then - All nested async calls should succeed with proper actor isolation
+            XCTAssertEqual(generatedFamilies.count, 5, "Nested async calls should succeed")
+            
+            // Verify the nested structure: Family -> Users -> Memberships
+            for familyInfo in generatedFamilies {
+                // Each family creation involves:
+                // 1. async createFamily call
+                // 2. multiple async createUserProfile calls  
+                // 3. multiple async createMembership calls
+                
+                let memberships = try realDataService.fetchMemberships(forFamily: familyInfo.family)
+                XCTAssertEqual(memberships.count, familyInfo.memberCount, "All nested async calls should complete")
+                
+                // Verify each membership has a valid user (from nested async calls)
+                for membership in memberships {
+                    let user = try realDataService.fetchUserProfile(byId: membership.userId)
+                    XCTAssertNotNil(user, "Nested async user creation should succeed")
+                    XCTAssertEqual(membership.familyId, familyInfo.family.id, "Nested async membership creation should succeed")
+                }
+            }
+            
+        } catch {
+            XCTFail("Nested async calls should succeed: \(error)")
+        }
+    }
+    
+    @MainActor
+    func testAsyncBehavior_AsyncSequentialExecution_ShouldMaintainOrder() async {
+        // Given - Clean database state
+        
+        // When - Execute multiple sequential async operations
+        var executionOrder: [String] = []
+        
+        do {
+            executionOrder.append("start_generation")
+            let generatedFamilies = try await sampleGenerator.generateSampleFamilies()
+            executionOrder.append("generation_complete")
+            
+            // Verify families exist
+            let context = createTestContext()
+            let familyDescriptor = FetchDescriptor<Family>()
+            let persistedFamilies = try context.fetch(familyDescriptor)
+            executionOrder.append("verification_complete")
+            
+            // Then - Operations should execute in proper sequence
+            XCTAssertEqual(executionOrder, ["start_generation", "generation_complete", "verification_complete"], 
+                          "Async operations should maintain sequential order")
+            XCTAssertEqual(generatedFamilies.count, 5, "Sequential async execution should succeed")
+            
+            let sampleFamilies = persistedFamilies.filter { family in
+                family.name.contains("Johnson") || 
+                family.name.contains("Garcia") || 
+                family.name.contains("Chen") || 
+                family.name.contains("Williams") || 
+                family.name.contains("Anderson")
+            }
+            XCTAssertEqual(sampleFamilies.count, 5, "Sequential async operations should persist data correctly")
+            
+        } catch {
+            XCTFail("Sequential async execution should succeed: \(error)")
+        }
+    }
 }

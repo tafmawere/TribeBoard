@@ -173,7 +173,7 @@ class NavigationStateManager: ObservableObject {
     }
     
     /// Validate user access to a specific run
-    private func validateRunAccess(_ run: ScheduledSchoolRun) throws {
+    private func validateRunAccess(_ run: SchoolRun) throws {
         guard let appState = appState,
               let _ = appState.currentFamily else {
             throw NavigationError.invalidAppState

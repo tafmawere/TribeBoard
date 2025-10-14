@@ -441,7 +441,7 @@ struct MapPlaceholderThumbnail: View {
     var body: some View {
         SchoolRunMapPlaceholder(
             currentStop: stopType.map { type in
-                RunStop(name: type.rawValue, type: type, task: "", estimatedMinutes: 5)
+                RunStop(name: type.rawValue, time: Date(), type: type, task: "", estimatedMinutes: 5)
             },
             showCurrentLocation: false,
             mapStyle: .thumbnail

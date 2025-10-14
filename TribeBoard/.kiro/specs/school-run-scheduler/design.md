@@ -2,586 +2,527 @@
 
 ## Overview
 
-The School Run Scheduler is a comprehensive multi-screen feature that enables parents to create, manage, and execute structured school transportation runs. The system consists of 5 interconnected SwiftUI screens that follow TribeBoard's established design patterns while introducing new scheduling and execution workflows.
-
-The architecture emphasizes local state management with placeholder data, ensuring the feature can demonstrate full UX flows without backend dependencies. All screens integrate seamlessly with TribeBoard's existing navigation structure, design system, and branding guidelines.
+The School Run module is a comprehensive feature addition to TribeBoard that enables parents to schedule, manage, and execute school transportation runs. The module integrates seamlessly with the existing 5-tab navigation structure, maintaining consistency with current design patterns, state management approaches, and styling conventions. All functionality operates locally in memory, providing a complete user experience without external dependencies.
 
 ## Architecture
 
-### Screen Flow Architecture
+### High-Level Architecture
+
+The School Run module follows TribeBoard's established MVVM architecture pattern:
 
 ```
-MainNavigationView
-├── SchoolRunDashboardView (Entry Point)
-│   ├── → ScheduleNewRunView (Create Flow)
-│   ├── → ScheduledRunsListView (Browse Flow)
-│   └── → RunDetailView (Review Flow)
-│       └── → RunExecutionView (Execution Flow)
-└── FloatingBottomNavigation (Persistent)
+Views (SwiftUI) ↔ ViewModels (ObservableObject) ↔ Models (Data Structures) ↔ Manager (Data Persistence)
 ```
 
-### Data Flow Architecture
+### Integration Points
 
-```
-SchoolRunSchedulerData (Static Model)
-├── MockRunTemplates[]
-├── MockChildrenProfiles[]
-├── MockStopPresets[]
-└── MockMapPlaceholders[]
+1. **Navigation Integration**: Extends existing `NavigationTab` enum with `.schoolRun` case
+2. **State Management**: Leverages `AppState` for global navigation coordination
+3. **Design System**: Uses existing `DesignSystem`, `BrandStyle`, and `BrandColors`
+4. **Accessibility**: Implements `EnhancedAccessibility` patterns
+5. **Animation**: Utilizes `AnimationUtilities` for consistent micro-interactions
 
-SchoolRunState (Local State Management)
-├── @StateObject runManager: SchoolRunManager
-├── @State selectedRun: SchoolRun?
-├── @State executionState: RunExecutionState
-└── @State navigationPath: NavigationPath
-```
+### Data Flow
 
-### Component Hierarchy
-
-```
-SchoolRunScheduler Module
-├── Views/
-│   ├── SchoolRunDashboardView
-│   ├── ScheduleNewRunView
-│   ├── ScheduledRunsListView
-│   ├── RunDetailView
-│   └── RunExecutionView
-├── Components/
-│   ├── RunSummaryCard
-│   ├── StopConfigurationRow
-│   ├── MapPlaceholderView
-│   ├── ProgressIndicator
-│   └── ExecutionControls
-├── Models/
-│   ├── SchoolRun
-│   ├── RunStop
-│   ├── ChildProfile
-│   └── RunExecutionState
-└── Utilities/
-    ├── SchoolRunManager
-    ├── MockDataProvider
-    └── ToastNotificationManager
+```mermaid
+graph TD
+    A[SchoolRunView] --> B[SchoolRunViewModel]
+    B --> C[SchoolRunManager]
+    C --> D[Local Storage]
+    
+    E[RunPlannerView] --> F[RunPlannerViewModel]
+    F --> C
+    
+    G[ActiveRunView] --> H[ActiveRunViewModel]
+    H --> C
+    
+    I[RunHistoryView] --> J[RunHistoryViewModel]
+    J --> C
 ```
 
 ## Components and Interfaces
 
-### 1. SchoolRunDashboardView
+### Core Data Models
 
-**Purpose**: Main entry point providing overview of runs and primary navigation
-
-**Layout Structure**:
+#### SchoolRun
 ```swift
-NavigationStack {
-    ScrollView {
-        VStack(spacing: 24) {
-            // Header with title
-            HeaderSection(title: "School Runs")
-            
-            // Primary action buttons
-            ActionButtonsSection()
-            
-            // Upcoming runs section
-            UpcomingRunsSection(runs: upcomingRuns)
-            
-            // Past runs section
-            PastRunsSection(runs: pastRuns)
-        }
-        .padding()
-    }
-    .navigationTitle("School Runs")
-    .navigationBarHidden(true)
-}
-```
-
-**Key Components**:
-- **ActionButtonsSection**: Two prominent buttons for "Schedule New Run" and "View Scheduled Runs"
-- **RunSummaryCard**: Reusable card component showing run overview (day, time, stops count)
-- **EmptyStateView**: Displayed when no runs exist in upcoming or past sections
-
-**State Management**:
-```swift
-@StateObject private var runManager = SchoolRunManager()
-@State private var showingScheduleView = false
-@State private var showingListView = false
-```
-
-### 2. ScheduleNewRunView
-
-**Purpose**: Form-based interface for creating new school runs with multiple stops
-
-**Layout Structure**:
-```swift
-NavigationView {
-    Form {
-        Section("Run Details") {
-            TextField("Run Name", text: $runName)
-            DatePicker("Day", selection: $selectedDate, displayedComponents: .date)
-            DatePicker("Time", selection: $selectedTime, displayedComponents: .hourAndMinute)
-        }
-        
-        Section("Stops") {
-            ForEach(stops.indices, id: \.self) { index in
-                StopConfigurationRow(
-                    stop: $stops[index],
-                    children: availableChildren,
-                    onDelete: { deleteStop(at: index) }
-                )
-            }
-            
-            Button("➕ Add Stop") {
-                addNewStop()
-            }
-        }
-        
-        Section {
-            Button("💾 Save Run") {
-                saveRun()
-            }
-            .buttonStyle(PrimaryButtonStyle())
-        }
-    }
-    .navigationTitle("Schedule New Run")
-    .navigationBarTitleDisplayMode(.inline)
-}
-```
-
-**Key Components**:
-- **StopConfigurationRow**: Complex component handling stop name, child assignment, task input, and time estimation
-- **ChildSelectionPicker**: Dropdown picker populated with mock child profiles
-- **StopPresetPicker**: Picker with preset options (Home, School, OT, Music, Custom)
-- **MapPlaceholderThumbnail**: Small static map image for each stop
-
-**State Management**:
-```swift
-@State private var runName = ""
-@State private var selectedDate = Date()
-@State private var selectedTime = Date()
-@State private var stops: [RunStop] = []
-@State private var availableChildren: [ChildProfile] = MockDataProvider.children
-```
-
-### 3. ScheduledRunsListView
-
-**Purpose**: Browse interface for viewing all created runs
-
-**Layout Structure**:
-```swift
-NavigationView {
-    List {
-        ForEach(scheduledRuns) { run in
-            NavigationLink(destination: RunDetailView(run: run)) {
-                RunListRowView(run: run)
-            }
-        }
-    }
-    .navigationTitle("Scheduled Runs")
-    .overlay {
-        if scheduledRuns.isEmpty {
-            EmptyStateView(
-                title: "No Scheduled Runs",
-                message: "Create your first school run to get started",
-                actionTitle: "Schedule Run",
-                action: { showingScheduleView = true }
-            )
-        }
-    }
-}
-```
-
-**Key Components**:
-- **RunListRowView**: Displays run name, day/time, and stop count in a clean row format
-- **EmptyStateView**: Encourages user to create first run when list is empty
-
-**State Management**:
-```swift
-@StateObject private var runManager = SchoolRunManager()
-@State private var showingScheduleView = false
-```
-
-### 4. RunDetailView
-
-**Purpose**: Detailed view of a specific run before execution
-
-**Layout Structure**:
-```swift
-ScrollView {
-    VStack(spacing: 20) {
-        // Run overview card
-        RunOverviewCard(run: run)
-        
-        // Stops list
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Route Details")
-                .font(.headline)
-            
-            ForEach(Array(run.stops.enumerated()), id: \.offset) { index, stop in
-                StopDetailRow(
-                    stopNumber: index + 1,
-                    totalStops: run.stops.count,
-                    stop: stop
-                )
-            }
-        }
-        
-        // Start run button
-        Button("▶️ Start Run") {
-            startRun()
-        }
-        .buttonStyle(PrimaryButtonStyle())
-        .padding(.top)
-    }
-    .padding()
-}
-.navigationTitle(run.name)
-.navigationBarTitleDisplayMode(.inline)
-```
-
-**Key Components**:
-- **RunOverviewCard**: Summary showing day, time, total duration, and participant count
-- **StopDetailRow**: Detailed stop information with location, child, task, and estimated time
-- **RouteVisualization**: Optional simple visual representation of the route
-
-**State Management**:
-```swift
-let run: SchoolRun
-@State private var showingExecutionView = false
-```
-
-### 5. RunExecutionView
-
-**Purpose**: Step-by-step execution interface with progress tracking
-
-**Layout Structure**:
-```swift
-VStack(spacing: 0) {
-    // Map placeholder (top half)
-    MapPlaceholderView(currentStop: currentStop)
-        .frame(height: UIScreen.main.bounds.height * 0.4)
+struct SchoolRun: Identifiable, Codable {
+    let id: UUID
+    var title: String
+    var date: Date
+    var route: [RunStop]
+    var status: RunStatus
+    var createdAt: Date
+    var estimatedDuration: TimeInterval
     
-    // Execution controls (bottom half)
-    VStack(spacing: 20) {
-        // Current stop info
-        CurrentStopCard(
-            stopNumber: currentStopIndex + 1,
-            totalStops: run.stops.count,
-            stop: currentStop
-        )
-        
-        // Progress indicator
-        ProgressIndicator(
-            current: currentStopIndex + 1,
-            total: run.stops.count
-        )
-        
-        // Action buttons
-        ExecutionControls(
-            onComplete: completeCurrentStop,
-            onPause: pauseRun,
-            onCancel: cancelRun
-        )
-    }
-    .padding()
-    .background(Color(.systemBackground))
+    // Computed properties for UI display
+    var formattedDate: String
+    var participatingChildren: [String]
+    var isToday: Bool
 }
-.navigationBarHidden(true)
 ```
 
-**Key Components**:
-- **MapPlaceholderView**: Large static map with current location indicator
-- **CurrentStopCard**: Prominent display of current stop details and task
-- **ProgressIndicator**: Visual progress bar showing completion status
-- **ExecutionControls**: Three action buttons for completing, pausing, or cancelling
-
-**State Management**:
+#### RunStop
 ```swift
-let run: SchoolRun
-@State private var currentStopIndex = 0
-@State private var executionState: RunExecutionState = .active
-@State private var showingCancelAlert = false
-@Environment(\.dismiss) private var dismiss
+struct RunStop: Identifiable, Codable {
+    let id: UUID
+    var name: String
+    var time: Date
+    var note: String
+    var type: StopType
+    var isCompleted: Bool
+    
+    enum StopType: String, CaseIterable {
+        case pickup, dropoff
+        
+        var icon: String
+        var displayName: String
+    }
+}
+```
+
+#### RunStatus
+```swift
+enum RunStatus: String, CaseIterable {
+    case scheduled, inProgress, completed, cancelled
+    
+    var displayText: String
+    var color: Color
+    var icon: String
+}
+```
+
+### View Models
+
+#### SchoolRunViewModel
+```swift
+@MainActor
+class SchoolRunViewModel: ObservableObject {
+    @Published var runs: [SchoolRun] = []
+    @Published var isLoading: Bool = false
+    @Published var errorMessage: String?
+    
+    private let manager: SchoolRunManager
+    
+    // Computed properties
+    var todaysRuns: [SchoolRun]
+    var upcomingRuns: [SchoolRun]
+    var completedRuns: [SchoolRun]
+    
+    // Methods
+    func loadRuns()
+    func deleteRun(_ run: SchoolRun)
+    func startRun(_ run: SchoolRun)
+}
+```
+
+#### RunPlannerViewModel
+```swift
+@MainActor
+class RunPlannerViewModel: ObservableObject {
+    @Published var title: String = ""
+    @Published var selectedDate: Date = Date()
+    @Published var stops: [RunStop] = []
+    @Published var isValid: Bool = false
+    
+    func addStop()
+    func removeStop(at index: Int)
+    func saveRun() -> SchoolRun?
+    func validateForm()
+}
+```
+
+#### ActiveRunViewModel
+```swift
+@MainActor
+class ActiveRunViewModel: ObservableObject {
+    @Published var currentRun: SchoolRun?
+    @Published var currentStopIndex: Int = 0
+    @Published var isRunning: Bool = false
+    
+    var currentStop: RunStop?
+    var nextStop: RunStop?
+    var progress: Double
+    
+    func nextStop()
+    func endRun()
+    func pauseRun()
+}
+```
+
+### Views Architecture
+
+#### Main Views
+1. **SchoolRunView**: Main dashboard showing runs list and quick actions
+2. **RunPlannerView**: Form-based interface for creating new runs
+3. **ActiveRunView**: Live run execution with map placeholder and controls
+4. **RunHistoryView**: Historical runs with filtering and details
+
+#### Component Views
+1. **RunCard**: Reusable card component for displaying run information
+2. **StopRow**: Individual stop display component
+3. **MapPlaceholderView**: Static map visualization using existing patterns
+4. **RunStatusBadge**: Status indicator component
+5. **QuickActionButtons**: Action buttons with haptic feedback
+
+### Manager Layer
+
+#### SchoolRunManager
+```swift
+class SchoolRunManager: ObservableObject {
+    @Published var runs: [SchoolRun] = []
+    @Published var activeRun: SchoolRun?
+    
+    private let storage: UserDefaults
+    
+    // CRUD Operations
+    func createRun(_ run: SchoolRun)
+    func updateRun(_ run: SchoolRun)
+    func deleteRun(id: UUID)
+    func getRun(id: UUID) -> SchoolRun?
+    
+    // Run Execution
+    func startRun(id: UUID)
+    func pauseRun(id: UUID)
+    func completeRun(id: UUID)
+    func cancelRun(id: UUID)
+    
+    // Data Persistence
+    func saveToStorage()
+    func loadFromStorage()
+}
 ```
 
 ## Data Models
 
-### Core Data Structures
+### Storage Strategy
+
+**Local Storage**: Uses `UserDefaults` for data persistence, following existing TribeBoard patterns:
 
 ```swift
-struct SchoolRun: Identifiable, Codable {
-    let id = UUID()
-    var name: String
-    var scheduledDate: Date
-    var scheduledTime: Date
-    var stops: [RunStop]
-    var isCompleted: Bool = false
-    var createdAt: Date = Date()
-    
-    var estimatedDuration: TimeInterval {
-        stops.reduce(0) { $0 + $1.estimatedMinutes * 60 }
-    }
-    
-    var participatingChildren: [ChildProfile] {
-        stops.compactMap(\.assignedChild).uniqued()
-    }
-}
+private let runsKey = "school_runs_data"
+private let activeRunKey = "active_school_run"
+```
 
-struct RunStop: Identifiable, Codable {
-    let id = UUID()
-    var name: String
-    var type: StopType
-    var assignedChild: ChildProfile?
-    var task: String
-    var estimatedMinutes: Int
-    var isCompleted: Bool = false
-    
-    enum StopType: String, CaseIterable, Codable {
-        case home = "Home"
-        case school = "School"
-        case ot = "OT"
-        case music = "Music"
-        case custom = "Custom"
-        
-        var icon: String {
-            switch self {
-            case .home: return "🏠"
-            case .school: return "🏫"
-            case .ot: return "🏥"
-            case .music: return "🎵"
-            case .custom: return "📍"
-            }
+**Data Structure**:
+```json
+{
+  "runs": [
+    {
+      "id": "uuid",
+      "title": "Morning School Run",
+      "date": "2025-01-15T08:00:00Z",
+      "status": "scheduled",
+      "route": [
+        {
+          "id": "uuid",
+          "name": "Home",
+          "time": "2025-01-15T08:00:00Z",
+          "type": "pickup",
+          "note": "Pick up Emma"
         }
+      ]
     }
-}
-
-struct ChildProfile: Identifiable, Codable, Hashable {
-    let id = UUID()
-    var name: String
-    var avatar: String
-    var age: Int
-}
-
-enum RunExecutionState {
-    case notStarted
-    case active
-    case paused
-    case completed
-    case cancelled
+  ]
 }
 ```
 
-### Mock Data Provider
+### Mock Data Generation
+
+Following existing `MockDataGenerator` patterns:
 
 ```swift
-class MockDataProvider {
-    static let children: [ChildProfile] = [
-        ChildProfile(name: "Emma", avatar: "person.circle.fill", age: 8),
-        ChildProfile(name: "Liam", avatar: "person.circle.fill", age: 10),
-        ChildProfile(name: "Sophia", avatar: "person.circle.fill", age: 6)
-    ]
+extension MockDataGenerator {
+    static func mockSchoolRuns() -> [SchoolRun] {
+        // Generate sample runs for demonstration
+    }
     
-    static let sampleRuns: [SchoolRun] = [
-        SchoolRun(
-            name: "Thursday School Run",
-            scheduledDate: Date().addingTimeInterval(86400),
-            scheduledTime: Calendar.current.date(bySettingHour: 15, minute: 30, second: 0, of: Date()) ?? Date(),
-            stops: [
-                RunStop(name: "Home", type: .home, task: "Pick snacks & guitar", estimatedMinutes: 5),
-                RunStop(name: "School", type: .school, assignedChild: children[0], task: "Pick up Emma", estimatedMinutes: 10),
-                RunStop(name: "OT Clinic", type: .ot, assignedChild: children[0], task: "Drop Emma for therapy", estimatedMinutes: 15),
-                RunStop(name: "Music School", type: .music, assignedChild: children[1], task: "Pick up Liam", estimatedMinutes: 10),
-                RunStop(name: "OT Clinic", type: .ot, assignedChild: children[0], task: "Pick up Emma", estimatedMinutes: 15),
-                RunStop(name: "Home", type: .home, task: "Return home", estimatedMinutes: 10)
-            ]
-        )
-    ]
-    
-    static let mapPlaceholders: [String] = [
-        "map-placeholder-1",
-        "map-placeholder-2",
-        "map-placeholder-3"
-    ]
+    static func mockRunStops() -> [RunStop] {
+        // Generate sample stops
+    }
 }
 ```
 
 ## Error Handling
 
-### User Experience Error Handling
+### Error Types
 
-Since this is a UX-focused implementation, error handling focuses on user interaction feedback and form validation:
-
-**Form Validation**:
 ```swift
-struct RunValidation {
-    static func validateRun(_ run: SchoolRun) -> [ValidationError] {
-        var errors: [ValidationError] = []
-        
-        if run.name.isEmpty {
-            errors.append(.emptyRunName)
-        }
-        
-        if run.stops.isEmpty {
-            errors.append(.noStops)
-        }
-        
-        if run.stops.contains(where: { $0.estimatedMinutes <= 0 }) {
-            errors.append(.invalidStopDuration)
-        }
-        
-        return errors
-    }
-}
-
-enum ValidationError: LocalizedError {
-    case emptyRunName
-    case noStops
-    case invalidStopDuration
+enum SchoolRunError: LocalizedError {
+    case invalidRunData
+    case runNotFound
+    case runAlreadyActive
+    case storageError
     
     var errorDescription: String? {
         switch self {
-        case .emptyRunName:
-            return "Please enter a name for your run"
-        case .noStops:
-            return "Please add at least one stop"
-        case .invalidStopDuration:
-            return "All stops must have a valid duration"
+        case .invalidRunData: return "Invalid run information provided"
+        case .runNotFound: return "School run not found"
+        case .runAlreadyActive: return "Another run is already in progress"
+        case .storageError: return "Failed to save run data"
         }
     }
 }
 ```
 
-**Toast Notification System**:
-```swift
-class ToastNotificationManager: ObservableObject {
-    @Published var currentToast: ToastMessage?
-    
-    func show(_ message: String, type: ToastType = .info) {
-        currentToast = ToastMessage(text: message, type: type)
-        
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-            self.currentToast = nil
-        }
-    }
-}
+### Error Handling Strategy
 
-struct ToastMessage {
-    let text: String
-    let type: ToastType
-    
-    enum ToastType {
-        case success, info, warning, error
-        
-        var color: Color {
-            switch self {
-            case .success: return .green
-            case .info: return .blue
-            case .warning: return .orange
-            case .error: return .red
-            }
-        }
-    }
-}
-```
+1. **View Level**: Display inline error messages using existing `InlineErrorView`
+2. **ViewModel Level**: Publish error states via `@Published var errorMessage: String?`
+3. **Manager Level**: Throw specific errors for proper handling upstream
+4. **Toast Notifications**: Use existing `ToastManager` for non-critical errors
 
 ## Testing Strategy
 
-### Unit Testing Approach
+### Unit Testing
 
-**Model Testing**:
+Following existing test structure in `TribeBoardTests/Unit/`:
+
+```
+TribeBoardTests/Unit/SchoolRun/
+├── Models/
+│   ├── SchoolRunTests.swift
+│   ├── RunStopTests.swift
+│   └── RunStatusTests.swift
+├── ViewModels/
+│   ├── SchoolRunViewModelTests.swift
+│   ├── RunPlannerViewModelTests.swift
+│   └── ActiveRunViewModelTests.swift
+├── Managers/
+│   └── SchoolRunManagerTests.swift
+└── Utilities/
+    └── SchoolRunMockDataTests.swift
+```
+
+### Integration Testing
+
+Following existing integration test patterns:
+
+```
+TribeBoardTests/Integration/
+└── SchoolRunIntegrationTests.swift
+```
+
+### UI Testing
+
+Following existing UI test structure:
+
+```
+TribeBoardUITests/SchoolRun/
+├── SchoolRunNavigationTests.swift
+├── RunPlannerUITests.swift
+├── ActiveRunUITests.swift
+└── SchoolRunAccessibilityTests.swift
+```
+
+### Test Coverage Goals
+
+- **Models**: 100% coverage for data validation and computed properties
+- **ViewModels**: 90% coverage for business logic and state management
+- **Manager**: 95% coverage for CRUD operations and data persistence
+- **Views**: 80% coverage for user interactions and accessibility
+
+### Mock Data Strategy
+
+Extend existing mock data patterns:
+
 ```swift
-class SchoolRunTests: XCTestCase {
-    func testRunDurationCalculation() {
-        let run = SchoolRun(
-            name: "Test Run",
-            scheduledDate: Date(),
-            scheduledTime: Date(),
-            stops: [
-                RunStop(name: "Stop 1", type: .home, task: "Task 1", estimatedMinutes: 10),
-                RunStop(name: "Stop 2", type: .school, task: "Task 2", estimatedMinutes: 15)
-            ]
+extension MockDataGenerator {
+    static func mockSchoolRunScenarios() -> [SchoolRun] {
+        return [
+            // Today's runs
+            mockTodaysRuns(),
+            // Upcoming runs
+            mockUpcomingRuns(),
+            // Completed runs
+            mockCompletedRuns(),
+            // Edge cases
+            mockEdgeCaseRuns()
+        ].flatMap { $0 }
+    }
+}
+```
+
+## Navigation Integration
+
+### Tab Bar Integration
+
+Extend existing `NavigationTab` enum:
+
+```swift
+enum NavigationTab: String, CaseIterable, Identifiable {
+    case dashboard = "dashboard"
+    case calendar = "calendar"
+    case schoolRun = "schoolRun"  // New case
+    case homeLife = "homeLife"
+    case tasks = "tasks"
+    
+    var displayName: String {
+        case .schoolRun: return "Run"
+    }
+    
+    var icon: String {
+        case .schoolRun: return "car"
+    }
+    
+    var activeIcon: String {
+        case .schoolRun: return "car.fill"
+    }
+}
+```
+
+### Navigation Flow
+
+```mermaid
+graph TD
+    A[MainNavigationView] --> B[SchoolRunView]
+    B --> C[RunPlannerView]
+    B --> D[ActiveRunView]
+    B --> E[RunHistoryView]
+    
+    C --> F[StopConfigurationView]
+    D --> G[RunProgressView]
+    E --> H[RunDetailView]
+```
+
+### Deep Linking Support
+
+Extend existing navigation path handling:
+
+```swift
+extension AppState {
+    func navigateToSchoolRun(runId: UUID? = nil) {
+        selectedNavigationTab = .schoolRun
+        if let runId = runId {
+            navigationPath.append(SchoolRunDestination.runDetail(runId))
+        }
+    }
+}
+```
+
+## Accessibility Implementation
+
+### Accessibility Features
+
+1. **VoiceOver Support**: All components include proper accessibility labels and hints
+2. **Dynamic Type**: Text scales appropriately with user preferences
+3. **High Contrast**: Colors adapt to increased contrast settings
+4. **Reduced Motion**: Animations respect user motion preferences
+5. **Keyboard Navigation**: Full keyboard support for all interactions
+
+### Implementation Pattern
+
+Following existing accessibility patterns:
+
+```swift
+struct RunCard: View {
+    var body: some View {
+        VStack {
+            // Content
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("School run: \(run.title)")
+        .accessibilityHint("Tap to view run details")
+        .accessibilityValue(run.status.displayText)
+        .accessibilityAddTraits(.isButton)
+    }
+}
+```
+
+## Performance Considerations
+
+### Memory Management
+
+1. **Lazy Loading**: Load run details only when needed
+2. **Image Optimization**: Use SF Symbols for icons, static images for map placeholders
+3. **Data Pagination**: Limit displayed runs to recent items with "Load More" functionality
+4. **State Cleanup**: Properly dispose of timers and observers
+
+### Storage Optimization
+
+1. **Data Compression**: Use efficient JSON encoding for storage
+2. **Cleanup Strategy**: Remove old completed runs after 30 days
+3. **Batch Operations**: Group multiple updates into single storage operations
+
+### UI Performance
+
+1. **List Optimization**: Use `LazyVStack` for large run lists
+2. **Animation Efficiency**: Use `withAnimation` judiciously
+3. **State Updates**: Minimize unnecessary view updates through proper `@Published` usage
+
+## Security Considerations
+
+### Data Privacy
+
+1. **Local Storage Only**: No data transmitted to external servers
+2. **Sandboxed Storage**: Data stored within app's sandbox
+3. **No Location Tracking**: Use mock location data only
+4. **Family Data Isolation**: Runs associated with current family context only
+
+### Input Validation
+
+1. **Form Validation**: Validate all user inputs before saving
+2. **Date Validation**: Ensure dates are reasonable and in future
+3. **String Sanitization**: Clean user-provided text inputs
+4. **Data Integrity**: Validate data structure on load
+
+## Styling and Design System Integration
+
+### Color Scheme
+
+Uses existing TribeBoard color system:
+
+```swift
+extension Color {
+    static let schoolRunPrimary = Color.brandPrimary
+    static let schoolRunSecondary = Color.brandSecondary
+    static let schoolRunAccent = Color.accentColor
+}
+```
+
+### Typography
+
+Follows existing typography scale:
+
+```swift
+extension Font {
+    static let schoolRunTitle = DesignSystem.Typography.titleLarge
+    static let schoolRunBody = DesignSystem.Typography.bodyMedium
+    static let schoolRunCaption = DesignSystem.Typography.captionRegular
+}
+```
+
+### Spacing and Layout
+
+Uses existing spacing system:
+
+```swift
+extension DesignSystem.Spacing {
+    // Existing spacing values used throughout
+    static let cardPadding = DesignSystem.Spacing.lg
+    static let itemSpacing = DesignSystem.Spacing.md
+    static let compactSpacing = DesignSystem.Spacing.sm
+}
+```
+
+### Component Styling
+
+Maintains consistency with existing components:
+
+```swift
+struct RunCard: View {
+    var body: some View {
+        VStack {
+            // Content
+        }
+        .cardPadding()
+        .background(
+            RoundedRectangle(cornerRadius: BrandStyle.cornerRadius)
+                .fill(Color(.systemBackground))
+                .mediumShadow()
         )
-        
-        XCTAssertEqual(run.estimatedDuration, 1500) // 25 minutes in seconds
-    }
-    
-    func testParticipatingChildren() {
-        // Test unique child extraction from stops
     }
 }
 ```
 
-**View Testing**:
-```swift
-class SchoolRunViewTests: XCTestCase {
-    func testDashboardInitialState() {
-        // Test dashboard renders correctly with mock data
-    }
-    
-    func testScheduleFormValidation() {
-        // Test form validation logic
-    }
-    
-    func testExecutionStateTransitions() {
-        // Test run execution state changes
-    }
-}
-```
-
-**Integration Testing**:
-```swift
-class SchoolRunIntegrationTests: XCTestCase {
-    func testCompleteRunCreationFlow() {
-        // Test full flow from dashboard to run creation
-    }
-    
-    func testRunExecutionFlow() {
-        // Test complete execution from start to finish
-    }
-}
-```
-
-### Manual Testing Scenarios
-
-**Navigation Flow Testing**:
-1. Navigate from main app to School Run Dashboard
-2. Create new run through complete form flow
-3. Browse scheduled runs and view details
-4. Execute run step-by-step
-5. Return to dashboard and verify completed run
-
-**Form Interaction Testing**:
-1. Test all form inputs and validation
-2. Add/remove stops dynamically
-3. Test drag-and-drop stop reordering
-4. Verify child assignment dropdowns
-5. Test save functionality
-
-**Execution Mode Testing**:
-1. Start run execution and verify initial state
-2. Complete stops sequentially
-3. Test pause/resume functionality
-4. Test cancellation with confirmation
-5. Verify progress tracking accuracy
-
-**Accessibility Testing**:
-1. Navigate entire flow with VoiceOver
-2. Test with large text sizes
-3. Verify high contrast mode compatibility
-4. Test keyboard navigation where applicable
-
-### Performance Considerations
-
-**Memory Management**:
-- Use `@StateObject` for managers that persist across view lifecycle
-- Use `@State` for local view state that doesn't need persistence
-- Implement proper cleanup in execution mode to prevent memory leaks
-
-**UI Performance**:
-- Use `LazyVStack` for large lists of runs or stops
-- Implement efficient list updates with proper `id` values
-- Use placeholder images that load quickly
-- Minimize state updates during execution mode
-
-**Data Persistence**:
-- Store runs in UserDefaults for demo purposes
-- Implement simple JSON encoding/decoding for run data
-- Clear old completed runs to prevent storage bloat
-- Use efficient data structures for quick lookups
+This design ensures the School Run module integrates seamlessly with TribeBoard's existing architecture while providing a comprehensive and user-friendly experience for managing school transportation runs.

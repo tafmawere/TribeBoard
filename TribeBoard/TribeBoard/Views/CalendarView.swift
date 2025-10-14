@@ -352,31 +352,31 @@ struct SchoolRunCard: View {
             
             // School run details
             VStack(alignment: .leading, spacing: 4) {
-                Text(schoolRun.route)
+                Text(schoolRun.title)
                     .font(.subheadline)
                     .fontWeight(.semibold)
                 
                 HStack(spacing: 8) {
-                    Text("Pickup: \(timeFormatter.string(from: schoolRun.pickupTime))")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                    if let firstPickup = schoolRun.pickupStops.first {
+                        Text("Pickup: \(timeFormatter.string(from: firstPickup.time))")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
                     
-                    Text("• Drop-off: \(timeFormatter.string(from: schoolRun.dropoffTime))")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                    if let firstDropoff = schoolRun.dropoffStops.first {
+                        Text("• Drop-off: \(timeFormatter.string(from: firstDropoff.time))")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
                 }
                 
-                if let driverName = userProfiles[schoolRun.driver]?.displayName {
-                    Text("Driver: \(driverName)")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
+                // Driver information would be added when driver assignment is implemented
             }
             
             Spacer()
             
             // Status badge
-            Text(schoolRun.status.displayName)
+            Text(schoolRun.status.displayText)
                 .font(.caption)
                 .fontWeight(.medium)
                 .padding(.horizontal, 8)
@@ -390,7 +390,7 @@ struct SchoolRunCard: View {
         .cornerRadius(12)
     }
     
-    private func colorForStatus(_ status: SchoolRun.RunStatus) -> Color {
+    private func colorForStatus(_ status: RunStatus) -> Color {
         switch status {
         case .scheduled:
             return .blue

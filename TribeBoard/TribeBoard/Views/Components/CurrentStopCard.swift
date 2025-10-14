@@ -368,10 +368,11 @@ private struct CompactCurrentStopCard: View {
             totalStops: 6,
             stop: RunStop(
                 name: "Home",
+                time: Date(),
                 type: .home,
+                isCompleted: true,
                 task: "Grab snacks and water bottles",
-                estimatedMinutes: 5,
-                isCompleted: true
+                estimatedMinutes: 5
             ),
             isActive: false
         )
@@ -423,10 +424,11 @@ private struct CompactCurrentStopCard: View {
             totalStops: 3,
             stop: RunStop(
                 name: "Riverside Elementary School",
+                time: Date(),
                 type: .school,
-                assignedChild: ChildProfile(name: "Emma-Louise", avatar: "person.circle.fill", age: 8),
                 task: "Pick up Emma-Louise from her classroom and collect her art project from the teacher. Make sure to check with the office about the field trip permission slip.",
-                estimatedMinutes: 15
+                estimatedMinutes: 15,
+                assignedChild: ChildProfile(name: "Emma-Louise", avatar: "person.circle.fill", age: 8)
             ),
             isActive: true
         )

@@ -733,18 +733,18 @@ struct SchoolRunRowView: View {
                 .font(.title3)
             
             VStack(alignment: .leading, spacing: 2) {
-                Text(schoolRun.route)
+                Text(schoolRun.title)
                     .font(.subheadline)
                     .fontWeight(.medium)
                 
-                Text(schoolRun.pickupTime, style: .time)
+                Text(schoolRun.date, style: .time)
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
             
             Spacer()
             
-            Text(schoolRun.status.displayName)
+            Text(schoolRun.status.displayText)
                 .font(.caption)
                 .fontWeight(.medium)
                 .padding(.horizontal, 6)

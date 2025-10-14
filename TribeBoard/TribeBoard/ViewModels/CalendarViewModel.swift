@@ -46,9 +46,9 @@ class CalendarViewModel: ObservableObject {
         let endOfWeek = Calendar.current.dateInterval(of: .weekOfYear, for: today)?.end ?? today
         
         return schoolRuns.filter { schoolRun in
-            schoolRun.pickupTime >= startOfWeek && schoolRun.pickupTime <= endOfWeek
+            schoolRun.date >= startOfWeek && schoolRun.date <= endOfWeek
         }
-        .sorted { $0.pickupTime < $1.pickupTime }
+        .sorted(by: { $0.date < $1.date })
     }
     
     // MARK: - Mock Data Loading
@@ -57,11 +57,13 @@ class CalendarViewModel: ObservableObject {
         isLoading = true
         
         // Simulate loading delay for realistic experience
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            self.loadCalendarEvents()
-            self.loadSchoolRuns()
-            self.loadUserProfiles()
-            self.isLoading = false
+        Task {
+            try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+            
+            loadCalendarEvents()
+            loadSchoolRuns()
+            loadUserProfiles()
+            isLoading = false
         }
     }
     
@@ -84,8 +86,9 @@ class CalendarViewModel: ObservableObject {
         successMessage = "Add Event feature coming soon! 📅"
         
         // Clear message after delay
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-            self.successMessage = nil
+        Task {
+            try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
+            successMessage = nil
         }
     }
     
@@ -101,8 +104,8 @@ class CalendarViewModel: ObservableObject {
     }
     
     func schoolRunsForDate(_ date: Date) -> [SchoolRun] {
-        return schoolRuns.filter { Calendar.current.isDate($0.pickupTime, inSameDayAs: date) }
-            .sorted { $0.pickupTime < $1.pickupTime }
+        return schoolRuns.filter { Calendar.current.isDate($0.date, inSameDayAs: date) }
+            .sorted(by: { $0.date < $1.date })
     }
     
     // MARK: - Event Management (Mock Actions)
@@ -122,8 +125,9 @@ class CalendarViewModel: ObservableObject {
         successMessage = "Event '\(title)' added successfully! 🎉"
         
         // Clear message after delay
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-            self.successMessage = nil
+        Task {
+            try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
+            successMessage = nil
         }
     }
     
@@ -132,8 +136,9 @@ class CalendarViewModel: ObservableObject {
         successMessage = "Event deleted successfully"
         
         // Clear message after delay
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-            self.successMessage = nil
+        Task {
+            try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
+            successMessage = nil
         }
     }
     
@@ -186,8 +191,9 @@ extension CalendarViewModel {
         errorMessage = "Unable to load calendar events. Please check your connection and try again."
         
         // Clear error after delay
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-            self.errorMessage = nil
+        Task {
+            try? await Task.sleep(nanoseconds: 3_000_000_000) // 3 seconds
+            errorMessage = nil
         }
     }
     
@@ -195,8 +201,9 @@ extension CalendarViewModel {
         errorMessage = "Something went wrong while loading your calendar. Please try again."
         
         // Clear error after delay
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-            self.errorMessage = nil
+        Task {
+            try? await Task.sleep(nanoseconds: 3_000_000_000) // 3 seconds
+            errorMessage = nil
         }
     }
 }

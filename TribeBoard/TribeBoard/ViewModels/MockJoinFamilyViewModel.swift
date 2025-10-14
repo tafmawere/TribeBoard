@@ -82,7 +82,7 @@ class MockJoinFamilyViewModel: ObservableObject {
                 await handleFoundFamily(family)
             } else {
                 // For demo purposes, create some mock families that can be found
-                if trimmedCode == "DEMO123" || trimmedCode == "TEST456" || trimmedCode == "FAMILY1" {
+                if trimmedCode == "DEMO12" || trimmedCode == "TEST45" || trimmedCode == "FAM123" {
                     let mockFamily = Family(
                         name: getMockFamilyName(for: trimmedCode),
                         code: trimmedCode,
@@ -112,7 +112,7 @@ class MockJoinFamilyViewModel: ObservableObject {
         try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
         
         // For prototype, simulate finding a family via QR scan
-        let mockQRCodes = ["TRIBE123", "DEMO123", "TEST456"]
+        let mockQRCodes = ["TRIBE123", "DEMO12", "TEST45"]
         let randomCode = mockQRCodes.randomElement() ?? "TRIBE123"
         
         familyCode = randomCode
@@ -220,11 +220,11 @@ class MockJoinFamilyViewModel: ObservableObject {
     /// Get mock family name for demo codes
     private func getMockFamilyName(for code: String) -> String {
         switch code {
-        case "DEMO123":
+        case "DEMO12":
             return "Demo Family"
-        case "TEST456":
+        case "TEST45":
             return "Test Family"
-        case "FAMILY1":
+        case "FAM123":
             return "Sample Family"
         default:
             return "Mock Family"
@@ -236,11 +236,11 @@ class MockJoinFamilyViewModel: ObservableObject {
         switch code {
         case "TRIBE123":
             return 3 // Matches the default mock family
-        case "DEMO123":
+        case "DEMO12":
             return 4
-        case "TEST456":
+        case "TEST45":
             return 2
-        case "FAMILY1":
+        case "FAM123":
             return 5
         default:
             return Int.random(in: 2...6)

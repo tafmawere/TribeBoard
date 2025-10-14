@@ -51,56 +51,40 @@ struct ScreenPreviewsTab: View {
             List {
                 Section("Main Screens") {
                     NavigationLink("Dashboard") {
-                        SchoolRunPreviewProvider.previewWithSampleData {
-                            SchoolRunDashboardView()
-                        }
+                        SchoolRunDashboardView()
                     }
                     
                     NavigationLink("Schedule New Run") {
-                        SchoolRunPreviewProvider.previewWithSampleData {
-                            ScheduleNewRunView()
-                        }
+                        ScheduleNewRunView()
                     }
                     
                     NavigationLink("Scheduled Runs List") {
-                        SchoolRunPreviewProvider.previewWithSampleData {
-                            ScheduledRunsListView()
-                        }
+                        ScheduledRunsListView()
                     }
                     
                     NavigationLink("Run Detail") {
-                        SchoolRunPreviewProvider.previewWithSampleData {
-                            RunDetailView(run: SchoolRunPreviewProvider.upcomingRun)
-                        }
+                        RunDetailView(run: SchoolRunPreviewProvider.upcomingRun)
                     }
                     
                     NavigationLink("Run Execution") {
-                        SchoolRunPreviewProvider.previewWithSampleData {
-                            RunExecutionView(run: SchoolRunPreviewProvider.executionRunStart)
-                        }
+                        RunExecutionView(run: SchoolRunPreviewProvider.executionRunStart)
                     }
                 }
                 
                 Section("Screen States") {
                     NavigationLink("Dashboard - Empty State") {
-                        SchoolRunPreviewProvider.previewWithSampleData {
-                            SchoolRunDashboardView()
-                                .onAppear {
-                                    // Would show empty state
-                                }
-                        }
+                        SchoolRunDashboardView()
+                            .onAppear {
+                                // Would show empty state
+                            }
                     }
                     
                     NavigationLink("Run Detail - Completed") {
-                        SchoolRunPreviewProvider.previewWithSampleData {
-                            RunDetailView(run: SchoolRunPreviewProvider.completedRun)
-                        }
+                        RunDetailView(run: SchoolRunPreviewProvider.completedRun)
                     }
                     
                     NavigationLink("Run Execution - Mid Progress") {
-                        SchoolRunPreviewProvider.previewWithSampleData {
-                            RunExecutionView(run: SchoolRunPreviewProvider.executionRunMidway)
-                        }
+                        RunExecutionView(run: SchoolRunPreviewProvider.executionRunMidway)
                     }
                 }
             }
@@ -170,9 +154,11 @@ struct ComponentPreviewsTab: View {
                                 StopConfigurationRow(
                                     stop: .constant(RunStop(
                                         name: "Custom Location",
-                                        type: .custom,
+                                        time: Date(),
+                                        note: "Quick errand",
+                                        type: .pickup,
                                         task: "Quick errand",
-                                        estimatedMinutes: 15
+                                        estimatedMinutes: 10
                                     )),
                                     children: SchoolRunPreviewProvider.sampleChildren,
                                     stopNumber: 2,
@@ -202,11 +188,12 @@ struct ComponentPreviewsTab: View {
                                     totalStops: 4,
                                     stop: RunStop(
                                         name: "Music Academy",
-                                        type: .music,
-                                        assignedChild: SchoolRunPreviewProvider.sampleChildren[1],
+                                        time: Date(),
+                                        note: "Drop off for lesson",
+                                        type: .dropoff,
+                                        isCompleted: true,
                                         task: "Drop off for lesson",
-                                        estimatedMinutes: 15,
-                                        isCompleted: true
+                                        estimatedMinutes: 15
                                     )
                                 )
                             }
@@ -271,17 +258,13 @@ struct AccessibilityPreviewsTab: View {
             List {
                 Section("Dynamic Type") {
                     NavigationLink("Large Text - Dashboard") {
-                        SchoolRunPreviewProvider.previewWithSampleData {
-                            SchoolRunDashboardView()
-                        }
-                        .environment(\.dynamicTypeSize, .accessibility2)
+                        SchoolRunDashboardView()
+                            .environment(\.dynamicTypeSize, .accessibility3)
                     }
                     
                     NavigationLink("Large Text - Form") {
-                        SchoolRunPreviewProvider.previewWithSampleData {
-                            ScheduleNewRunView()
-                        }
-                        .environment(\.dynamicTypeSize, .accessibility1)
+                        ScheduleNewRunView()
+                            .environment(\.dynamicTypeSize, .accessibility2)
                     }
                     
                     NavigationLink("Large Text - Components") {
@@ -294,8 +277,9 @@ struct AccessibilityPreviewsTab: View {
                                     totalStops: 2,
                                     stop: RunStop(
                                         name: "Riverside Elementary School",
-                                        type: .school,
-                                        assignedChild: ChildProfile(name: "Emma-Louise", avatar: "person.circle.fill", age: 8),
+                                        time: Date(),
+                                        note: "Pick up Emma-Louise from her classroom and collect her art project",
+                                        type: .pickup,
                                         task: "Pick up Emma-Louise from her classroom and collect her art project",
                                         estimatedMinutes: 15
                                     ),
@@ -303,15 +287,13 @@ struct AccessibilityPreviewsTab: View {
                                 )
                             }
                         }
-                        .environment(\.dynamicTypeSize, .accessibility1)
+                        .environment(\.dynamicTypeSize, .accessibility2)
                     }
                 }
                 
                 Section("High Contrast") {
                     NavigationLink("High Contrast - Dashboard") {
-                        SchoolRunPreviewProvider.previewWithSampleData {
-                            SchoolRunDashboardView()
-                        }
+                        SchoolRunDashboardView()
                     }
                     
                     NavigationLink("High Contrast - Components") {
@@ -333,9 +315,7 @@ struct AccessibilityPreviewsTab: View {
                 
                 Section("Reduced Motion") {
                     NavigationLink("Reduced Motion - Execution") {
-                        SchoolRunPreviewProvider.previewWithSampleData {
-                            RunExecutionView(run: SchoolRunPreviewProvider.executionRunStart)
-                        }
+                        RunExecutionView(run: SchoolRunPreviewProvider.executionRunStart)
                     }
                     
                     NavigationLink("Reduced Motion - Components") {
@@ -492,7 +472,7 @@ struct InteractiveUserJourneyDemo: View {
 
 struct InteractiveFormDemo: View {
     @State private var stops: [RunStop] = [
-        RunStop(name: "", type: .home, task: "", estimatedMinutes: 5)
+        RunStop(name: "", time: Date(), note: "", type: .pickup, task: "", estimatedMinutes: 5)
     ]
     
     var body: some View {
@@ -513,7 +493,7 @@ struct InteractiveFormDemo: View {
                 }
                 
                 Button("Add Stop") {
-                    stops.append(RunStop(name: "", type: .home, task: "", estimatedMinutes: 5))
+                    stops.append(RunStop(name: "", time: Date(), note: "", type: .pickup, task: "", estimatedMinutes: 5))
                 }
                 .buttonStyle(SecondaryButtonStyle())
                 

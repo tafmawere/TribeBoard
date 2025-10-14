@@ -36,16 +36,51 @@ class MockDataService: ObservableObject {
             appleUserIdHash: "mock_guardian_hash_003"
         )
         
-        mockUsers = [parentUser, childUser, guardianUser]
+        // Create additional demo users
+        let demoParent = UserProfile(
+            displayName: "Demo Parent",
+            appleUserIdHash: "demo_parent_hash_004"
+        )
         
-        // Create mock family
+        let testParent = UserProfile(
+            displayName: "Test Parent", 
+            appleUserIdHash: "test_parent_hash_005"
+        )
+        
+        let sampleParent = UserProfile(
+            displayName: "Sample Parent",
+            appleUserIdHash: "sample_parent_hash_006"
+        )
+        
+        mockUsers = [parentUser, childUser, guardianUser, demoParent, testParent, sampleParent]
+        
+        // Create mock families
         let mockFamily = Family(
             name: "Mawere Family",
             code: "TRIBE123",
             createdByUserId: parentUser.id
         )
         
-        mockFamilies = [mockFamily]
+        // Add demo families for testing join functionality
+        let demoFamily = Family(
+            name: "Demo Family",
+            code: "DEMO12",
+            createdByUserId: demoParent.id
+        )
+        
+        let testFamily = Family(
+            name: "Test Family", 
+            code: "TEST45",
+            createdByUserId: testParent.id
+        )
+        
+        let sampleFamily = Family(
+            name: "Sample Family",
+            code: "FAM123", 
+            createdByUserId: sampleParent.id
+        )
+        
+        mockFamilies = [mockFamily, demoFamily, testFamily, sampleFamily]
         
         // Create mock memberships
         let parentMembership = Membership(
@@ -66,7 +101,29 @@ class MockDataService: ObservableObject {
             role: .adult
         )
         
-        mockMemberships = [parentMembership, childMembership, guardianMembership]
+        // Create memberships for demo families
+        let demoParentMembership = Membership(
+            family: demoFamily,
+            user: demoParent,
+            role: .parentAdmin
+        )
+        
+        let testParentMembership = Membership(
+            family: testFamily,
+            user: testParent,
+            role: .parentAdmin
+        )
+        
+        let sampleParentMembership = Membership(
+            family: sampleFamily,
+            user: sampleParent,
+            role: .parentAdmin
+        )
+        
+        mockMemberships = [
+            parentMembership, childMembership, guardianMembership,
+            demoParentMembership, testParentMembership, sampleParentMembership
+        ]
     }
     
     // MARK: - Family Operations

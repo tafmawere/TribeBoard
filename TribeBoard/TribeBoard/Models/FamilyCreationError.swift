@@ -408,4 +408,13 @@ enum FamilyJoinError: LocalizedError, Equatable {
             return "Please try again or restart the app"
         }
     }
+    
+    var isRetryable: Bool {
+        switch self {
+        case .invalidCode, .emptyCode, .alreadyMember:
+            return false
+        case .familyNotFound, .userNotFound, .unknownError:
+            return true
+        }
+    }
 }
