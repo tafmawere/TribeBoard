@@ -76,6 +76,64 @@ final class Family {
         lastSyncDate = Date()
         needsSync = false
     }
+    
+    // MARK: - Calendar Integration
+    
+    /// Gets all calendar permissions for this family
+    var calendarPermissions: [CalendarPermission] {
+        // This would be populated through a relationship in a real implementation
+        // For now, we'll use a computed property that would be filled by the service layer
+        return []
+    }
+    
+    /// Gets calendar permission for a specific user
+    func calendarPermission(for userId: UUID) -> CalendarPermission? {
+        return calendarPermissions.first { $0.userId == userId && $0.isActive }
+    }
+    
+    /// Checks if a user has calendar admin privileges
+    func hasCalendarAdmin(userId: UUID) -> Bool {
+        guard let permission = calendarPermission(for: userId) else { return false }
+        return permission.permissionLevel == .admin
+    }
+    
+    /// Gets all family members with calendar access
+    var membersWithCalendarAccess: [Membership] {
+        return activeMembers.filter { member in
+            if let permission = calendarPermission(for: member.userId ?? UUID()) {
+                return permission.hasPermission(.viewFamilyEvents)
+            }
+            // Default access based on role
+            return member.role != .visitor
+        }
+    }
+    
+    /// Gets calendar statistics for this family
+    func getCalendarStats(events: [CalendarEvent]) -> FamilyCalendarStats {
+        let familyEvents = events.filter { $0.familyId == self.id && $0.privacyLevel == .familyShared }
+        let now = Date()
+        
+        let upcomingEvents = familyEvents.filter { $0.startDate > now }.count
+        let pastEvents = familyEvents.filter { $0.endDate < now }.count
+        let todayEvents = familyEvents.filter { Calendar.current.isDate($0.startDate, inSameDayAs: now) }.count
+        
+        let eventsByCreator = Dictionary(grouping: familyEvents) { $0.createdBy }
+        
+        // Create a date range for the last 30 days to next 30 days
+        let startDate = Calendar.current.date(byAdding: .day, value: -30, to: now) ?? now
+        let endDate = Calendar.current.date(byAdding: .day, value: 30, to: now) ?? now
+        let dateRange = DateInterval(start: startDate, end: endDate)
+        
+        return FamilyCalendarStats(
+            totalEvents: familyEvents.count,
+            upcomingEvents: upcomingEvents,
+            pastEvents: pastEvents,
+            todayEvents: todayEvents,
+            uniqueCreators: eventsByCreator.keys.count,
+            eventsByCreator: eventsByCreator.mapValues { $0.count },
+            dateRange: dateRange
+        )
+    }
 }
 
 // MARK: - CloudKit Synchronization

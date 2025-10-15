@@ -130,6 +130,8 @@ class NetworkMonitor: ObservableObject {
     }
     
     private func updateNetworkStatus(_ path: NWPath) {
+        let wasConnected = isConnected
+        
         // Update connection status
         isConnected = path.status == .satisfied
         
@@ -146,6 +148,11 @@ class NetworkMonitor: ObservableObject {
         
         // Update expensive status
         isExpensive = path.isExpensive
+        
+        // Post notification if connection status changed
+        if wasConnected != isConnected {
+            postNetworkStatusChange()
+        }
     }
 }
 

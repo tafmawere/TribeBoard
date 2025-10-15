@@ -13,6 +13,9 @@ class ServiceCoordinator: ObservableObject {
     let authService: AuthService
     let qrCodeService: QRCodeService
     let codeGenerator: CodeGenerator
+    let eventKitManager: EventKitManager
+    let calendarSyncService: CalendarSyncService
+    let calendarService: CalendarService
     
     // MARK: - Initialization
     
@@ -23,6 +26,9 @@ class ServiceCoordinator: ObservableObject {
         self.authService = AuthService()
         self.qrCodeService = QRCodeService()
         self.codeGenerator = CodeGenerator()
+        self.eventKitManager = EventKitManager()
+        self.calendarSyncService = CalendarSyncService(eventKitManager: eventKitManager, modelContext: modelContext)
+        self.calendarService = CalendarService(modelContext: modelContext, eventKitManager: eventKitManager, calendarSyncService: calendarSyncService)
         
         // Set up service dependencies
         self.authService.setDataService(dataService)
@@ -75,5 +81,30 @@ class ServiceCoordinator: ObservableObject {
             familyId: family.id,
             currentUserId: currentUserId
         )
+    }
+    
+    // MARK: - Calendar Service Factory Methods
+    
+    /// Creates CalendarViewModel with proper dependencies
+    func calendarViewModel(userId: UUID) -> CalendarViewModel {
+        return CalendarViewModel(
+            calendarService: calendarService,
+            userId: userId
+        )
+    }
+    
+    /// Provides access to calendar service for calendar operations
+    func getCalendarService() -> CalendarService {
+        return calendarService
+    }
+    
+    /// Provides access to EventKit manager for calendar operations
+    func getEventKitManager() -> EventKitManager {
+        return eventKitManager
+    }
+    
+    /// Provides access to calendar sync service
+    func getCalendarSyncService() -> CalendarSyncService {
+        return calendarSyncService
     }
 }

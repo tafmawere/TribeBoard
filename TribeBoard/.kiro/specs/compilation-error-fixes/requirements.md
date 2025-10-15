@@ -2,72 +2,56 @@
 
 ## Introduction
 
-The TribeBoard project currently has multiple compilation errors that prevent successful builds. These errors span across accessibility utilities, error handling, school run components, and SwiftUI view implementations. The system needs comprehensive fixes to resolve duplicate declarations, missing enum cases, parameter mismatches, and main actor isolation issues to restore build functionality.
+The TribeBoard calendar system is experiencing critical compilation errors that prevent the application from building successfully. These errors stem from type ambiguity issues, incomplete type definitions, missing method implementations, and structural code problems in the CalendarService and related files. The system needs immediate fixes to restore compilation and maintain the enhanced calendar functionality.
 
 ## Requirements
 
 ### Requirement 1
 
-**User Story:** As a developer, I want all duplicate declarations removed from the codebase, so that the project compiles without redeclaration errors.
+**User Story:** As a developer, I want the TribeBoard application to compile successfully, so that I can build and test the calendar enhancement features.
 
 #### Acceptance Criteria
 
-1. WHEN the project is built THEN the system SHALL NOT have any "Invalid redeclaration" errors
-2. WHEN accessibility utilities are used THEN the system SHALL have unique method signatures for all accessibility functions
-3. WHEN error handling utilities are referenced THEN the system SHALL have a single, consistent ErrorCategory definition
-4. WHEN view components are compiled THEN the system SHALL NOT have duplicate struct or function declarations
+1. WHEN the project is built THEN the system SHALL compile without any type ambiguity errors
+2. WHEN CalendarEvent is referenced THEN the system SHALL use the correct SwiftData model type
+3. WHEN the build process runs THEN there SHALL be no "ambiguous for type lookup" errors
 
 ### Requirement 2
 
-**User Story:** As a developer, I want all missing enum cases properly defined, so that school run functionality works correctly.
+**User Story:** As a developer, I want all type definitions to be complete and properly structured, so that the Swift compiler can resolve all references correctly.
 
 #### Acceptance Criteria
 
-1. WHEN RunStop.StopType is referenced THEN the system SHALL have all required cases (.home, .school, .pickup, .dropoff)
-2. WHEN stop types are used in UI components THEN the system SHALL provide proper initialization parameters
-3. WHEN stop configuration is displayed THEN the system SHALL handle all stop types consistently
-4. WHEN map placeholders are shown THEN the system SHALL support all defined stop types
+1. WHEN SyncStatusInfo is used THEN the system SHALL have a complete struct definition with all required properties
+2. WHEN SyncOperation is referenced THEN the system SHALL have a properly defined enum with all cases
+3. WHEN any calendar-related type is used THEN the system SHALL have consistent and complete type definitions
 
 ### Requirement 3
 
-**User Story:** As a developer, I want all function calls to have correct parameters, so that the code compiles without argument errors.
+**User Story:** As a developer, I want all method calls to reference existing implementations, so that there are no missing method or property errors.
 
 #### Acceptance Criteria
 
-1. WHEN functions are called THEN the system SHALL provide all required parameters
-2. WHEN optional parameters are used THEN the system SHALL handle them correctly
-3. WHEN initializers are called THEN the system SHALL match the expected signature
-4. WHEN view builders are used THEN the system SHALL follow proper SwiftUI syntax
+1. WHEN CalendarPermissionType is used THEN the system SHALL have all referenced enum cases defined
+2. WHEN EventKitManager methods are called THEN the system SHALL have corresponding method implementations
+3. WHEN CalendarErrorLogger methods are called THEN the system SHALL use correct method signatures with proper parameter labels
 
 ### Requirement 4
 
-**User Story:** As a developer, I want proper main actor isolation, so that ViewModels work correctly with SwiftUI.
+**User Story:** As a developer, I want the code structure to be syntactically correct, so that there are no parsing or structural compilation errors.
 
 #### Acceptance Criteria
 
-1. WHEN ViewModels are initialized THEN the system SHALL handle main actor requirements properly
-2. WHEN @Published properties are used THEN the system SHALL ensure thread safety
-3. WHEN UI updates occur THEN the system SHALL execute on the main thread
-4. WHEN async operations run THEN the system SHALL properly isolate main actor calls
+1. WHEN the Swift parser processes files THEN there SHALL be no extraneous braces or incomplete expressions
+2. WHEN method signatures are defined THEN they SHALL have proper parameter labels and return types
+3. WHEN closures are used THEN they SHALL have proper type annotations where required
 
 ### Requirement 5
 
-**User Story:** As a developer, I want proper SwiftUI ViewBuilder syntax, so that views render correctly.
+**User Story:** As a developer, I want mock and prototype code to be clearly separated from production code, so that there are no naming conflicts between different implementations.
 
 #### Acceptance Criteria
 
-1. WHEN ViewBuilder closures are used THEN the system SHALL follow proper syntax rules
-2. WHEN return statements are needed THEN the system SHALL use them correctly
-3. WHEN view modifiers are applied THEN the system SHALL chain them properly
-4. WHEN preview configurations are set THEN the system SHALL use valid environment settings
-
-### Requirement 6
-
-**User Story:** As a developer, I want proper SwiftUI ViewBuilder closure syntax in preview showcase files, so that preview content renders correctly.
-
-#### Acceptance Criteria
-
-1. WHEN ViewBuilder closures are used in preview functions THEN the system SHALL return proper View types
-2. WHEN trailing closures are passed to functions THEN the system SHALL not have extra trailing closures
-3. WHEN environment modifiers are applied THEN the system SHALL be applied to proper View types not arrays
-4. WHEN accessibility environment values are used THEN the system SHALL use valid accessibility size values
+1. WHEN mock data structures are defined THEN they SHALL use distinct names that don't conflict with production models
+2. WHEN prototype code exists THEN it SHALL be properly namespaced or renamed to avoid conflicts
+3. WHEN multiple implementations exist THEN the system SHALL clearly distinguish between them

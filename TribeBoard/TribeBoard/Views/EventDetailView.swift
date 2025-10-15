@@ -447,7 +447,7 @@ struct EditEventView: View {
 
 #Preview {
     EventDetailView(
-        event: MockDataGenerator.mockCalendarEvents().first!,
+        event: MockDataGenerator.mockCalendarEvents().first!.toCalendarEvent(),
         userProfiles: Dictionary(uniqueKeysWithValues: MockDataGenerator.mockMawereFamily().users.map { ($0.id, $0) })
     )
 }

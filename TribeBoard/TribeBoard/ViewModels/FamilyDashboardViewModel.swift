@@ -42,18 +42,42 @@ class FamilyDashboardViewModel: ObservableObject {
     /// Member to be removed
     @Published var memberToRemove: InMemoryMember?
     
+    // MARK: - Calendar Integration Properties
+    
+    /// Calendar dashboard data
+    @Published var calendarDashboardData: FamilyCalendarDashboardData?
+    
+    /// Calendar activity feed
+    @Published var calendarActivityFeed: [FamilyCalendarActivity] = []
+    
+    /// Show calendar section in dashboard
+    @Published var showCalendarSection = true
+    
+    /// Calendar loading state
+    @Published var isLoadingCalendar = false
+    
+    /// Calendar error
+    @Published var calendarError: Error?
+    
     // MARK: - Dependencies
     
     private let dataManager: InMemoryFamilyDataManager
     private let currentFamilyId: UUID
     private let currentUserId: UUID
+    private let familyCalendarService: FamilyCalendarIntegrationService?
     
     // MARK: - Initialization
     
-    init(familyId: UUID, currentUserId: UUID, dataManager: InMemoryFamilyDataManager? = nil) {
+    init(
+        familyId: UUID, 
+        currentUserId: UUID, 
+        dataManager: InMemoryFamilyDataManager? = nil,
+        familyCalendarService: FamilyCalendarIntegrationService? = nil
+    ) {
         self.currentFamilyId = familyId
         self.currentUserId = currentUserId
         self.dataManager = dataManager ?? InMemoryFamilyDataManager.shared
+        self.familyCalendarService = familyCalendarService
         
         // Set current family from data manager
         self.currentFamily = dataManager?.families.first { $0.id == familyId }
@@ -66,6 +90,13 @@ class FamilyDashboardViewModel: ObservableObject {
         
         // Load initial member data
         loadMembers()
+        
+        // Load calendar data if service is available
+        if familyCalendarService != nil {
+            Task {
+                await loadCalendarDashboardData()
+            }
+        }
     }
     
     // MARK: - Public Methods
@@ -259,6 +290,187 @@ class FamilyDashboardViewModel: ObservableObject {
         return members.count
     }
     
+    // MARK: - Calendar Integration Methods
+    
+    /// Load calendar dashboard data
+    func loadCalendarDashboardData() async {
+        guard let familyCalendarService = familyCalendarService else {
+            print("📋 FamilyDashboardViewModel: No calendar service available")
+            return
+        }
+        
+        isLoadingCalendar = true
+        calendarError = nil
+        
+        do {
+            let dashboardData = try await familyCalendarService.getFamilyCalendarDashboardData(
+                familyId: currentFamilyId,
+                userId: currentUserId
+            )
+            
+            calendarDashboardData = dashboardData
+            showCalendarSection = dashboardData.hasCalendarAccess
+            
+            // Also load activity feed
+            let activityFeed = try await familyCalendarService.getFamilyCalendarActivityFeed(
+                familyId: currentFamilyId,
+                userId: currentUserId,
+                limit: 5
+            )
+            
+            calendarActivityFeed = activityFeed
+            
+            print("✅ FamilyDashboardViewModel: Loaded calendar dashboard data")
+            
+        } catch {
+            calendarError = error
+            showCalendarSection = false
+            print("❌ FamilyDashboardViewModel: Failed to load calendar data: \(error)")
+        }
+        
+        isLoadingCalendar = false
+    }
+    
+    /// Refresh calendar data
+    func refreshCalendarData() async {
+        await loadCalendarDashboardData()
+    }
+    
+    /// Get calendar info for a specific member
+    func getCalendarInfoForMember(_ member: InMemoryMember) async -> MemberCalendarInfo? {
+        guard let familyCalendarService = familyCalendarService else { return nil }
+        
+        do {
+            return try await familyCalendarService.getCalendarInfoForMemberProfile(
+                userId: member.userId,
+                familyId: currentFamilyId,
+                viewingUserId: currentUserId
+            )
+        } catch {
+            print("❌ FamilyDashboardViewModel: Failed to get calendar info for member: \(error)")
+            return nil
+        }
+    }
+    
+    /// Update calendar permissions for a member (admin only)
+    func updateMemberCalendarPermissions(
+        for member: InMemoryMember,
+        newPermissionLevel: CalendarPermissionLevel
+    ) async {
+        guard let familyCalendarService = familyCalendarService else { return }
+        guard currentUserRole == .parent else {
+            showError(.userNotFound) // Using closest available error
+            return
+        }
+        
+        isLoading = true
+        clearError()
+        
+        do {
+            try await familyCalendarService.updateMemberCalendarPermissions(
+                targetUserId: member.userId,
+                familyId: currentFamilyId,
+                newPermissionLevel: newPermissionLevel,
+                adminUserId: currentUserId
+            )
+            
+            showSuccess("Calendar permissions updated for \(user(for: member)?.name ?? "member")")
+            
+            // Refresh calendar data to reflect changes
+            await loadCalendarDashboardData()
+            
+        } catch {
+            showError(.unknownError)
+            print("❌ FamilyDashboardViewModel: Failed to update calendar permissions: \(error)")
+        }
+        
+        isLoading = false
+    }
+    
+    /// Handle role change with calendar permission updates
+    func changeRoleWithCalendarUpdate(for member: InMemoryMember, to newRole: InMemoryRole) async {
+        let oldRole = member.role
+        
+        // First update the role using existing logic
+        changeRole(for: member, to: newRole)
+        
+        // Then update calendar permissions if service is available
+        if let familyCalendarService = familyCalendarService {
+            do {
+                // Convert InMemoryRole to Role for calendar service
+                let calendarOldRole = Role.fromInMemoryRole(oldRole)
+                let calendarNewRole = Role.fromInMemoryRole(newRole)
+                
+                // Create a temporary membership for the calendar service
+                let tempMembership = createTempMembership(for: member, with: calendarNewRole)
+                
+                try await familyCalendarService.updateCalendarPermissionsForRoleChange(
+                    membership: tempMembership,
+                    oldRole: calendarOldRole,
+                    newRole: calendarNewRole,
+                    changedBy: currentUserId
+                )
+                
+                // Refresh calendar data
+                await loadCalendarDashboardData()
+                
+                print("✅ FamilyDashboardViewModel: Updated calendar permissions for role change")
+                
+            } catch {
+                print("❌ FamilyDashboardViewModel: Failed to update calendar permissions for role change: \(error)")
+                // Don't show error to user as the role change itself succeeded
+            }
+        }
+    }
+    
+    /// Handle member removal with calendar cleanup
+    func removeMemberWithCalendarCleanup(_ member: InMemoryMember) async {
+        // First remove using existing logic
+        removeMember(member)
+        
+        // Then clean up calendar permissions if service is available
+        if let familyCalendarService = familyCalendarService {
+            do {
+                try await familyCalendarService.removeCalendarPermissionsForMember(
+                    userId: member.userId,
+                    familyId: currentFamilyId,
+                    removedBy: currentUserId
+                )
+                
+                // Refresh calendar data
+                await loadCalendarDashboardData()
+                
+                print("✅ FamilyDashboardViewModel: Cleaned up calendar permissions for removed member")
+                
+            } catch {
+                print("❌ FamilyDashboardViewModel: Failed to clean up calendar permissions: \(error)")
+                // Don't show error to user as the removal itself succeeded
+            }
+        }
+    }
+    
+    /// Navigate to family calendar view
+    func navigateToFamilyCalendar(appState: AppState) {
+        // This would be handled by the view layer to navigate to calendar
+        print("📅 FamilyDashboardViewModel: Navigate to family calendar requested")
+    }
+    
+    /// Check if user has calendar access
+    var hasCalendarAccess: Bool {
+        return calendarDashboardData?.hasCalendarAccess ?? false
+    }
+    
+    /// Check if user can manage calendar permissions
+    var canManageCalendarPermissions: Bool {
+        return calendarDashboardData?.permissions.isAdmin ?? false
+    }
+    
+    /// Get calendar statistics summary
+    var calendarStatsSummary: String? {
+        guard let stats = calendarDashboardData?.stats else { return nil }
+        return "📅 \(stats.totalEvents) events • \(stats.upcomingEvents) upcoming"
+    }
+    
     // MARK: - Private Methods
     
     /// Refresh member data from data manager (for SwiftUI reactive updates)
@@ -306,5 +518,46 @@ class FamilyDashboardViewModel: ObservableObject {
         }
         
         return (true, nil)
+    }
+    
+    /// Creates a temporary membership object for calendar service integration
+    private func createTempMembership(for member: InMemoryMember, with role: Role) -> Membership {
+        // This is a temporary solution - in a real implementation, we'd have proper data model integration
+        let tempFamily = Family(name: familyName, code: familyCode, createdByUserId: currentUserId)
+        tempFamily.id = currentFamilyId
+        
+        let tempUser = UserProfile(
+            displayName: user(for: member)?.name ?? "Unknown",
+            appleUserIdHash: "temp_hash_\(member.userId)"
+        )
+        tempUser.id = member.userId
+        
+        let tempMembership = Membership(family: tempFamily, user: tempUser, role: role)
+        return tempMembership
+    }
+}
+
+// MARK: - Role Conversion Extensions
+
+extension Role {
+    /// Converts from InMemoryRole to Role
+    static func fromInMemoryRole(_ inMemoryRole: InMemoryRole) -> Role {
+        switch inMemoryRole {
+        case .parent:
+            return .parentAdmin
+        case .child:
+            return .kid
+        case .guardian:
+            return .adult
+        case .helper:
+            return .adult
+        }
+    }
+}
+
+extension InMemoryRole {
+    /// Converts to Role
+    var asRole: Role {
+        return Role.fromInMemoryRole(self)
     }
 }

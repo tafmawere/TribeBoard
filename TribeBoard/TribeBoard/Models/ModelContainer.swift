@@ -67,13 +67,17 @@ struct ModelContainerConfiguration {
             let schema = Schema([
                 Family.self,
                 UserProfile.self,
-                Membership.self
+                Membership.self,
+                CalendarEvent.self,
+                SyncConfiguration.self
             ])
             
             print("✅ SwiftData schema compilation successful")
             print("   - Family model: ✓")
             print("   - UserProfile model: ✓") 
             print("   - Membership model: ✓")
+            print("   - CalendarEvent model: ✓")
+            print("   - SyncConfiguration model: ✓")
             print("   - Total entities: \(schema.entities.count)")
             
             // Perform detailed validation of each entity
@@ -101,7 +105,7 @@ struct ModelContainerConfiguration {
     private static func validateEntityStructure(_ schema: Schema) throws {
         print("🔍 Validating entity structure...")
         
-        let expectedEntities = ["Family", "UserProfile", "Membership"]
+        let expectedEntities = ["Family", "UserProfile", "Membership", "CalendarEvent", "SyncConfiguration"]
         let actualEntities = schema.entities.map { $0.name }
         
         // Check that all expected entities are present
@@ -127,6 +131,10 @@ struct ModelContainerConfiguration {
                 try validateUserProfileEntity(entity)
             case "Membership":
                 try validateMembershipEntity(entity)
+            case "CalendarEvent":
+                try validateCalendarEventEntity(entity)
+            case "SyncConfiguration":
+                try validateSyncConfigurationEntity(entity)
             default:
                 print("     ⚠️ Unknown entity type: \(entity.name)")
             }
@@ -187,6 +195,44 @@ struct ModelContainerConfiguration {
         for expectedUnique in expectedUniqueProperties {
             if !uniqueProperties.contains(where: { $0.name == expectedUnique }) {
                 print("     ⚠️ Warning: Membership entity missing unique constraint on '\(expectedUnique)'")
+                // Don't throw error - SwiftData may handle uniqueness differently
+            }
+        }
+    }
+    
+    /// Validates the CalendarEvent entity structure
+    private static func validateCalendarEventEntity(_ entity: Schema.Entity) throws {
+        let requiredProperties = ["id", "title", "startDate", "endDate", "isAllDay", "privacyLevel", "createdBy", "lastModified", "isDeleted", "needsSync", "createdAt", "version"]
+        let relationshipProperties: [String] = [] // CalendarEvent doesn't have direct relationships
+        
+        try validateEntityProperties(entity, required: requiredProperties, relationships: relationshipProperties)
+        
+        // Validate unique attributes - but don't fail if they're missing, just warn
+        let uniqueProperties = entity.properties.filter { $0.isUnique }
+        let expectedUniqueProperties = ["id"]
+        
+        for expectedUnique in expectedUniqueProperties {
+            if !uniqueProperties.contains(where: { $0.name == expectedUnique }) {
+                print("     ⚠️ Warning: CalendarEvent entity missing unique constraint on '\(expectedUnique)'")
+                // Don't throw error - SwiftData may handle uniqueness differently
+            }
+        }
+    }
+    
+    /// Validates the SyncConfiguration entity structure
+    private static func validateSyncConfigurationEntity(_ entity: Schema.Entity) throws {
+        let requiredProperties = ["id", "userId", "isAppleCalendarSyncEnabled", "syncConflictResolution", "syncDirection", "autoSyncEnabled", "syncFrequencyMinutes", "eventKitPermissionGranted", "syncErrorCount", "pendingSyncOperationsCount", "needsSync", "createdAt", "updatedAt", "version"]
+        let relationshipProperties: [String] = [] // SyncConfiguration doesn't have direct relationships
+        
+        try validateEntityProperties(entity, required: requiredProperties, relationships: relationshipProperties)
+        
+        // Validate unique attributes - but don't fail if they're missing, just warn
+        let uniqueProperties = entity.properties.filter { $0.isUnique }
+        let expectedUniqueProperties = ["id"]
+        
+        for expectedUnique in expectedUniqueProperties {
+            if !uniqueProperties.contains(where: { $0.name == expectedUnique }) {
+                print("     ⚠️ Warning: SyncConfiguration entity missing unique constraint on '\(expectedUnique)'")
                 // Don't throw error - SwiftData may handle uniqueness differently
             }
         }
@@ -337,6 +383,24 @@ struct ModelContainerConfiguration {
                 print("     - Check @Relationship configurations for family and user")
             }
             
+            if errorDescription.contains("calendarevent") {
+                print("   🔍 Issue detected in CalendarEvent model:")
+                print("     - Check @Model annotation is present")
+                print("     - Verify PrivacyLevel enum is properly defined")
+                print("     - Ensure @Attribute(.unique) is set on id")
+                print("     - Check all Date and UUID properties are properly declared")
+                print("     - Verify CloudKitSyncable protocol implementation")
+            }
+            
+            if errorDescription.contains("syncconfiguration") {
+                print("   🔍 Issue detected in SyncConfiguration model:")
+                print("     - Check @Model annotation is present")
+                print("     - Verify ConflictResolutionStrategy and SyncDirection enums are properly defined")
+                print("     - Ensure @Attribute(.unique) is set on id")
+                print("     - Check all enum properties conform to required protocols")
+                print("     - Verify CloudKitSyncable protocol implementation")
+            }
+            
             if errorDescription.contains("circular") || errorDescription.contains("relationship") {
                 print("   🔍 Relationship configuration issue detected:")
                 print("     - Check inverse relationship configurations")
@@ -371,7 +435,9 @@ struct ModelContainerConfiguration {
         let schema = Schema([
             Family.self,
             UserProfile.self,
-            Membership.self
+            Membership.self,
+            CalendarEvent.self,
+            SyncConfiguration.self
         ])
         
         let modelConfiguration = ModelConfiguration(
@@ -448,7 +514,9 @@ struct ModelContainerConfiguration {
             let schema = Schema([
                 Family.self,
                 UserProfile.self,
-                Membership.self
+                Membership.self,
+                CalendarEvent.self,
+                SyncConfiguration.self
             ])
             
             // Validate schema compilation before container creation
@@ -496,7 +564,9 @@ struct ModelContainerConfiguration {
             let schema = Schema([
                 Family.self,
                 UserProfile.self,
-                Membership.self
+                Membership.self,
+                CalendarEvent.self,
+                SyncConfiguration.self
             ])
             
             // Validate schema compilation before container creation
@@ -543,7 +613,9 @@ struct ModelContainerConfiguration {
             let schema = Schema([
                 Family.self,
                 UserProfile.self,
-                Membership.self
+                Membership.self,
+                CalendarEvent.self,
+                SyncConfiguration.self
             ])
             
             print("   🔍 Creating in-memory configuration...")

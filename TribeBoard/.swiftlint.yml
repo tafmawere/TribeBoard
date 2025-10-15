@@ -1,0 +1,75 @@
+# SwiftLint Configuration for TribeBoard
+# Helps prevent compilation errors through consistent naming and structure
+
+# Enabled rules for error prevention
+opt_in_rules:
+  - explicit_type_interface
+  - explicit_init
+  - redundant_type_annotation
+  - unused_import
+  - unused_declaration
+
+# Disabled rules that might conflict with our patterns
+disabled_rules:
+  - line_length # We handle this manually for readability
+
+# Type naming rules to prevent conflicts
+type_name:
+  min_length: 3
+  max_length: 50
+  excluded:
+    - ID
+    - URL
+    - UUID
+  validates_start_with_lowercase: false
+
+# Identifier naming rules
+identifier_name:
+  min_length: 1
+  max_length: 50
+  excluded:
+    - id
+    - x
+    - y
+    - z
+
+# File naming rules
+file_name:
+  excluded:
+    - main.swift
+    - LinuxMain.swift
+
+# Custom rules for our specific patterns
+custom_rules:
+  mock_type_naming:
+    name: "Mock Type Naming"
+    regex: '^struct\s+(?!Mock|Demo|Test|Prototype)\w*Event\s*\{'
+    message: "Event types should be prefixed with Mock/Demo/Test/Prototype to avoid conflicts with production CalendarEvent"
+    severity: error
+    
+  calendar_event_import:
+    name: "CalendarEvent Import Check"
+    regex: 'import.*CalendarEvent'
+    message: "Avoid importing CalendarEvent directly - use SwiftData import instead"
+    severity: warning
+
+# Exclude generated and external files
+excluded:
+  - Pods
+  - build
+  - .build
+  - DerivedData
+  - .swiftpm
+
+# Include specific paths
+included:
+  - TribeBoard
+  - TribeBoardTests
+  - TribeBoardUITests
+
+# Reporter configuration
+reporter: "xcode"
+
+# Severity levels
+warning_threshold: 10
+error_threshold: 5

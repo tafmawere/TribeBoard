@@ -2,132 +2,153 @@
 
 ## Overview
 
-This design addresses systematic compilation errors in the TribeBoard project by implementing targeted fixes for duplicate declarations, missing enum cases, parameter mismatches, and SwiftUI syntax issues. The approach prioritizes minimal code changes while ensuring comprehensive error resolution.
+This design addresses critical compilation errors in the TribeBoard calendar system by systematically resolving type ambiguity issues, completing incomplete type definitions, fixing method signature mismatches, and correcting structural code problems. The solution maintains the existing calendar enhancement functionality while ensuring clean compilation.
 
 ## Architecture
 
-### Error Categories
-1. **Duplicate Declarations**: Remove redundant method/struct definitions
-2. **Missing Enum Cases**: Add required StopType cases with proper implementations
-3. **Parameter Mismatches**: Fix function calls to match expected signatures
-4. **Main Actor Issues**: Resolve concurrency isolation problems
-5. **SwiftUI Syntax**: Fix ViewBuilder and modifier chain issues
+The fix strategy follows a layered approach:
 
-### Fix Strategy
-- **Consolidation**: Merge duplicate functionality into single implementations
-- **Extension**: Add missing enum cases with backward compatibility
-- **Correction**: Fix parameter lists and function signatures
-- **Isolation**: Properly handle main actor requirements
-- **Validation**: Ensure SwiftUI syntax compliance
+1. **Type Resolution Layer**: Resolve naming conflicts and ambiguous type references
+2. **Definition Completion Layer**: Complete incomplete struct and enum definitions  
+3. **Method Signature Layer**: Fix method calls and parameter label mismatches
+4. **Code Structure Layer**: Correct syntax and structural issues
 
 ## Components and Interfaces
 
-### 1. Accessibility Utilities Consolidation
-**Purpose**: Remove duplicate accessibility method declarations
-**Implementation**: 
-- Identify conflicting methods in EnhancedAccessibility.swift and AccessibilityHelpers.swift
-- Consolidate into single, comprehensive implementations
-- Maintain existing functionality while removing duplicates
+### 1. Type Conflict Resolution
 
-### 2. Error Handling Unification
-**Purpose**: Resolve ErrorCategory redeclaration issues
-**Implementation**:
-- Establish single ErrorCategory definition in ErrorHandlingUtilities.swift
-- Update all references to use unified error categorization
-- Ensure consistent error handling across the codebase
+**Problem**: Multiple `CalendarEvent` definitions causing ambiguity
+- Main SwiftData model: `TribeBoard/Models/CalendarEvent.swift`
+- Conflicting struct: `TribeBoard/Models/MockDataGenerator.swift`
 
-### 3. RunStop.StopType Enhancement
-**Purpose**: Add missing enum cases for school run functionality
-**Implementation**:
-- Add `.home`, `.school`, `.pickup`, `.dropoff` cases to StopType enum
-- Implement proper display names and icons for each type
-- Update initializers to handle new cases
-
-### 4. Function Signature Corrections
-**Purpose**: Fix parameter mismatches in function calls
-**Implementation**:
-- Analyze each compilation error for missing/extra parameters
-- Update function calls to match expected signatures
-- Ensure proper parameter ordering and types
-
-### 5. Main Actor Isolation Fixes
-**Purpose**: Resolve concurrency issues in ViewModels
-**Implementation**:
-- Add proper @MainActor annotations where needed
-- Use Task.detached for non-main actor operations
-- Ensure UI updates happen on main thread
-
-### 6. SwiftUI ViewBuilder Corrections
-**Purpose**: Fix ViewBuilder syntax and modifier chain issues
-**Implementation**:
-- Remove invalid return statements in ViewBuilder contexts
-- Fix modifier chains on proper view types
-- Correct preview environment configurations
-
-### 7. SchoolRunPreviewShowcase ViewBuilder Fixes
-**Purpose**: Fix ViewBuilder closure syntax errors in preview showcase
-**Implementation**:
-- Fix ViewBuilder closures that return function types instead of View types
-- Remove extra trailing closures in function calls
-- Fix environment modifiers applied to array types instead of View types
-- Correct accessibility environment values to use valid enum cases
-
-## Data Models
-
-### Enhanced StopType Enum
+**Solution**: Rename the mock/prototype CalendarEvent to avoid conflicts
 ```swift
-enum StopType: String, CaseIterable, Codable {
-    case home = "home"
-    case school = "school" 
-    case pickup = "pickup"
-    case dropoff = "dropoff"
-    case other = "other"
-    
-    var displayName: String { ... }
-    var icon: String { ... }
+// In MockDataGenerator.swift - rename to:
+struct MockCalendarEvent {
+    // ... existing properties
 }
 ```
 
-### Unified ErrorCategory
+### 2. Complete Type Definitions
+
+**Problem**: Incomplete `SyncStatusInfo` struct definition
+- Missing closing brace and property definitions
+- Orphaned properties causing compilation errors
+
+**Solution**: Complete the struct definition properly
 ```swift
-enum ErrorCategory: String, CaseIterable {
-    case network = "network"
-    case validation = "validation"
-    case persistence = "persistence"
-    case authentication = "authentication"
-    case unknown = "unknown"
+struct SyncStatusInfo {
+    let isOnline: Bool
+    let isSyncing: Bool
+    let syncProgress: Double
+    let lastSyncDate: Date?
+    let pendingOperations: Int
+    let offlineStatistics: OfflineStatistics
+    let syncError: String?
+    
+    // ... rest of implementation
+}
+```
+
+### 3. Method Signature Corrections
+
+**Problem**: Missing parameter labels and incorrect method calls
+- `CalendarErrorLogger` method calls missing parameter labels
+- `EventKitManager` method calls referencing non-existent methods
+- Enum cases that don't exist in their respective types
+
+**Solution**: Fix method signatures and enum references
+```swift
+// Fix parameter labels
+CalendarErrorLogger.shared.logError(error, context: context)
+
+// Fix enum references  
+CalendarPermissionType.deleteEvents -> CalendarPermissionType.deleteFamilyEvents
+
+// Fix method calls
+eventKitManager.setupAllTribeBoardCalendars() -> eventKitManager.setupTribeBoardCalendars()
+```
+
+### 4. Structural Code Fixes
+
+**Problem**: Syntax errors and incomplete expressions
+- Extraneous braces at file endings
+- Incomplete return statements
+- Missing type annotations in closures
+
+**Solution**: Clean up syntax issues
+```swift
+// Fix incomplete expressions
+return !try modelContext.fetch(descriptor).isEmpty
+
+// Fix closure type annotations
+.compactMap { (event: CalendarEvent) -> CalendarEvent? in
+    // ... implementation
+}
+
+// Remove extraneous braces and fix file structure
+```
+
+## Data Models
+
+### Updated MockDataGenerator Structure
+```swift
+// Rename conflicting types
+struct MockCalendarEvent {
+    let id: UUID
+    let title: String
+    let date: Date
+    let type: EventType
+    // ... rest remains the same
+}
+```
+
+### Complete SyncStatusInfo Definition
+```swift
+struct SyncStatusInfo {
+    let isOnline: Bool
+    let isSyncing: Bool
+    let syncProgress: Double
+    let lastSyncDate: Date?
+    let pendingOperations: Int
+    let offlineStatistics: OfflineStatistics
+    let syncError: String?
+    
+    var statusDescription: String { /* implementation */ }
+    var healthStatus: SyncHealthStatus { /* implementation */ }
+    
+    enum SyncHealthStatus {
+        case healthy, syncing, offline, error
+        var color: String { /* implementation */ }
+        var icon: String { /* implementation */ }
+    }
 }
 ```
 
 ## Error Handling
 
-### Compilation Error Resolution Process
-1. **Identification**: Categorize each error by type
-2. **Analysis**: Determine root cause and impact
-3. **Resolution**: Apply targeted fix with minimal changes
-4. **Validation**: Ensure fix doesn't introduce new issues
+### Compilation Error Categories
+1. **Type Ambiguity Errors**: Resolved through renaming conflicts
+2. **Missing Definition Errors**: Fixed by completing type definitions
+3. **Method Signature Errors**: Corrected through proper parameter labels
+4. **Structural Errors**: Fixed through syntax cleanup
 
-### Error Prevention
-- Establish clear naming conventions
-- Use proper Swift concurrency patterns
-- Follow SwiftUI best practices
-- Implement comprehensive testing
+### Error Prevention Strategy
+- Use explicit type annotations where ambiguity might occur
+- Implement proper namespacing for mock/prototype code
+- Maintain consistent method signatures across the codebase
+- Use proper Swift syntax validation
 
 ## Testing Strategy
 
 ### Compilation Verification
-- Build project after each fix category
-- Verify no new errors introduced
-- Test affected functionality still works
+1. **Build Test**: Verify project compiles without errors
+2. **Type Resolution Test**: Ensure all type references resolve correctly
+3. **Method Call Test**: Validate all method calls use correct signatures
+4. **Import Test**: Verify all imports and dependencies work correctly
 
-### Functionality Testing
-- Run existing unit tests
-- Verify UI components render correctly
-- Test school run features work as expected
-- Validate accessibility features function properly
-
-### Integration Testing
-- Test complete app build and launch
-- Verify navigation between views
-- Test data persistence and loading
-- Validate error handling scenarios
+### Regression Prevention
+1. **Code Review**: Implement checks for naming conflicts
+2. **Build Automation**: Set up continuous integration to catch compilation errors
+3. **Type Safety**: Use explicit typing where beneficial
+4. **Documentation**: Document naming conventions to prevent future conflicts

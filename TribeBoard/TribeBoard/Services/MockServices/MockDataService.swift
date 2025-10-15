@@ -1,6 +1,12 @@
 import Foundation
 import SwiftUI
 
+// Local ValidationResult to avoid ambiguity
+struct MockValidationResult {
+    let isValid: Bool
+    let message: String
+}
+
 /// Mock data service for UI/UX prototype with predefined family and user data
 @MainActor
 class MockDataService: ObservableObject {
@@ -289,41 +295,41 @@ class MockDataService: ObservableObject {
     // MARK: - Validation Methods
     
     /// Mock family validation - always returns valid for prototype
-    func validateFamily(name: String, code: String) async throws -> ValidationResult {
+    func validateFamily(name: String, code: String) async throws -> MockValidationResult {
         // Simulate brief validation time
         try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
         
         // Basic validation for demo purposes
         if name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return ValidationResult(isValid: false, message: "Family name cannot be empty")
+            return MockValidationResult(isValid: false, message: "Family name cannot be empty")
         }
         
         if code.count < 6 || code.count > 8 {
-            return ValidationResult(isValid: false, message: "Family code must be 6-8 characters")
+            return MockValidationResult(isValid: false, message: "Family code must be 6-8 characters")
         }
         
         // Check if code already exists
         if mockFamilies.contains(where: { $0.code == code }) {
-            return ValidationResult(isValid: false, message: "Family code already exists")
+            return MockValidationResult(isValid: false, message: "Family code already exists")
         }
         
-        return ValidationResult(isValid: true, message: "Valid")
+        return MockValidationResult(isValid: true, message: "Valid")
     }
     
     /// Mock user profile validation
-    func validateUserProfile(displayName: String, appleUserIdHash: String) async throws -> ValidationResult {
+    func validateUserProfile(displayName: String, appleUserIdHash: String) async throws -> MockValidationResult {
         // Simulate brief validation time
         try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
         
         if displayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return ValidationResult(isValid: false, message: "Display name cannot be empty")
+            return MockValidationResult(isValid: false, message: "Display name cannot be empty")
         }
         
         if appleUserIdHash.isEmpty {
-            return ValidationResult(isValid: false, message: "Apple user ID hash cannot be empty")
+            return MockValidationResult(isValid: false, message: "Apple user ID hash cannot be empty")
         }
         
-        return ValidationResult(isValid: true, message: "Valid")
+        return MockValidationResult(isValid: true, message: "Valid")
     }
     
     // MARK: - Synchronous Methods (for compatibility with ViewModels)

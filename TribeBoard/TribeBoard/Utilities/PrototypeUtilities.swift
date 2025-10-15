@@ -149,7 +149,7 @@ class PrototypeUtilities: ObservableObject {
     
     // MARK: - Prototype Validation
     
-    func validatePrototypeInput(_ input: String, type: InputType) -> ValidationResult {
+    func validatePrototypeInput(_ input: String, type: InputType) -> PrototypeValidationResult {
         switch type {
         case .familyName:
             return validateFamilyName(input)
@@ -166,17 +166,19 @@ class PrototypeUtilities: ObservableObject {
         case userName
     }
     
-    struct ValidationResult {
+    // Note: ValidationResult is now defined in CalendarService.swift
+    // Local struct for prototype-specific validation
+    struct PrototypeValidationResult {
         let isValid: Bool
         let message: String
         let suggestion: String?
     }
     
-    private func validateFamilyName(_ name: String) -> ValidationResult {
+    private func validateFamilyName(_ name: String) -> PrototypeValidationResult {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         
         if trimmed.isEmpty {
-            return ValidationResult(
+            return PrototypeValidationResult(
                 isValid: false,
                 message: "Family name is required",
                 suggestion: "Try 'Mawere Family'"
@@ -184,7 +186,7 @@ class PrototypeUtilities: ObservableObject {
         }
         
         if trimmed.lowercased().contains("mawere") {
-            return ValidationResult(
+            return PrototypeValidationResult(
                 isValid: true,
                 message: "Perfect! This matches our demo family",
                 suggestion: nil
@@ -192,25 +194,25 @@ class PrototypeUtilities: ObservableObject {
         }
         
         if trimmed.count < 2 {
-            return ValidationResult(
+            return PrototypeValidationResult(
                 isValid: false,
                 message: "Family name must be at least 2 characters",
                 suggestion: "Try 'Mawere Family'"
             )
         }
         
-        return ValidationResult(
+        return PrototypeValidationResult(
             isValid: true,
             message: "Great choice!",
             suggestion: nil
         )
     }
     
-    private func validateFamilyCode(_ code: String) -> ValidationResult {
+    private func validateFamilyCode(_ code: String) -> PrototypeValidationResult {
         let trimmed = code.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
         
         if trimmed.isEmpty {
-            return ValidationResult(
+            return PrototypeValidationResult(
                 isValid: false,
                 message: "Family code is required",
                 suggestion: "Try 'ABC123'"
@@ -218,7 +220,7 @@ class PrototypeUtilities: ObservableObject {
         }
         
         if trimmed == "ABC123" || trimmed == "DEMO01" {
-            return ValidationResult(
+            return PrototypeValidationResult(
                 isValid: true,
                 message: "Perfect! This is a valid demo code",
                 suggestion: nil
@@ -226,25 +228,25 @@ class PrototypeUtilities: ObservableObject {
         }
         
         if trimmed.count < 4 || trimmed.count > 8 {
-            return ValidationResult(
+            return PrototypeValidationResult(
                 isValid: false,
                 message: "Family code must be 4-8 characters",
                 suggestion: "Try 'ABC123'"
             )
         }
         
-        return ValidationResult(
+        return PrototypeValidationResult(
             isValid: true,
             message: "Valid format - try 'ABC123' for demo",
             suggestion: "ABC123"
         )
     }
     
-    private func validateUserName(_ name: String) -> ValidationResult {
+    private func validateUserName(_ name: String) -> PrototypeValidationResult {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         
         if trimmed.isEmpty {
-            return ValidationResult(
+            return PrototypeValidationResult(
                 isValid: false,
                 message: "Name is required",
                 suggestion: "Try 'John Doe'"
@@ -252,14 +254,14 @@ class PrototypeUtilities: ObservableObject {
         }
         
         if trimmed.count < 2 {
-            return ValidationResult(
+            return PrototypeValidationResult(
                 isValid: false,
                 message: "Name must be at least 2 characters",
                 suggestion: "Try 'John Doe'"
             )
         }
         
-        return ValidationResult(
+        return PrototypeValidationResult(
             isValid: true,
             message: "Looks good!",
             suggestion: nil

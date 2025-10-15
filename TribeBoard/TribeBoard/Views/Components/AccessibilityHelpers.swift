@@ -507,7 +507,7 @@ struct AccessibleFormField: View {
     @Binding var text: String
     let placeholder: String
     let isSecure: Bool
-    let validation: ValidationResult?
+    let validation: AccessibleEventCreationView.ValidationResult?
     let keyboardType: UIKeyboardType
     
     @FocusState private var isFocused: Bool

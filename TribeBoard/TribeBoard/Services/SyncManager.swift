@@ -19,7 +19,7 @@ class SyncManager: ObservableObject {
     @Published private(set) var isOfflineMode = false
     
     /// Current sync status
-    @Published private(set) var syncStatus: SyncStatus = .idle
+    @Published private(set) var syncStatus: SyncManagerStatus = .idle
     
     /// Number of records pending sync
     @Published private(set) var pendingSyncCount = 0
@@ -86,15 +86,7 @@ class SyncManager: ObservableObject {
                 
                 self.updateOfflineMode()
                 
-                // Post notification about network status change
-                NotificationCenter.default.post(
-                    name: .networkStatusChanged,
-                    object: self,
-                    userInfo: [
-                        "isAvailable": self.isNetworkAvailable,
-                        "path": path
-                    ]
-                )
+
             }
         }
         
@@ -493,14 +485,22 @@ class SyncManager: ObservableObject {
     
     /// Gets current sync status information
     func getSyncStatusInfo() -> SyncStatusInfo {
+        // Create offline statistics
+        let offlineStats = OfflineStatistics(
+            totalEvents: 0, // This would be populated from actual data
+            pendingSyncEvents: pendingSyncCount,
+            lastOfflineAction: lastSyncDate,
+            offlineCapabilities: []
+        )
+        
         return SyncStatusInfo(
-            isOffline: isOfflineMode,
-            isNetworkAvailable: isNetworkAvailable,
-            isCloudKitAvailable: isCloudKitAvailable,
-            syncStatus: syncStatus,
-            pendingCount: pendingSyncCount,
+            isOnline: isNetworkAvailable,
+            isSyncing: syncStatus.isActive,
+            syncProgress: syncProgress,
             lastSyncDate: lastSyncDate,
-            progress: syncProgress
+            pendingOperations: pendingSyncCount,
+            offlineStatistics: offlineStats,
+            syncError: nil // This would be populated from actual error state
         )
     }
     
@@ -559,7 +559,7 @@ class SyncManager: ObservableObject {
 // MARK: - Supporting Types
 
 /// Current sync status
-enum SyncStatus: Equatable {
+enum SyncManagerStatus: Equatable {
     case idle
     case syncing
     case completed
@@ -606,11 +606,11 @@ enum SyncStatus: Equatable {
         }
     }
     
-    static func == (lhs: SyncStatus, rhs: SyncStatus) -> Bool {
+    static func == (lhs: SyncManagerStatus, rhs: SyncManagerStatus) -> Bool {
         switch (lhs, rhs) {
         case (.idle, .idle), (.syncing, .syncing), (.completed, .completed):
             return true
-        case (.failed(let lhsError), (.failed(let rhsError))):
+        case (.failed(let lhsError), .failed(let rhsError)):
             return lhsError.localizedDescription == rhsError.localizedDescription
         default:
             return false
@@ -618,35 +618,11 @@ enum SyncStatus: Equatable {
     }
 }
 
-/// Comprehensive sync status information
-struct SyncStatusInfo {
-    let isOffline: Bool
-    let isNetworkAvailable: Bool
-    let isCloudKitAvailable: Bool
-    let syncStatus: SyncStatus
-    let pendingCount: Int
-    let lastSyncDate: Date?
-    let progress: Double
-    
-    var statusMessage: String {
-        if isOffline {
-            return pendingCount > 0 
-                ? "Offline - \(pendingCount) records pending sync"
-                : "Working offline"
-        } else if syncStatus.isActive {
-            return "Syncing \(pendingCount) records..."
-        } else if pendingCount > 0 {
-            return "\(pendingCount) records ready to sync"
-        } else {
-            return "All data synced"
-        }
-    }
-}
+// Note: SyncStatusInfo is now defined in CalendarService.swift
 
 // MARK: - Notification Names Extension
 
 extension Notification.Name {
-    static let networkStatusChanged = Notification.Name("networkStatusChanged")
     static let offlineModeChanged = Notification.Name("offlineModeChanged")
     static let syncCompleted = Notification.Name("syncCompleted")
     static let syncFailed = Notification.Name("syncFailed")

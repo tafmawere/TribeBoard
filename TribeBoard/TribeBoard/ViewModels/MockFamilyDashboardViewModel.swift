@@ -273,7 +273,7 @@ class MockFamilyDashboardViewModel: ObservableObject {
             .filter { $0.date >= today }
             .sorted { $0.date < $1.date }
             .prefix(3)
-            .map { $0 }
+            .map { CalendarEvent.fromLegacyMockEvent($0, createdBy: currentUserId, familyId: currentFamily.id) }
         
         // Get pending tasks (not completed, limited by role)
         pendingTasks = roleSpecificData.tasks

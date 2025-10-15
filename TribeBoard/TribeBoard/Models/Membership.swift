@@ -123,6 +123,48 @@ final class Membership {
         lastSyncDate = Date()
         needsSync = false
     }
+    
+    // MARK: - Calendar Integration
+    
+    /// Gets the default calendar permission level for this membership's role
+    var defaultCalendarPermissionLevel: CalendarPermissionLevel {
+        return CalendarPermissionLevel.defaultForRole(role)
+    }
+    
+    /// Checks if this membership should have calendar access by default
+    var shouldHaveCalendarAccess: Bool {
+        return role != .visitor && status == .active
+    }
+    
+    /// Gets calendar-related display information for this membership
+    var calendarDisplayInfo: (canViewFamily: Bool, canCreateEvents: Bool, canManagePermissions: Bool) {
+        switch role {
+        case .parentAdmin:
+            return (true, true, true)
+        case .adult:
+            return (true, true, false)
+        case .kid:
+            return (true, false, false)
+        case .visitor:
+            return (false, false, false)
+        }
+    }
+    
+    /// Creates a default calendar permission for this membership
+    func createDefaultCalendarPermission() -> CalendarPermission? {
+        guard let familyId = self.familyId,
+              let userId = self.userId,
+              shouldHaveCalendarAccess else {
+            return nil
+        }
+        
+        return CalendarPermission(
+            userId: userId,
+            familyId: familyId,
+            permissionLevel: defaultCalendarPermissionLevel,
+            grantedBy: userId // Self-granted for initial setup
+        )
+    }
 }
 
 // MARK: - CloudKit Synchronization

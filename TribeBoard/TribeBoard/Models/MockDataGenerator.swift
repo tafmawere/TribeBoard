@@ -1,10 +1,53 @@
 import Foundation
 import SwiftData
 
+/**
+ * MockDataGenerator.swift
+ * 
+ * IMPORTANT: Type Separation Documentation
+ * =====================================
+ * 
+ * This file contains MOCK/PROTOTYPE data structures that are separate from the production
+ * SwiftData models used in the actual application. The separation is intentional to avoid
+ * type conflicts and maintain clear boundaries between test/demo data and production data.
+ * 
+ * Key Type Separations:
+ * - MockCalendarEvent (this file) vs CalendarEvent (production SwiftData model)
+ * - FamilyTask (this file) vs any production task models
+ * - Mock notification types vs production notification models
+ * 
+ * Usage Guidelines:
+ * - Use MockCalendarEvent for UI previews, demos, and prototyping
+ * - Use CalendarEvent (SwiftData model) for actual data persistence and production features
+ * - Always import the correct type in your files to avoid ambiguity
+ * - When adding new mock types, use descriptive prefixes (Mock*, Demo*, Prototype*)
+ * 
+ * This separation was implemented to resolve compilation errors caused by type ambiguity
+ * between mock data structures and production SwiftData models.
+ * 
+ * NAMING CONVENTION ENFORCEMENT:
+ * All new mock types added to this file MUST follow the naming convention:
+ * - Use "Mock" prefix for data structures (MockCalendarEvent, MockUserProfile, etc.)
+ * - Use descriptive names that clearly indicate their purpose
+ * - Never use the same name as production SwiftData models
+ * - Document the relationship to production types when relevant
+ */
+
 // MARK: - Prototype Data Models
 
-/// Calendar event for prototype
-struct CalendarEvent {
+/**
+ * MockCalendarEvent - Prototype calendar event structure
+ * 
+ * This is a lightweight mock structure used for UI previews and demos.
+ * DO NOT confuse with the production CalendarEvent SwiftData model.
+ * 
+ * Use this type for:
+ * - SwiftUI previews
+ * - Demo scenarios
+ * - UI prototyping
+ * - Test data generation
+ */
+struct MockCalendarEvent {
     let id: UUID
     let title: String
     let date: Date
@@ -40,9 +83,27 @@ struct CalendarEvent {
             }
         }
     }
+    
+    /// Converts MockCalendarEvent to CalendarEvent for preview purposes
+    func toCalendarEvent() -> CalendarEvent {
+        let event = CalendarEvent()
+        event.id = self.id
+        event.title = self.title
+        event.startDate = self.date
+        event.endDate = Calendar.current.date(byAdding: .hour, value: 1, to: self.date) ?? self.date
+        event.location = self.location
+        event.notes = self.description
+        event.participants = self.participants
+        return event
+    }
 }
 
-/// Family task for prototype
+/**
+ * FamilyTask - Prototype task structure
+ * 
+ * Mock task structure for demo and testing purposes.
+ * This is separate from any production task models to avoid conflicts.
+ */
 struct FamilyTask: Codable {
     let id: UUID
     let title: String
@@ -106,7 +167,12 @@ struct FamilyTask: Codable {
     }
 }
 
-/// Family message for prototype
+/**
+ * FamilyMessage - Prototype messaging structure
+ * 
+ * Mock message structure for demo messaging features.
+ * Separate from production messaging models.
+ */
 struct FamilyMessage: Codable {
     let id: UUID
     let content: String
@@ -246,7 +312,7 @@ struct DemoShowcaseData {
     let family: Family
     let users: [UserProfile]
     let memberships: [Membership]
-    let calendarEvents: [CalendarEvent]
+    let calendarEvents: [MockCalendarEvent]
     let tasks: [FamilyTask]
     let messages: [FamilyMessage]
     let noticeboardPosts: [NoticeboardPost]
@@ -260,7 +326,7 @@ struct DemoScenarioData {
     let users: [UserProfile]
     let memberships: [Membership]
     let currentUser: UserProfile
-    let calendarEvents: [CalendarEvent]
+    let calendarEvents: [MockCalendarEvent]
     let tasks: [FamilyTask]
     let messages: [FamilyMessage]
     let schoolRuns: [SchoolRun]
@@ -322,7 +388,23 @@ enum UserJourneyScenario: String, CaseIterable, Codable {
     }
 }
 
-/// Provides mock data for testing UI components and prototyping
+/**
+ * MockDataGenerator - Central hub for all prototype and demo data
+ * 
+ * This class provides comprehensive mock data for:
+ * - SwiftUI previews
+ * - Demo scenarios
+ * - UI testing
+ * - Prototype development
+ * 
+ * All data generated here uses mock types (MockCalendarEvent, FamilyTask, etc.)
+ * that are separate from production SwiftData models to prevent type conflicts.
+ * 
+ * Method Naming Conventions:
+ * - mock*() methods generate individual data types
+ * - mockDataFor*() methods generate role or scenario-specific data sets
+ * - preview* static properties provide quick access for SwiftUI previews
+ */
 struct MockDataGenerator {
     
     // MARK: - Family Mock Data
@@ -488,7 +570,7 @@ struct MockDataGenerator {
     
     /// Generates role-specific mock data for different user experiences
     static func mockDataForRole(_ role: Role) -> (
-        calendarEvents: [CalendarEvent],
+        calendarEvents: [MockCalendarEvent],
         tasks: [FamilyTask],
         messages: [FamilyMessage],
         schoolRuns: [SchoolRun]
@@ -688,13 +770,13 @@ struct MockDataGenerator {
     // MARK: - Calendar Events Mock Data
     
     /// Generates mock calendar events for the Mawere Family
-    static func mockCalendarEvents() -> [CalendarEvent] {
+    static func mockCalendarEvents() -> [MockCalendarEvent] {
         let (_, users, _) = mockMawereFamily()
         let calendar = Calendar.current
         let today = Date()
         
         return [
-            CalendarEvent(
+            MockCalendarEvent(
                 id: UUID(),
                 title: "Ethan's Birthday Party",
                 date: calendar.date(byAdding: .day, value: 3, to: today)!,
@@ -703,7 +785,7 @@ struct MockDataGenerator {
                 description: "Ethan turns 12! Pizza party at home.",
                 location: "Home"
             ),
-            CalendarEvent(
+            MockCalendarEvent(
                 id: UUID(),
                 title: "Parent-Teacher Conference",
                 date: calendar.date(byAdding: .day, value: 7, to: today)!,
@@ -712,7 +794,7 @@ struct MockDataGenerator {
                 description: "Meeting with Mrs. Johnson about Zoe's progress",
                 location: "Greenwood Elementary"
             ),
-            CalendarEvent(
+            MockCalendarEvent(
                 id: UUID(),
                 title: "Family Movie Night",
                 date: calendar.date(byAdding: .day, value: 1, to: today)!,
@@ -721,7 +803,7 @@ struct MockDataGenerator {
                 description: "Weekly family movie night - Zoe's turn to pick!",
                 location: "Living Room"
             ),
-            CalendarEvent(
+            MockCalendarEvent(
                 id: UUID(),
                 title: "Dentist Appointment - Zoe",
                 date: calendar.date(byAdding: .day, value: 5, to: today)!,
@@ -730,7 +812,7 @@ struct MockDataGenerator {
                 description: "Regular checkup and cleaning",
                 location: "Smile Dental Clinic"
             ),
-            CalendarEvent(
+            MockCalendarEvent(
                 id: UUID(),
                 title: "School Science Fair",
                 date: calendar.date(byAdding: .day, value: 14, to: today)!,
@@ -739,7 +821,7 @@ struct MockDataGenerator {
                 description: "Ethan presenting his volcano project",
                 location: "School Gymnasium"
             ),
-            CalendarEvent(
+            MockCalendarEvent(
                 id: UUID(),
                 title: "Grace's Work Presentation",
                 date: calendar.date(byAdding: .day, value: 2, to: today)!,
@@ -1586,7 +1668,7 @@ struct MockDataGenerator {
         family: Family,
         users: [UserProfile],
         memberships: [Membership],
-        calendarEvents: [CalendarEvent],
+        calendarEvents: [MockCalendarEvent],
         tasks: [FamilyTask],
         messages: [FamilyMessage],
         schoolRuns: [SchoolRun],

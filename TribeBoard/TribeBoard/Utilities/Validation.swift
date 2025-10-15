@@ -233,66 +233,7 @@ struct Validation {
 ///     // Display result.message to user
 /// }
 /// ```
-struct ValidationResult {
-    /// Whether the validation passed
-    let isValid: Bool
-    
-    /// User-friendly message describing the result
-    let message: String
-    
-    /// Optional error code for programmatic handling
-    let errorCode: ValidationErrorCode?
-    
-    /// Timestamp when validation was performed
-    let timestamp: Date
-    
-    /// Initializes a validation result
-    /// - Parameters:
-    ///   - isValid: Whether validation passed
-    ///   - message: User-friendly message
-    ///   - errorCode: Optional error code for programmatic handling
-    init(isValid: Bool, message: String, errorCode: ValidationErrorCode? = nil) {
-        self.isValid = isValid
-        self.message = message
-        self.errorCode = errorCode
-        self.timestamp = Date()
-    }
-    
-    /// Returns a success result with default message
-    static var success: ValidationResult {
-        return ValidationResult(isValid: true, message: "Valid")
-    }
-    
-    /// Returns a success result with custom message
-    /// - Parameter message: Success message
-    /// - Returns: Success ValidationResult
-    static func success(_ message: String) -> ValidationResult {
-        return ValidationResult(isValid: true, message: message)
-    }
-    
-    /// Returns a failure result with message
-    /// - Parameters:
-    ///   - message: Error message
-    ///   - errorCode: Optional error code
-    /// - Returns: Failure ValidationResult
-    static func failure(_ message: String, errorCode: ValidationErrorCode? = nil) -> ValidationResult {
-        return ValidationResult(isValid: false, message: message, errorCode: errorCode)
-    }
-    
-    /// Combines multiple validation results using AND logic
-    /// - Parameter results: Array of validation results to combine
-    /// - Returns: Combined result (fails if any individual result fails)
-    static func combine(_ results: [ValidationResult]) -> ValidationResult {
-        let failures = results.filter { !$0.isValid }
-        
-        if failures.isEmpty {
-            return .success("All validations passed")
-        } else {
-            let combinedMessage = failures.map { $0.message }.joined(separator: "; ")
-            return .failure(combinedMessage)
-        }
-    }
-}
+// Note: ValidationResult is now defined in CalendarService.swift
 
 /// Error codes for programmatic validation error handling
 enum ValidationErrorCode: String, CaseIterable {

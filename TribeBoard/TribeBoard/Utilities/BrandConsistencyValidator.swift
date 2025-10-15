@@ -6,8 +6,8 @@ struct BrandConsistencyValidator {
     // MARK: - Typography Validation
     
     /// Validates that typography follows the design system
-    static func validateTypography() -> [ValidationIssue] {
-        var issues: [ValidationIssue] = []
+    static func validateTypography() -> [BrandValidationIssue] {
+        var issues: [BrandValidationIssue] = []
         
         // Check for hardcoded font sizes that should use design system
         let deprecatedFontUsage = [
@@ -19,7 +19,7 @@ struct BrandConsistencyValidator {
         ]
         
         for usage in deprecatedFontUsage {
-            issues.append(ValidationIssue(
+            issues.append(BrandValidationIssue(
                 type: .typography,
                 severity: .warning,
                 description: "Consider using DesignSystem.Typography instead of \(usage)",
@@ -33,8 +33,8 @@ struct BrandConsistencyValidator {
     // MARK: - Color Validation
     
     /// Validates that colors follow the brand guidelines
-    static func validateColors() -> [ValidationIssue] {
-        var issues: [ValidationIssue] = []
+    static func validateColors() -> [BrandValidationIssue] {
+        var issues: [BrandValidationIssue] = []
         
         // Check for hardcoded colors that should use brand colors
         let deprecatedColorUsage = [
@@ -46,7 +46,7 @@ struct BrandConsistencyValidator {
         ]
         
         for usage in deprecatedColorUsage {
-            issues.append(ValidationIssue(
+            issues.append(BrandValidationIssue(
                 type: .color,
                 severity: .error,
                 description: "Hardcoded color usage: \(usage)",
@@ -60,8 +60,8 @@ struct BrandConsistencyValidator {
     // MARK: - Spacing Validation
     
     /// Validates that spacing follows the design system
-    static func validateSpacing() -> [ValidationIssue] {
-        var issues: [ValidationIssue] = []
+    static func validateSpacing() -> [BrandValidationIssue] {
+        var issues: [BrandValidationIssue] = []
         
         // Check for hardcoded spacing values
         let deprecatedSpacingUsage = [
@@ -72,7 +72,7 @@ struct BrandConsistencyValidator {
         ]
         
         for usage in deprecatedSpacingUsage {
-            issues.append(ValidationIssue(
+            issues.append(BrandValidationIssue(
                 type: .spacing,
                 severity: .warning,
                 description: "Hardcoded spacing: \(usage)",
@@ -86,11 +86,11 @@ struct BrandConsistencyValidator {
     // MARK: - Component Validation
     
     /// Validates that components follow brand guidelines
-    static func validateComponents() -> [ValidationIssue] {
-        var issues: [ValidationIssue] = []
+    static func validateComponents() -> [BrandValidationIssue] {
+        var issues: [BrandValidationIssue] = []
         
         // Check for inconsistent button styling
-        issues.append(ValidationIssue(
+        issues.append(BrandValidationIssue(
             type: .component,
             severity: .info,
             description: "Ensure all buttons use consistent ButtonStyle implementations",
@@ -98,7 +98,7 @@ struct BrandConsistencyValidator {
         ))
         
         // Check for inconsistent corner radius usage
-        issues.append(ValidationIssue(
+        issues.append(BrandValidationIssue(
             type: .component,
             severity: .warning,
             description: "Use BrandStyle.cornerRadius for consistent corner radius",
@@ -111,10 +111,10 @@ struct BrandConsistencyValidator {
     // MARK: - Shadow Validation
     
     /// Validates that shadows follow the design system
-    static func validateShadows() -> [ValidationIssue] {
-        var issues: [ValidationIssue] = []
+    static func validateShadows() -> [BrandValidationIssue] {
+        var issues: [BrandValidationIssue] = []
         
-        issues.append(ValidationIssue(
+        issues.append(BrandValidationIssue(
             type: .shadow,
             severity: .info,
             description: "Use DesignSystem.Shadow for consistent elevation",
@@ -128,7 +128,7 @@ struct BrandConsistencyValidator {
     
     /// Runs all validation checks and returns consolidated results
     static func validateBrandConsistency() -> BrandValidationReport {
-        var allIssues: [ValidationIssue] = []
+        var allIssues: [BrandValidationIssue] = []
         
         allIssues.append(contentsOf: validateTypography())
         allIssues.append(contentsOf: validateColors())
@@ -142,7 +142,7 @@ struct BrandConsistencyValidator {
 
 // MARK: - Supporting Types
 
-struct ValidationIssue {
+struct BrandValidationIssue {
     let type: ValidationType
     let severity: ValidationSeverity
     let description: String
@@ -203,7 +203,7 @@ struct ValidationIssue {
 }
 
 struct BrandValidationReport {
-    let issues: [ValidationIssue]
+    let issues: [BrandValidationIssue]
     let timestamp: Date = Date()
     
     var errorCount: Int {
@@ -403,7 +403,7 @@ struct BrandValidationView: View {
         .frame(maxWidth: .infinity)
     }
     
-    private func issuesList(issues: [ValidationIssue]) -> some View {
+    private func issuesList(issues: [BrandValidationIssue]) -> some View {
         VStack(alignment: .leading, spacing: DesignSystem.Spacing.md) {
             Text("Issues Found")
                 .headlineSmall()

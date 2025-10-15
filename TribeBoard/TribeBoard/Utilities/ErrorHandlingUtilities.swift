@@ -298,8 +298,8 @@ struct ErrorHandlingUtilities {
     
     /// Determines available user actions for an error
     private static func determineUserActions(for error: FamilyCreationError, 
-                                           context: ErrorContext) -> [UserAction] {
-        var actions: [UserAction] = []
+                                           context: ErrorContext) -> [ErrorUserAction] {
+        var actions: [ErrorUserAction] = []
         
         // Always allow dismissal
         actions.append(.dismiss)
@@ -515,7 +515,7 @@ struct ErrorContext {
 enum ErrorRecoveryAction {
     case retry(delay: TimeInterval, maxAttempts: Int, strategy: RetryStrategy)
     case fallbackToLocal(message: String, allowContinue: Bool)
-    case requireUserAction(message: String, actions: [UserAction])
+    case requireUserAction(message: String, actions: [ErrorUserAction])
     case abort(message: String, allowRetry: Bool)
 }
 
@@ -527,7 +527,7 @@ enum RetryStrategy {
 }
 
 /// User actions available for error recovery
-enum UserAction {
+enum ErrorUserAction {
     case dismiss
     case retry
     case signIn

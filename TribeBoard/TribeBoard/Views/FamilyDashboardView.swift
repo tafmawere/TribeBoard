@@ -140,6 +140,12 @@ struct FamilyDashboardView: View {
         ScrollView {
             LazyVStack(spacing: 16) {
                 familyHeaderView
+                
+                // Calendar section
+                if viewModel.showCalendarSection {
+                    calendarDashboardSection
+                }
+                
                 membersSection
                 
                 if viewModel.canManageMembers {
@@ -327,6 +333,138 @@ struct FamilyDashboardView: View {
         .accessibilityLabel("Family members section")
     }
     
+    private var calendarDashboardSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Enhanced Calendar Widget
+            CalendarWidgetView()
+                .accessibilityElement(children: .contain)
+                .accessibilityLabel("Family calendar widget")
+            
+            // Calendar Shortcuts
+            CalendarShortcutsView()
+                .accessibilityElement(children: .contain)
+                .accessibilityLabel("Calendar shortcuts")
+        }
+    }
+    
+    @ViewBuilder
+    private func calendarContentView(_ data: FamilyCalendarDashboardData) -> some View {
+        VStack(spacing: 12) {
+            // Today's events
+            if data.hasTodayEvents {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Today")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundColor(.secondary)
+                    
+                    ForEach(data.todayEvents.prefix(3), id: \.id) { event in
+                        CalendarEventRowView(event: event, showDate: false)
+                    }
+                }
+            }
+            
+            // Upcoming events
+            if data.hasUpcomingEvents {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Upcoming")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundColor(.secondary)
+                    
+                    ForEach(data.upcomingEvents.prefix(3), id: \.id) { event in
+                        CalendarEventRowView(event: event, showDate: true)
+                    }
+                }
+            }
+            
+            // Calendar stats
+            if let statsText = viewModel.calendarStatsSummary {
+                HStack {
+                    Text(statsText)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    
+                    Spacer()
+                    
+                    if data.permissions.canCreate {
+                        Button("Add Event") {
+                            HapticManager.shared.selection()
+                            // TODO: Navigate to event creation
+                            ToastManager.shared.info("Event creation coming soon")
+                        }
+                        .font(.caption)
+                        .foregroundColor(.brandPrimary)
+                    }
+                }
+            }
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+        .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
+    }
+    
+    private var calendarLoadingView: some View {
+        VStack(spacing: 8) {
+            SkeletonLoadingView(rows: 2, showAvatar: false)
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+        .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
+    }
+    
+    private var calendarErrorView: some View {
+        VStack(spacing: 8) {
+            Image(systemName: "calendar.badge.exclamationmark")
+                .font(.title2)
+                .foregroundColor(.secondary)
+            
+            Text("Unable to load calendar")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+            
+            Button("Retry") {
+                Task {
+                    await viewModel.refreshCalendarData()
+                }
+            }
+            .font(.caption)
+            .foregroundColor(.brandPrimary)
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+        .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
+    }
+    
+    private var calendarEmptyView: some View {
+        VStack(spacing: 8) {
+            Image(systemName: "calendar")
+                .font(.title2)
+                .foregroundColor(.secondary)
+            
+            Text("No upcoming events")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+            
+            if viewModel.calendarDashboardData?.permissions.canCreate == true {
+                Button("Create First Event") {
+                    HapticManager.shared.selection()
+                    // TODO: Navigate to event creation
+                    ToastManager.shared.info("Event creation coming soon")
+                }
+                .font(.caption)
+                .foregroundColor(.brandPrimary)
+            }
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+        .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
+    }
+    
     private var adminControlsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Admin Controls")
@@ -352,6 +490,18 @@ struct FamilyDashboardView: View {
                         ToastManager.shared.info("Settings functionality coming soon")
                     }
                 )
+                
+                // Calendar admin controls
+                if viewModel.canManageCalendarPermissions {
+                    AdminControlButton(
+                        title: "Calendar Permissions",
+                        icon: "calendar.badge.gearshape",
+                        action: {
+                            // TODO: Navigate to calendar permission management
+                            ToastManager.shared.info("Calendar permission management coming soon")
+                        }
+                    )
+                }
             }
             .padding()
             .background(Color(.systemBackground))
@@ -666,6 +816,89 @@ struct RoleSelectionRow: View {
         .buttonStyle(PlainButtonStyle())
         .disabled(isDisabled)
         .padding(.horizontal)
+    }
+}
+
+// MARK: - Calendar Event Row View
+
+struct CalendarEventRowView: View {
+    let event: CalendarEvent
+    let showDate: Bool
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            // Event indicator
+            Circle()
+                .fill(event.privacyLevel == .familyShared ? Color.brandPrimary : Color.secondary)
+                .frame(width: 8, height: 8)
+            
+            // Event info
+            VStack(alignment: .leading, spacing: 2) {
+                Text(event.title)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .lineLimit(1)
+                
+                HStack(spacing: 4) {
+                    if showDate {
+                        Text(event.startDate, style: .date)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        
+                        Text("•")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    Text(event.startDate, style: .time)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    
+                    if event.privacyLevel == .familyShared {
+                        Image(systemName: "person.2.fill")
+                            .font(.caption2)
+                            .foregroundColor(.brandPrimary)
+                    }
+                }
+            }
+            
+            Spacer()
+            
+            // Event status
+            if event.isHappening {
+                Text("Now")
+                    .font(.caption2)
+                    .fontWeight(.medium)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Color.green.opacity(0.2))
+                    .foregroundColor(.green)
+                    .cornerRadius(4)
+            } else if event.isUpcoming {
+                Text(timeUntilEvent(event.startDate))
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
+        }
+        .padding(.vertical, 4)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Event: \(event.title), \(event.dateRangeString)")
+    }
+    
+    private func timeUntilEvent(_ date: Date) -> String {
+        let now = Date()
+        let timeInterval = date.timeIntervalSince(now)
+        
+        if timeInterval < 3600 { // Less than 1 hour
+            let minutes = Int(timeInterval / 60)
+            return "\(minutes)m"
+        } else if timeInterval < 86400 { // Less than 1 day
+            let hours = Int(timeInterval / 3600)
+            return "\(hours)h"
+        } else {
+            let days = Int(timeInterval / 86400)
+            return "\(days)d"
+        }
     }
 }
 
