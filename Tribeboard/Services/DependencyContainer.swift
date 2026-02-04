@@ -123,6 +123,17 @@ class DependencyContainer: ObservableObject {
         return DelayNotificationService(runEventService: runEventService)
     }()
     
+    // MARK: - Demo Services
+    
+    lazy var demoRunPlaybackController: DemoRunPlaybackController = {
+        return DemoRunPlaybackController(
+            runEventService: runEventService,
+            locationService: locationService,
+            firebaseService: firebaseService,
+            coreDataService: coreDataService
+        )
+    }()
+    
     // MARK: - ViewModels
     
     lazy var homeDashboardViewModel: HomeDashboardViewModel = {
@@ -207,6 +218,11 @@ class DependencyContainer: ObservableObject {
         // Set up demo user data for Active Run Only mode
         if AppConfig.isActiveRunOnlyMode {
             setupDemoUserData()
+            
+            // Start demo playback if enabled
+            if AppConfig.isDemoPlaybackEnabled {
+                demoRunPlaybackController.startIfNeeded()
+            }
         }
         
         // Initialize app lifecycle management
@@ -228,6 +244,11 @@ class DependencyContainer: ObservableObject {
     // MARK: - Cleanup
     
     func cleanup() {
+        // Stop demo playback
+        if AppConfig.isActiveRunOnlyMode && AppConfig.isDemoPlaybackEnabled {
+            demoRunPlaybackController.stop()
+        }
+        
         // Notify app lifecycle manager of termination
         appLifecycleManager.handleAppWillTerminate()
     }

@@ -365,10 +365,17 @@ class MockFirebaseRunService: ObservableObject {
                 ),
                 RunStop(
                     type: .dropoff,
-                    label: "Home",
-                    scheduledTime: Date().addingTimeInterval(1200),
-                    requiredPassengerIds: ["demo_child1", "demo_child2"],
+                    label: "Emma's House",
+                    scheduledTime: Date().addingTimeInterval(900),
+                    requiredPassengerIds: ["demo_child1"],
                     location: LocationData(latitude: -17.8145, longitude: 31.0493, address: "123 Main Street, Harare")
+                ),
+                RunStop(
+                    type: .dropoff,
+                    label: "Liam's House",
+                    scheduledTime: Date().addingTimeInterval(1200),
+                    requiredPassengerIds: ["demo_child2"],
+                    location: LocationData(latitude: -17.8050, longitude: 31.0600, address: "456 Oak Avenue, Harare")
                 )
             ],
             passengers: [
