@@ -10,12 +10,36 @@ import CoreData
 
 @main
 struct TribeboardApp: App {
-    let persistenceController = PersistenceController.shared
-
+    @StateObject private var dependencyContainer = DependencyContainer()
+    
     var body: some Scene {
         WindowGroup {
-            ContentView()
-                .environment(\.managedObjectContext, persistenceController.container.viewContext)
+            if AppConfig.isActiveRunOnlyMode {
+                LaunchRootView()
+                    .withDependencyContainer(dependencyContainer)
+                    .environment(\.managedObjectContext, dependencyContainer.persistenceController.container.viewContext)
+                    .environment(\.appLifecycleManager, dependencyContainer.appLifecycleManager)
+                    .onAppear {
+                        setupInitialConfiguration()
+                    }
+            } else {
+                MainNavigationView(dependencyContainer: dependencyContainer)
+                    .withDependencyContainer(dependencyContainer)
+                    .environment(\.managedObjectContext, dependencyContainer.persistenceController.container.viewContext)
+                    .environment(\.appLifecycleManager, dependencyContainer.appLifecycleManager)
+                    .onAppear {
+                        setupInitialConfiguration()
+                    }
+            }
+        }
+    }
+    
+    private func setupInitialConfiguration() {
+        print("🚀 TribeBoard app launched with integrated architecture")
+        
+        // App lifecycle manager will handle the rest of the initialization
+        Task { @MainActor in
+            await dependencyContainer.appLifecycleManager.handleAppLaunch()
         }
     }
 }

@@ -14,10 +14,19 @@ struct PersistenceController {
     static let preview: PersistenceController = {
         let result = PersistenceController(inMemory: true)
         let viewContext = result.container.viewContext
-        for _ in 0..<10 {
-            let newItem = Item(context: viewContext)
-            newItem.timestamp = Date()
-        }
+        
+        // Create sample run data for previews
+        let runEntity = RunEntity(context: viewContext)
+        runEntity.id = "preview_run"
+        runEntity.title = "Preview Run"
+        runEntity.scheduledTime = Date()
+        runEntity.driverId = "preview_driver"
+        runEntity.status = RunStatus.scheduled.rawValue
+        runEntity.createdBy = "preview_user"
+        runEntity.familyId = "preview_family"
+        runEntity.isDelayed = false
+        runEntity.currentStopIndex = 0
+        
         do {
             try viewContext.save()
         } catch {

@@ -1,9 +1,40 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <model type="com.apple.IDECoreDataModeler.DataModel" documentVersion="1.0" lastSavedToolsVersion="1" systemVersion="11A491" minimumToolsVersion="Automatic" sourceLanguage="Swift" usedWithCloudKit="true" userDefinedModelVersionIdentifier="">
-    <entity name="Item" representedClassName="Item" syncable="YES" codeGenerationType="class">
+    <entity name="RunEntity" representedClassName="RunEntity" syncable="YES" codeGenerationType="class">
+        <attribute name="id" optional="YES" attributeType="String"/>
+        <attribute name="title" optional="YES" attributeType="String"/>
+        <attribute name="scheduledTime" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="driverId" optional="YES" attributeType="String"/>
+        <attribute name="status" optional="YES" attributeType="String"/>
+        <attribute name="createdBy" optional="YES" attributeType="String"/>
+        <attribute name="familyId" optional="YES" attributeType="String"/>
+        <attribute name="isDelayed" optional="YES" attributeType="Boolean" defaultValue="NO" usesScalarValueType="YES"/>
+        <attribute name="delayReason" optional="YES" attributeType="String"/>
+        <attribute name="currentStopIndex" optional="YES" attributeType="Integer 32" defaultValue="0" usesScalarValueType="YES"/>
+        <attribute name="lastLocationLatitude" optional="YES" attributeType="Double" defaultValue="0.0" usesScalarValueType="YES"/>
+        <attribute name="lastLocationLongitude" optional="YES" attributeType="Double" defaultValue="0.0" usesScalarValueType="YES"/>
+        <attribute name="lastLocationUpdatedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="startTime" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="stopsData" optional="YES" attributeType="Binary"/>
+        <attribute name="passengersData" optional="YES" attributeType="Binary"/>
+        <attribute name="lastSyncedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+    </entity>
+    <entity name="RunEventEntity" representedClassName="RunEventEntity" syncable="YES" codeGenerationType="class">
+        <attribute name="id" optional="YES" attributeType="String"/>
+        <attribute name="runId" optional="YES" attributeType="String"/>
+        <attribute name="type" optional="YES" attributeType="String"/>
         <attribute name="timestamp" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="actorId" optional="YES" attributeType="String"/>
+        <attribute name="stateBefore" optional="YES" attributeType="String"/>
+        <attribute name="stateAfter" optional="YES" attributeType="String"/>
+        <attribute name="currentStopIndex" optional="YES" attributeType="Integer 32" defaultValue="0" usesScalarValueType="YES"/>
+        <attribute name="locationLatitude" optional="YES" attributeType="Double" defaultValue="0.0" usesScalarValueType="YES"/>
+        <attribute name="locationLongitude" optional="YES" attributeType="Double" defaultValue="0.0" usesScalarValueType="YES"/>
+        <attribute name="note" optional="YES" attributeType="String"/>
+        <attribute name="lastSyncedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
     </entity>
     <elements>
-        <element name="Item" positionX="-63" positionY="-18" width="128" height="44"/>
+        <element name="RunEntity" positionX="-63" positionY="-18" width="128" height="284"/>
+        <element name="RunEventEntity" positionX="135" positionY="-18" width="128" height="209"/>
     </elements>
 </model>
