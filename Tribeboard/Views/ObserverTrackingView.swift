@@ -99,10 +99,11 @@ struct ObserverTrackingView: View {
                 delayDetailSheet(delay: delay)
             }
         }
+        .debugOverlay()
         .onAppear {
             updateMapRegion()
         }
-        .onChange(of: viewModel.driverLocation) { _ in
+        .task(id: viewModel.driverLocation) {
             updateMapRegion()
         }
     }
@@ -244,8 +245,25 @@ struct ObserverTrackingView: View {
                 }
             }
             
-            Map(coordinateRegion: $mapRegion, annotationItems: mapAnnotations) { annotation in
-                MapPin(coordinate: annotation.coordinate, tint: colorForAnnotationType(annotation.type))
+            Map(position: .constant(.region(mapRegion))) {
+                // Driver location marker
+                if let driverLocation = viewModel.driverLocation {
+                    Marker("Driver", systemImage: "car.fill", coordinate: driverLocation)
+                        .tint(.blue)
+                }
+                
+                // Current run stops
+                if let runInfo = viewModel.getCurrentRunInfo() {
+                    ForEach(Array(runInfo.run.stops.enumerated()), id: \.element.id) { index, stop in
+                        if index == runInfo.run.currentStopIndex {
+                            Marker(stop.label, systemImage: "mappin.circle.fill", coordinate: stop.location.coordinate)
+                                .tint(.green)
+                        } else {
+                            Marker(stop.label, systemImage: "mappin.circle", coordinate: stop.location.coordinate)
+                                .tint(.orange)
+                        }
+                    }
+                }
             }
             .frame(height: 200)
             .cornerRadius(12)
@@ -814,65 +832,6 @@ struct ObserverTrackingView: View {
         }
     }
     
-    private var mapAnnotations: [MapAnnotation] {
-        var annotations: [MapAnnotation] = []
-        
-        // Driver location
-        if let driverLocation = viewModel.driverLocation {
-            annotations.append(MapAnnotation(
-                id: "driver",
-                coordinate: driverLocation,
-                type: .driver
-            ))
-        }
-        
-        // Current run stops
-        if let runInfo = viewModel.getCurrentRunInfo() {
-            for (index, stop) in runInfo.run.stops.enumerated() {
-                annotations.append(MapAnnotation(
-                    id: stop.id,
-                    coordinate: stop.location.coordinate,
-                    type: index == runInfo.run.currentStopIndex ? .currentStop : .futureStop
-                ))
-            }
-        }
-        
-        return annotations
-    }
-    
-    private func mapAnnotationView(for annotation: MapAnnotation) -> some View {
-        Group {
-            switch annotation.type {
-            case .driver:
-                Image(systemName: "car.fill")
-                    .foregroundColor(.blue)
-                    .background(Circle().fill(Color.white))
-                    .background(Circle().stroke(Color.blue, lineWidth: 2))
-                
-            case .currentStop:
-                Image(systemName: "mappin.circle.fill")
-                    .foregroundColor(.red)
-                    .font(.title2)
-                
-            case .futureStop:
-                Image(systemName: "mappin.circle")
-                    .foregroundColor(.gray)
-                    .font(.title2)
-            }
-        }
-    }
-    
-    private func colorForAnnotationType(_ type: MapAnnotationType) -> Color {
-        switch type {
-        case .driver:
-            return .blue
-        case .currentStop:
-            return .green
-        case .futureStop:
-            return .orange
-        }
-    }
-    
     private func handleObserverAction(_ action: ObserverAction) {
         switch action {
         case .viewDetails:
@@ -995,18 +954,6 @@ extension Color {
             self = .gray
         }
     }
-}
-
-struct MapAnnotation: Identifiable {
-    let id: String
-    let coordinate: CLLocationCoordinate2D
-    let type: MapAnnotationType
-}
-
-enum MapAnnotationType {
-    case driver
-    case currentStop
-    case futureStop
 }
 
 struct Badge: View {

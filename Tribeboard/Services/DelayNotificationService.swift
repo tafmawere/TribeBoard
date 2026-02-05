@@ -155,7 +155,7 @@ class DelayNotificationService: ObservableObject {
     // MARK: - Private Methods
     
     private func setupNotificationPermissions() {
-        Task {
+        Task { @MainActor in
             let settings = await notificationCenter.notificationSettings()
             isNotificationEnabled = settings.authorizationStatus == .authorized
         }
@@ -269,8 +269,9 @@ class DelayNotificationService: ObservableObject {
     private func startDelayMonitoring(for delay: DelayNotification) {
         // Start a timer to monitor delay duration and send periodic updates
         let timer = Timer.scheduledTimer(withTimeInterval: 300, repeats: true) { [weak self] _ in
+            guard let self = self else { return }
             Task { @MainActor in
-                self?.sendDelayUpdateNotification(delay)
+                await self.sendDelayUpdateNotification(delay)
             }
         }
         
@@ -282,7 +283,7 @@ class DelayNotificationService: ObservableObject {
         delayTimers.removeValue(forKey: runId)
     }
     
-    private func sendDelayUpdateNotification(_ delay: DelayNotification) {
+    private func sendDelayUpdateNotification(_ delay: DelayNotification) async {
         guard isNotificationEnabled else { return }
         
         let duration = Date().timeIntervalSince(delay.timestamp)

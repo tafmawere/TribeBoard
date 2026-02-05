@@ -47,6 +47,28 @@ class MockFirebaseRunService: ObservableObject {
     
     private var mockRuns: [String: Run] = [:]
     private var mockEvents: [String: [RunEvent]] = [:]
+    private var mockUsers: [String: User] = [:]
+    private var mockFamilies: [String: [String]] = [:] // familyId -> [memberIds]
+    
+    // MARK: - User Management
+    
+    func upsertUser(_ user: User) async throws {
+        mockUsers[user.id] = user
+    }
+    
+    func getUser(userId: String) async throws -> User? {
+        return mockUsers[userId]
+    }
+    
+    // MARK: - Family Management
+    
+    func upsertFamily(id: String, members: [String]) async throws {
+        mockFamilies[id] = members
+    }
+    
+    func getFamily(familyId: String) async throws -> [String]? {
+        return mockFamilies[familyId]
+    }
     
     // MARK: - Run Management
     
@@ -101,6 +123,39 @@ class MockFirebaseRunService: ObservableObject {
         )
         
         return createdRun
+    }
+    
+    func upsertRun(_ run: Run) async throws -> Run {
+        // Store or update run in mock database
+        mockRuns[run.id] = run
+        
+        // Log creation event if this is a new run
+        if mockEvents[run.id] == nil {
+            await logRunEvent(
+                runId: run.id,
+                type: .runCreated,
+                stateBefore: nil,
+                stateAfter: run.status,
+                currentStopIndex: run.currentStopIndex,
+                note: "Run '\(run.title)' created"
+            )
+        }
+        
+        return run
+    }
+    
+    func listRuns(forFamilyId familyId: String) async throws -> [Run] {
+        // Simulate network delay
+        try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+        
+        // Filter runs by family ID and sort by scheduled time
+        return mockRuns.values
+            .filter { $0.familyId == familyId }
+            .sorted { $0.scheduledTime < $1.scheduledTime }
+    }
+    
+    func getRun(runId: String) async throws -> Run? {
+        return mockRuns[runId]
     }
     
     func fetchRun(runId: String) async throws -> Run {
@@ -334,8 +389,18 @@ class MockFirebaseRunService: ObservableObject {
             run.familyId == familyId && run.status.isActive
         }
         
-        // Return the most recent active run
-        return activeRuns.sorted { $0.scheduledTime > $1.scheduledTime }.first
+        // Return the most recent active run if found
+        if let activeRun = activeRuns.sorted(by: { $0.scheduledTime > $1.scheduledTime }).first {
+            return activeRun
+        }
+        
+        // For demo purposes, create enhanced demo seed data if no active run exists
+        // This ensures getCurrentActiveRun() returns non-nil for debug overlay testing
+        if familyId == "demo_family_id" {
+            return try await createEnhancedDemoSeedData()
+        }
+        
+        return nil
     }
     
     /// Get all active runs for a family
@@ -398,6 +463,118 @@ class MockFirebaseRunService: ObservableObject {
         )
         
         return demoRun
+    }
+    
+    /// Create enhanced demo seed data that meets debug overlay requirements
+    func createEnhancedDemoSeedData() async throws -> Run {
+        // Create demo run with activeEnroute status and proper configuration
+        let enhancedDemoRun = Run(
+            title: "Enhanced Demo Run",
+            scheduledTime: Date().addingTimeInterval(-1800), // Started 30 minutes ago
+            driverId: "demo_driver_user_id", // Matches demo driver user id
+            status: .activeEnroute, // Active state as required
+            stops: [
+                RunStop(
+                    type: .pickup,
+                    label: "Riverside Elementary",
+                    scheduledTime: Date().addingTimeInterval(-1200), // 20 minutes ago
+                    requiredPassengerIds: ["demo_passenger_1", "demo_passenger_2"],
+                    location: LocationData(latitude: -17.8252, longitude: 31.0335, address: "Riverside Elementary School, Harare")
+                ),
+                RunStop(
+                    type: .dropoff,
+                    label: "Sarah's Home",
+                    scheduledTime: Date().addingTimeInterval(-600), // 10 minutes ago
+                    requiredPassengerIds: ["demo_passenger_1"],
+                    location: LocationData(latitude: -17.8145, longitude: 31.0493, address: "789 Pine Street, Harare")
+                ),
+                RunStop(
+                    type: .dropoff,
+                    label: "Alex's Home",
+                    scheduledTime: Date().addingTimeInterval(300), // 5 minutes from now
+                    requiredPassengerIds: ["demo_passenger_2"],
+                    location: LocationData(latitude: -17.8050, longitude: 31.0600, address: "321 Elm Avenue, Harare")
+                )
+            ],
+            passengers: [
+                MemberSummary(id: "demo_passenger_1", displayName: "Sarah", role: .passenger, status: .onboard),
+                MemberSummary(id: "demo_passenger_2", displayName: "Alex", role: .passenger, status: .onboard)
+            ],
+            createdBy: "demo_parent_user_id",
+            familyId: "demo_family_id",
+            currentStopIndex: 1, // Currently between pickup and first dropoff
+            lastLocation: GeoPoint(latitude: -17.8200, longitude: 31.0400), // En route location
+            lastLocationUpdatedAt: Date().addingTimeInterval(-60), // Updated 1 minute ago
+            startTime: Date().addingTimeInterval(-1800) // Started 30 minutes ago
+        )
+        
+        // Validate demo data structure meets requirements
+        guard validateDemoDataStructure(enhancedDemoRun) else {
+            throw FirebaseError.invalidData
+        }
+        
+        // Store in mock database
+        mockRuns[enhancedDemoRun.id] = enhancedDemoRun
+        
+        // Log creation and start events
+        await logRunEvent(
+            runId: enhancedDemoRun.id,
+            type: .runCreated,
+            stateBefore: nil,
+            stateAfter: .scheduled,
+            currentStopIndex: 0,
+            note: "Enhanced demo run created for debug overlay testing"
+        )
+        
+        await logRunEvent(
+            runId: enhancedDemoRun.id,
+            type: .runStarted,
+            stateBefore: .scheduled,
+            stateAfter: .activeEnroute,
+            currentStopIndex: 1,
+            location: enhancedDemoRun.lastLocation,
+            note: "Demo run started and en route to first dropoff"
+        )
+        
+        return enhancedDemoRun
+    }
+    
+    /// Validate demo data structure meets requirements 4.1-4.6
+    private func validateDemoDataStructure(_ run: Run) -> Bool {
+        // Requirement 4.1: getCurrentActiveRun() returns non-nil (handled by caller)
+        // Requirement 4.2: Run state is activeEnroute or arrivedAtStop (not scheduled)
+        guard run.status == .activeEnroute || run.status == .arrivedAtStop else {
+            return false
+        }
+        
+        // Requirement 4.3: Exactly 2 passengers and 3 stops
+        guard run.passengers.count == 2 && run.stops.count == 3 else {
+            return false
+        }
+        
+        // Requirement 4.4: currentStopIndex between 0 and stops.count-1
+        guard run.currentStopIndex >= 0 && run.currentStopIndex < run.stops.count else {
+            return false
+        }
+        
+        // Requirement 4.5: driverId matches demo driver user id
+        guard run.driverId == "demo_driver_user_id" else {
+            return false
+        }
+        
+        // Requirement 4.6: Demo observer user exists (validated by having demo users setup)
+        // This is handled by the DependencyContainer setup
+        
+        return true
+    }
+    
+    /// Create demo observer user for testing purposes (Requirement 4.6)
+    func createDemoObserverUser() -> MemberSummary {
+        return MemberSummary(
+            id: "demo_observer_user_id",
+            displayName: "Demo Observer",
+            role: .observer
+        )
     }
     
     // MARK: - Cleanup

@@ -154,7 +154,7 @@ class CacheManagementService: ObservableObject {
     /// Handle app restart state restoration
     /// Implements Requirements 10.5 - handle app restart state restoration
     func restoreAppState() {
-        Task {
+        Task { @MainActor in
             do {
                 // Restore active runs
                 let activeRuns = try await restoreActiveRuns()
@@ -279,8 +279,9 @@ class CacheManagementService: ObservableObject {
     
     private func setupPeriodicCleanup() {
         cleanupTimer = Timer.scheduledTimer(withTimeInterval: configuration.cleanupInterval, repeats: true) { [weak self] _ in
+            guard let self = self else { return }
             Task { @MainActor in
-                await self?.performCacheCleanup()
+                await self.performCacheCleanup()
             }
         }
     }
@@ -301,14 +302,18 @@ class CacheManagementService: ObservableObject {
                 let runSize = Int64(runs.count * 2048)
                 let eventSize = Int64(events.count * 1024)
                 
-                cacheSize = runSize + eventSize
+                Task { @MainActor in
+                    self.cacheSize = runSize + eventSize
+                }
                 
             } catch {
-                logger.logError(
-                    error,
-                    context: .cacheManagement,
-                    additionalInfo: ["operation": "cache_size_calculation"]
-                )
+                Task { @MainActor in
+                    self.logger.logError(
+                        error,
+                        context: .cacheManagement,
+                        additionalInfo: ["operation": "cache_size_calculation"]
+                    )
+                }
             }
         }
     }
@@ -498,7 +503,7 @@ class CacheManagementService: ObservableObject {
     }
     
     /// Delete events for a specific run
-    private func deleteEventsForRun(runId: String, context: NSManagedObjectContext) throws {
+    nonisolated private func deleteEventsForRun(runId: String, context: NSManagedObjectContext) throws {
         let eventFetchRequest: NSFetchRequest<RunEventEntity> = RunEventEntity.fetchRequest()
         eventFetchRequest.predicate = NSPredicate(format: "runId == %@", runId)
         
@@ -573,11 +578,13 @@ class CacheManagementService: ObservableObject {
                         orphanedEvents.forEach { context.delete($0) }
                         try context.save()
                         
-                        self.logger.logInfo(
-                            message: "Removed orphaned events during cache validation",
-                            context: .cacheManagement,
-                            additionalInfo: ["orphanedEventsCount": String(orphanedEvents.count)]
-                        )
+                        Task { @MainActor in
+                            self.logger.logInfo(
+                                message: "Removed orphaned events during cache validation",
+                                context: .cacheManagement,
+                                additionalInfo: ["orphanedEventsCount": String(orphanedEvents.count)]
+                            )
+                        }
                     }
                     
                     continuation.resume()
@@ -591,12 +598,8 @@ class CacheManagementService: ObservableObject {
     deinit {
         cleanupTimer?.invalidate()
         
-        // Save last cleanup date
-        Task { @MainActor in
-            if let lastCleanupDate = lastCleanupDate {
-                UserDefaults.standard.set(lastCleanupDate, forKey: "lastCacheCleanup")
-            }
-        }
+        // Save last cleanup date synchronously
+        UserDefaults.standard.set(Date(), forKey: "lastCacheCleanup")
     }
 }
 

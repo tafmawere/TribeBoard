@@ -148,7 +148,8 @@ class ActivityStreamViewModel: ObservableObject {
             .filter { $0.runId == self.runId }
             .receive(on: DispatchQueue.main)
             .sink { [weak self] event in
-                self?.addEvent(event)
+                guard let self = self else { return }
+                self.addEvent(event)
             }
             .store(in: &cancellables)
         
@@ -157,7 +158,8 @@ class ActivityStreamViewModel: ObservableObject {
             .filter { $0.runId == self.runId }
             .receive(on: DispatchQueue.main)
             .sink { [weak self] stateChange in
-                self?.handleStateChange(stateChange)
+                guard let self = self else { return }
+                self.handleStateChange(stateChange)
             }
             .store(in: &cancellables)
     }
@@ -188,9 +190,7 @@ class ActivityStreamViewModel: ObservableObject {
     }
     
     deinit {
-        Task { @MainActor in
-            runEventService.stopListening(to: runId)
-        }
+        runEventService.stopListening(to: runId)
         cancellables.removeAll()
     }
 }

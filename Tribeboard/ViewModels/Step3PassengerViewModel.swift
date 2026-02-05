@@ -197,7 +197,6 @@ class Step3PassengerViewModel: ObservableObject {
         // Check for age-appropriate supervision
         let selectedProfiles = selectedPassengerIds.compactMap { getPassengerProfile($0) }
         let hasYoungChildren = selectedProfiles.contains { $0.ageGroup == .child }
-        let hasTeens = selectedProfiles.contains { $0.ageGroup == .teen }
         
         if hasYoungChildren && selectedProfiles.count > 4 {
             errors.append(.supervisionRequired("Young children require additional supervision for groups larger than 4"))
@@ -221,6 +220,33 @@ class Step3PassengerViewModel: ObservableObject {
     }
     
     private func loadAvailablePassengers() {
+        #if DEBUG
+        // Load demo family members in DEBUG mode
+        if AppConfig.isFullAppMode {
+            availablePassengers = [
+                PassengerProfile(
+                    id: DemoSeedDataService.tjId,
+                    displayName: "TJ",
+                    ageGroup: .child,
+                    age: 10,
+                    avatarURL: nil,
+                    specialNeeds: [],
+                    guardianIds: [DemoSeedDataService.rueId, DemoSeedDataService.tafadzwaId]
+                ),
+                PassengerProfile(
+                    id: DemoSeedDataService.tawanaId,
+                    displayName: "Tawana",
+                    ageGroup: .child,
+                    age: 8,
+                    avatarURL: nil,
+                    specialNeeds: [],
+                    guardianIds: [DemoSeedDataService.rueId, DemoSeedDataService.tafadzwaId]
+                )
+            ]
+            return
+        }
+        #endif
+        
         // Simulate loading family members who can be passengers
         // In a real app, this would fetch from the backend
         availablePassengers = [

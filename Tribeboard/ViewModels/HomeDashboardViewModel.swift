@@ -56,13 +56,27 @@ class HomeDashboardViewModel: ObservableObject, HomeDashboardContract {
         self.roleBasedDataFilter = roleBasedDataFilter
         self.runEventService = runEventService
         
-        // Initialize user from role management service
+        // Initialize user from debug mode selection or role management service
+        // Requirements: 5.2, 5.4
+        #if DEBUG
+        if AppConfig.isActiveRunOnlyMode {
+            self._currentUser = AppConfig.currentDemoUser
+        } else {
+            self._currentUser = User(
+                id: roleManagementService.currentUserId,
+                displayName: "Demo User",
+                role: roleManagementService.currentUserRole,
+                familyId: roleManagementService.currentFamilyId
+            )
+        }
+        #else
         self._currentUser = User(
             id: roleManagementService.currentUserId,
             displayName: "Demo User",
             role: roleManagementService.currentUserRole,
             familyId: roleManagementService.currentFamilyId
         )
+        #endif
         
         self.roleContext = RoleContext(
             userId: _currentUser.id,
@@ -183,8 +197,9 @@ class HomeDashboardViewModel: ObservableObject, HomeDashboardContract {
         // Listen to run events for real-time updates
         runEventService.eventPublisher
             .sink { [weak self] event in
+                guard let self = self else { return }
                 Task { @MainActor in
-                    await self?.handleRunEvent(event)
+                    await self.handleRunEvent(event)
                 }
             }
             .store(in: &cancellables)
@@ -192,8 +207,9 @@ class HomeDashboardViewModel: ObservableObject, HomeDashboardContract {
         // Listen to state changes
         runEventService.stateChangePublisher
             .sink { [weak self] stateChange in
+                guard let self = self else { return }
                 Task { @MainActor in
-                    await self?.handleStateChange(stateChange)
+                    await self.handleStateChange(stateChange)
                 }
             }
             .store(in: &cancellables)
@@ -209,19 +225,14 @@ class HomeDashboardViewModel: ObservableObject, HomeDashboardContract {
         isLoading = true
         error = nil
         
-        do {
-            // Load runs based on user role - Requirements 5.2, 5.3, 5.4
-            await loadRoleBasedRuns()
-            
-            // Load today's events
-            await loadTodayEvents()
-            
-            // Update available actions based on role
-            updateAvailableActions()
-            
-        } catch {
-            self.error = .loadingFailed(error.localizedDescription)
-        }
+        // Load runs based on user role - Requirements 5.2, 5.3, 5.4
+        await loadRoleBasedRuns()
+        
+        // Load today's events
+        await loadTodayEvents()
+        
+        // Update available actions based on role
+        updateAvailableActions()
         
         isLoading = false
     }
@@ -239,10 +250,15 @@ class HomeDashboardViewModel: ObservableObject, HomeDashboardContract {
     }
     
     private func loadAllRunsFromService() async -> [Run] {
-        // This would typically call a service method to fetch all runs
-        // For now, return empty array - in real implementation this would be:
-        // return try await runService.fetchRuns(familyId: roleContext.familyId)
-        return []
+        do {
+            // Fetch runs for the user's family from Firebase service
+            let runs = try await firebaseService.listRuns(forFamilyId: roleContext.familyId)
+            return runs
+        } catch {
+            print("Error loading runs: \(error.localizedDescription)")
+            self.error = .loadingFailed(error.localizedDescription)
+            return []
+        }
     }
     
     private func loadTodayEvents() async {

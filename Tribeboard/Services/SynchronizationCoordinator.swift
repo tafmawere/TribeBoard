@@ -151,22 +151,17 @@ class SynchronizationCoordinator: ObservableObject {
             isSyncing = false
         }
         
-        do {
-            // Step 1: Sync offline queue in chronological order - Requirement 7.3
-            await runEventService.forceSynchronization()
-            
-            // Step 2: Resolve any conflicts between local and backend data - Requirement 7.4
-            await resolveDataConflicts()
-            
-            // Step 3: Validate data consistency
-            await validateDataConsistency()
-            
-            lastSyncTime = Date()
-            syncStatus = .completed
-            
-        } catch {
-            syncStatus = .failed(error)
-        }
+        // Step 1: Sync offline queue in chronological order - Requirement 7.3
+        await runEventService.forceSynchronization()
+        
+        // Step 2: Resolve any conflicts between local and backend data - Requirement 7.4
+        await resolveDataConflicts()
+        
+        // Step 3: Validate data consistency
+        await validateDataConsistency()
+        
+        lastSyncTime = Date()
+        syncStatus = .completed
     }
     
     /// Get synchronization status for a specific run
@@ -209,8 +204,9 @@ class SynchronizationCoordinator: ObservableObject {
         // Listen to run events and update local cache
         runEventService.eventPublisher
             .sink { [weak self] event in
+                guard let self = self else { return }
                 Task { @MainActor in
-                    await self?.handleRunEvent(event)
+                    await self.handleRunEvent(event)
                 }
             }
             .store(in: &cancellables)

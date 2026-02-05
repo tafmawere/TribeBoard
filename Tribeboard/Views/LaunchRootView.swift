@@ -13,20 +13,179 @@ struct LaunchRootView: View {
     @State private var activeRun: Run?
     @State private var isLoading = true
     @State private var error: Error?
+    @State private var selectedUserId: String = DemoSeedDataService.rueId
     
     var body: some View {
         Group {
             if AppConfig.isActiveRunOnlyMode {
                 activeRunOnlyContent
+            } else if AppConfig.isDemoFlowEnabled {
+                // Demo flow mode - land on MyRunsView (to be created in Task 5)
+                demoFlowContent
             } else {
                 // Full app mode - use existing MainNavigationView
-                MainNavigationView(dependencyContainer: dependencyContainer)
+                fullAppContent
             }
         }
         .task {
-            await loadActiveRun()
+            await setupUserAndLoadData()
         }
     }
+    
+    // MARK: - Full App Content
+    
+    @ViewBuilder
+    private var fullAppContent: some View {
+        #if DEBUG
+        // Set up demo user based on AppConfig.demoUser
+        let _ = setupDemoUser()
+        #endif
+        
+        MainNavigationView(dependencyContainer: dependencyContainer)
+    }
+    
+    // MARK: - Demo Flow Content
+    
+    @ViewBuilder
+    private var demoFlowContent: some View {
+        VStack(spacing: 0) {
+            // User switcher at the top
+            userSwitcherView
+                .padding()
+                .background(Color(.systemBackground))
+                .shadow(color: Color.black.opacity(0.1), radius: 2, y: 1)
+            
+            // TODO: Task 5 - Replace with MyRunsView
+            // For now, show placeholder
+            VStack(spacing: 16) {
+                Text("Demo Flow Mode")
+                    .font(.title)
+                Text("MyRunsView will be implemented in Task 5")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                
+                // Show current user info
+                VStack(spacing: 8) {
+                    Text("Current User:")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Text(getCurrentUserDisplayName())
+                        .font(.headline)
+                    Text("Role: \(dependencyContainer.roleManagementService.currentUserRole.displayName)")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+                .padding()
+                .background(Color(.secondarySystemBackground))
+                .cornerRadius(8)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color(.systemBackground))
+        }
+    }
+    
+    /// User switcher control for demo mode
+    @ViewBuilder
+    private var userSwitcherView: some View {
+        VStack(spacing: 12) {
+            Text("Switch User")
+                .font(.caption)
+                .foregroundColor(.secondary)
+            
+            Picker("User", selection: $selectedUserId) {
+                Text("Rue Mawere").tag(DemoSeedDataService.rueId)
+                Text("Tafadzwa Mawere").tag(DemoSeedDataService.tafadzwaId)
+                Text("TJ").tag(DemoSeedDataService.tjId)
+                Text("Tawana").tag(DemoSeedDataService.tawanaId)
+            }
+            .pickerStyle(.segmented)
+            .onChange(of: selectedUserId) { oldValue, newValue in
+                switchUser(to: newValue)
+            }
+        }
+    }
+    
+    /// Get display name for current user
+    private func getCurrentUserDisplayName() -> String {
+        switch selectedUserId {
+        case DemoSeedDataService.rueId:
+            return "Rue Mawere"
+        case DemoSeedDataService.tafadzwaId:
+            return "Tafadzwa Mawere"
+        case DemoSeedDataService.tjId:
+            return "TJ"
+        case DemoSeedDataService.tawanaId:
+            return "Tawana"
+        default:
+            return "Unknown"
+        }
+    }
+    
+    /// Switch to a different demo user
+    private func switchUser(to userId: String) {
+        let (displayName, role) = getUserInfo(for: userId)
+        
+        dependencyContainer.roleManagementService.setCurrentUser(
+            userId: userId,
+            displayName: displayName,
+            role: role,
+            familyId: DemoSeedDataService.demoFamilyId
+        )
+        
+        // Update debug overlay
+        #if DEBUG
+        DebugStateManager.shared.updateCurrentUser(id: userId, mode: role.displayName)
+        #endif
+        
+        print("🔄 Switched to user: \(displayName) (role: \(role.displayName))")
+    }
+    
+    /// Get user info for a given user ID
+    private func getUserInfo(for userId: String) -> (displayName: String, role: FamilyRole) {
+        switch userId {
+        case DemoSeedDataService.rueId:
+            return ("Rue Mawere", .observer) // Parent/Admin/Observer
+        case DemoSeedDataService.tafadzwaId:
+            return ("Tafadzwa Mawere", .driver) // Parent/Admin/Driver
+        case DemoSeedDataService.tjId:
+            return ("TJ", .observer) // Child/Passenger
+        case DemoSeedDataService.tawanaId:
+            return ("Tawana", .observer) // Child/Passenger
+        default:
+            return ("Unknown", .observer)
+        }
+    }
+    
+    #if DEBUG
+    /// Set up demo user for full app mode
+    private func setupDemoUser() {
+        let demoUser: User
+        
+        switch AppConfig.demoUser {
+        case .rue:
+            demoUser = User(
+                id: DemoSeedDataService.rueId,
+                displayName: "Rue",
+                role: .admin,
+                familyId: DemoSeedDataService.demoFamilyId
+            )
+        case .tafadzwa:
+            demoUser = User(
+                id: DemoSeedDataService.tafadzwaId,
+                displayName: "Tafadzwa",
+                role: .admin,
+                familyId: DemoSeedDataService.demoFamilyId
+            )
+        }
+        
+        // Update role management service with demo user
+        dependencyContainer.roleManagementService.updateUserRole(
+            demoUser.role,
+            userId: demoUser.id,
+            familyId: demoUser.familyId
+        )
+    }
+    #endif
     
     // MARK: - Active Run Only Content
     
@@ -90,6 +249,26 @@ struct LaunchRootView: View {
     // MARK: - Helper Methods
     
     @MainActor
+    private func setupUserAndLoadData() async {
+        #if DEBUG
+        if AppConfig.isFullAppMode {
+            // In full app mode, just set up the demo user
+            setupDemoUser()
+            return
+        }
+        
+        if AppConfig.isDemoFlowEnabled {
+            // In demo flow mode, set up initial user (Rue by default)
+            switchUser(to: selectedUserId)
+            return
+        }
+        #endif
+        
+        // In active run only mode, load the active run
+        await loadActiveRun()
+    }
+    
+    @MainActor
     private func loadActiveRun() async {
         isLoading = true
         error = nil
@@ -110,13 +289,20 @@ struct LaunchRootView: View {
         
         // Try to get existing active run
         if let activeRun = try await dependencyContainer.firebaseService.getCurrentActiveRun(for: familyId) {
+            // Debug assertion: Log that we found an active run
+            debugLog("App launch: getCurrentActiveRun() returned active run with id=\(activeRun.id), state=\(activeRun.status)")
             return activeRun
         }
+        
+        // Debug assertion: Log that no active run was found
+        debugLog("App launch: getCurrentActiveRun() returned nil - no active run found for family \(familyId)")
         
         // For demo purposes in Active Run Only mode, create a demo active run if none exists
         #if DEBUG
         if AppConfig.isActiveRunOnlyMode {
-            return try await createDemoActiveRun(for: familyId)
+            let demoRun = try await createDemoActiveRun(for: familyId)
+            debugLog("App launch: Created demo active run with id=\(demoRun.id)")
+            return demoRun
         }
         #endif
         

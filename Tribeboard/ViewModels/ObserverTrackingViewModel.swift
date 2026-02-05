@@ -167,8 +167,9 @@ class ObserverTrackingViewModel: ObservableObject, ObserverTrackingContract {
         runEventService.eventPublisher
             .filter { $0.runId == self._runId }
             .sink { [weak self] event in
+                guard let self = self else { return }
                 Task { @MainActor in
-                    await self?.handleRunEvent(event)
+                    await self.handleRunEvent(event)
                 }
             }
             .store(in: &cancellables)
@@ -177,8 +178,9 @@ class ObserverTrackingViewModel: ObservableObject, ObserverTrackingContract {
         runEventService.stateChangePublisher
             .filter { $0.runId == self._runId }
             .sink { [weak self] stateChange in
+                guard let self = self else { return }
                 Task { @MainActor in
-                    self?.handleStateChange(stateChange)
+                    self.handleStateChange(stateChange)
                 }
             }
             .store(in: &cancellables)
@@ -186,7 +188,8 @@ class ObserverTrackingViewModel: ObservableObject, ObserverTrackingContract {
         // Monitor connection status
         runEventService.$isConnected
             .sink { [weak self] isConnected in
-                self?.isConnected = isConnected
+                guard let self = self else { return }
+                self.isConnected = isConnected
             }
             .store(in: &cancellables)
         
@@ -204,21 +207,16 @@ class ObserverTrackingViewModel: ObservableObject, ObserverTrackingContract {
         isLoading = true
         error = nil
         
-        do {
-            // Load current run data
-            await loadCurrentRun()
-            
-            // Load timeline events
-            await loadTimelineEvents()
-            
-            // Update ETA calculation
-            updateETA()
-            
-            lastUpdateTime = Date()
-            
-        } catch {
-            self.error = .loadingFailed(error.localizedDescription)
-        }
+        // Load current run data
+        await loadCurrentRun()
+        
+        // Load timeline events
+        await loadTimelineEvents()
+        
+        // Update ETA calculation
+        updateETA()
+        
+        lastUpdateTime = Date()
         
         isLoading = false
     }
@@ -303,9 +301,7 @@ class ObserverTrackingViewModel: ObservableObject, ObserverTrackingContract {
     
     deinit {
         // Stop listening when view model is deallocated
-        Task { @MainActor in
-            runEventService.stopListening(to: _runId)
-        }
+        runEventService.stopListening(to: _runId)
     }
 }
 

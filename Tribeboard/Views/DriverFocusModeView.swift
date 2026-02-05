@@ -61,6 +61,7 @@ struct DriverFocusModeView: View {
                 delayDialogView
             }
         }
+        .debugOverlay()
     }
     
     // MARK: - Main Content

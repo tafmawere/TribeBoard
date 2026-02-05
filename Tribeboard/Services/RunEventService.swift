@@ -85,9 +85,11 @@ class RunEventService: ObservableObject {
     }
     
     /// Stop listening to updates for a specific run
-    func stopListening(to runId: String) {
-        activeListeners.remove(runId)
-        // Firebase listeners will be cleaned up automatically
+    nonisolated func stopListening(to runId: String) {
+        Task { @MainActor in
+            activeListeners.remove(runId)
+            // Firebase listeners will be cleaned up automatically
+        }
     }
     
     /// Broadcast a run event to all observers

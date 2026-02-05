@@ -44,8 +44,9 @@ class LocationService: NSObject, ObservableObject {
         
         // Start periodic location updates for Firebase
         locationUpdateTimer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: true) { [weak self] _ in
+            guard let self = self else { return }
             Task { @MainActor in
-                guard let self = self, let location = self.currentLocation else { return }
+                guard let location = self.currentLocation else { return }
                 self.onLocationUpdate?(location)
             }
         }
@@ -78,9 +79,9 @@ class LocationService: NSObject, ObservableObject {
     private var locationContinuation: CheckedContinuation<CLLocationCoordinate2D, Error>?
     
     deinit {
-        Task { @MainActor in
-            stopTracking()
-        }
+        locationUpdateTimer?.invalidate()
+        locationUpdateTimer = nil
+        locationManager.stopUpdatingLocation()
     }
 }
 

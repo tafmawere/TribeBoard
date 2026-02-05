@@ -338,8 +338,9 @@ class DriverFocusModeViewModel: ObservableObject, DriverFocusModeContract {
         runEventService.eventPublisher
             .filter { $0.runId == self._runId }
             .sink { [weak self] event in
+                guard let self = self else { return }
                 Task { @MainActor in
-                    await self?.handleRunEvent(event)
+                    await self.handleRunEvent(event)
                 }
             }
             .store(in: &cancellables)
@@ -348,8 +349,9 @@ class DriverFocusModeViewModel: ObservableObject, DriverFocusModeContract {
         runEventService.stateChangePublisher
             .filter { $0.runId == self._runId }
             .sink { [weak self] stateChange in
+                guard let self = self else { return }
                 Task { @MainActor in
-                    self?.handleStateChange(stateChange)
+                    self.handleStateChange(stateChange)
                 }
             }
             .store(in: &cancellables)
@@ -368,16 +370,11 @@ class DriverFocusModeViewModel: ObservableObject, DriverFocusModeContract {
         isLoading = true
         error = nil
         
-        do {
-            // In a real implementation, this would fetch from a service
-            // For now, we'll simulate loading run data
-            await loadCurrentRun()
-            updateStopsAndPassengers()
-            updateAvailableActions()
-            
-        } catch {
-            self.error = .loadingFailed(error.localizedDescription)
-        }
+        // In a real implementation, this would fetch from a service
+        // For now, we'll simulate loading run data
+        await loadCurrentRun()
+        updateStopsAndPassengers()
+        updateAvailableActions()
         
         isLoading = false
     }
@@ -623,9 +620,7 @@ class DriverFocusModeViewModel: ObservableObject, DriverFocusModeContract {
     
     deinit {
         // Stop listening when view model is deallocated
-        Task { @MainActor in
-            runEventService.stopListening(to: _runId)
-        }
+        runEventService.stopListening(to: _runId)
     }
 }
 

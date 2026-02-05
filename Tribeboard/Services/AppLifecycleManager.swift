@@ -53,39 +53,28 @@ class AppLifecycleManager: ObservableObject {
             additionalInfo: [:]
         )
         
-        do {
-            // Step 1: Restore cache and data
-            await dependencyContainer.cacheManagementService.restoreAppState()
-            
-            // Step 2: Restore user session
-            await restoreUserSession()
-            
-            // Step 3: Restore navigation state
-            await restoreNavigationState()
-            
-            // Step 4: Restore active runs
-            await restoreActiveRuns()
-            
-            // Step 5: Initialize real-time services
-            await initializeRealTimeServices()
-            
-            appState = .active
-            
-            logger.logInfo(
-                message: "App launch and state restoration completed successfully",
-                context: .appLifecycle,
-                additionalInfo: ["finalState": appState.rawValue]
-            )
-            
-        } catch {
-            logger.logError(
-                error,
-                context: .appLifecycle,
-                additionalInfo: ["operation": "app_launch"]
-            )
-            
-            appState = .error(error.localizedDescription)
-        }
+        // Step 1: Restore cache and data
+        dependencyContainer.cacheManagementService.restoreAppState()
+        
+        // Step 2: Restore user session
+        await restoreUserSession()
+        
+        // Step 3: Restore navigation state
+        await restoreNavigationState()
+        
+        // Step 4: Restore active runs
+        await restoreActiveRuns()
+        
+        // Step 5: Initialize real-time services
+        await initializeRealTimeServices()
+        
+        appState = .active
+        
+        logger.logInfo(
+            message: "App launch and state restoration completed successfully",
+            context: .appLifecycle,
+            additionalInfo: ["finalState": appState.rawValue]
+        )
         
         isRestoringState = false
     }
@@ -100,7 +89,7 @@ class AppLifecycleManager: ObservableObject {
             additionalInfo: [:]
         )
         
-        Task {
+        Task { @MainActor in
             await saveAppState()
             await pauseNonEssentialServices()
         }
@@ -117,7 +106,7 @@ class AppLifecycleManager: ObservableObject {
             additionalInfo: ["previousState": previousState.rawValue]
         )
         
-        Task {
+        Task { @MainActor in
             await resumeServices()
             await syncPendingChanges()
         }

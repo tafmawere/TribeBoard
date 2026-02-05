@@ -189,4 +189,42 @@ class RunEventServiceTests: XCTestCase {
         // Then - Should not update sync time when offline
         // (The actual sync happens when connectivity is restored)
     }
+    
+    // MARK: - Enhanced Demo Data Tests
+    
+    func testEnhancedDemoSeedDataGeneration() async throws {
+        // Given - Demo family ID
+        let demoFamilyId = "demo_family_id"
+        
+        // When - Get current active run for demo family
+        let activeRun = try await mockFirebaseService.getCurrentActiveRun(for: demoFamilyId)
+        
+        // Then - Should return enhanced demo data that meets requirements
+        XCTAssertNotNil(activeRun, "getCurrentActiveRun should return non-nil for demo family (Requirement 4.1)")
+        
+        guard let run = activeRun else { return }
+        
+        // Requirement 4.2: Run state should be activeEnroute or arrivedAtStop
+        XCTAssertTrue(run.status == .activeEnroute || run.status == .arrivedAtStop, 
+                     "Run state should be activeEnroute or arrivedAtStop, got \(run.status)")
+        
+        // Requirement 4.3: Exactly 2 passengers and 3 stops
+        XCTAssertEqual(run.passengers.count, 2, "Run should have exactly 2 passengers")
+        XCTAssertEqual(run.stops.count, 3, "Run should have exactly 3 stops")
+        
+        // Requirement 4.4: currentStopIndex between 0 and stops.count-1
+        XCTAssertGreaterThanOrEqual(run.currentStopIndex, 0, "currentStopIndex should be >= 0")
+        XCTAssertLessThan(run.currentStopIndex, run.stops.count, "currentStopIndex should be < stops.count")
+        
+        // Requirement 4.5: driverId should match demo driver user id
+        XCTAssertEqual(run.driverId, "demo_driver_user_id", "driverId should match demo driver user id")
+        
+        // Additional validation: Run should have proper family ID
+        XCTAssertEqual(run.familyId, demoFamilyId, "Run should belong to demo family")
+        
+        // Validate that demo observer user can be created (Requirement 4.6)
+        let demoObserver = mockFirebaseService.createDemoObserverUser()
+        XCTAssertEqual(demoObserver.id, "demo_observer_user_id", "Demo observer user should have correct ID")
+        XCTAssertEqual(demoObserver.role, .observer, "Demo observer should have observer role")
+    }
 }

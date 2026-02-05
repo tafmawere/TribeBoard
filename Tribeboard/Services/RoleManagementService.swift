@@ -38,6 +38,13 @@ class RoleManagementService: ObservableObject {
     
     // MARK: - Public Methods
     
+    /// Set the current user (for demo user switching)
+    /// Implements Requirements 2
+    func setCurrentUser(userId: String, displayName: String, role: FamilyRole, familyId: String) {
+        updateUserRole(role, userId: userId, familyId: familyId)
+        print("👤 Current user set to: \(displayName) (role: \(role.displayName))")
+    }
+    
     /// Update the current user's role and refresh permissions
     /// Implements Requirements 6.5
     func updateUserRole(_ newRole: FamilyRole, userId: String, familyId: String) {

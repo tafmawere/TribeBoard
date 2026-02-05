@@ -157,6 +157,31 @@ class Step2DriverViewModel: ObservableObject {
     }
     
     private func loadEligibleDrivers() {
+        #if DEBUG
+        // Load demo family members in DEBUG mode
+        if AppConfig.isFullAppMode {
+            eligibleDrivers = [
+                FamilyMember(
+                    id: DemoSeedDataService.rueId,
+                    displayName: "Rue",
+                    role: .admin,
+                    avatarURL: nil,
+                    isActive: true,
+                    lastSeen: Date()
+                ),
+                FamilyMember(
+                    id: DemoSeedDataService.tafadzwaId,
+                    displayName: "Tafadzwa",
+                    role: .admin,
+                    avatarURL: nil,
+                    isActive: true,
+                    lastSeen: Date()
+                )
+            ]
+            return
+        }
+        #endif
+        
         // Simulate loading family members who can drive
         // In a real app, this would fetch from the backend
         eligibleDrivers = [

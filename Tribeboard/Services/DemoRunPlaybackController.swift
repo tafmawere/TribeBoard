@@ -33,6 +33,7 @@ final class DemoRunPlaybackController: ObservableObject {
     
     private var locationTimer: AnyCancellable?
     private var playbackTimer: AnyCancellable?
+    private var runStateMonitorTimer: AnyCancellable?
     private var cancellables = Set<AnyCancellable>()
     
     private var currentRun: Run?
@@ -41,6 +42,8 @@ final class DemoRunPlaybackController: ObservableObject {
     private var isPlaybackActive: Bool = false
     private var playbackScript: [PlaybackAction] = []
     private var currentScriptIndex: Int = 0
+    private var hasLoggedStart: Bool = false // Track if we've logged start to ensure it happens only once
+    private var isStartupInProgress: Bool = false // Prevent concurrent startup attempts
     
     // MARK: - Initialization
     
@@ -60,11 +63,34 @@ final class DemoRunPlaybackController: ObservableObject {
     
     /// Start demo playback if conditions are met
     func startIfNeeded() {
-        guard AppConfig.isDemoPlaybackEnabled else { return }
-        guard AppConfig.isActiveRunOnlyMode else { return }
+        // Idempotent behavior: only start if conditions are met and not already running
+        guard AppConfig.launchMode == .activeRunOnly else {
+            #if DEBUG
+            print("DemoRunPlaybackController: Not starting - LaunchMode is not activeRunOnly")
+            #endif
+            return
+        }
+        
+        guard AppConfig.isDemoPlaybackEnabled else {
+            #if DEBUG
+            print("DemoRunPlaybackController: Not starting - Demo playback is disabled")
+            #endif
+            return
+        }
+        
+        // Prevent multiple startup attempts
+        guard !isPlaybackActive && !isStartupInProgress else {
+            #if DEBUG
+            print("DemoRunPlaybackController: Already running or startup in progress")
+            #endif
+            return
+        }
+        
+        isStartupInProgress = true
         
         Task {
             await loadAndStartDemo()
+            isStartupInProgress = false
         }
     }
     
@@ -73,10 +99,16 @@ final class DemoRunPlaybackController: ObservableObject {
         isPlaybackActive = false
         stopLocationUpdates()
         stopPlaybackScript()
+        stopRunStateMonitoring()
         
         #if DEBUG
         print("DemoRunPlaybackController: Stopped")
         #endif
+    }
+    
+    /// Check if the controller is currently running
+    var isRunning: Bool {
+        return isPlaybackActive
     }
     
     /// Reset demo to initial state (optional - only if needed)
@@ -87,6 +119,8 @@ final class DemoRunPlaybackController: ObservableObject {
         playbackScript = []
         routeCoordinates = []
         currentRun = nil
+        hasLoggedStart = false // Reset start logging flag
+        isStartupInProgress = false // Reset startup flag
         
         #if DEBUG
         print("DemoRunPlaybackController: Reset")
@@ -144,8 +178,15 @@ final class DemoRunPlaybackController: ObservableObject {
             // Start playback
             startLocationUpdates()
             startPlaybackScript()
+            startRunStateMonitoring() // Add periodic run state monitoring
             
             isPlaybackActive = true
+            
+            // Debug assertion: Log playback start exactly once per controller instance
+            if !hasLoggedStart {
+                debugLog("PLAYBACK STARTED runId=\(run.id)")
+                hasLoggedStart = true
+            }
             
             #if DEBUG
             print("DemoRunPlaybackController: Started for run \(run.id)")
@@ -296,9 +337,24 @@ final class DemoRunPlaybackController: ObservableObject {
         guard isPlaybackActive,
               let run = currentRun,
               run.status.isActive,
-              currentRouteIndex < routeCoordinates.count else { return }
+              currentRouteIndex < routeCoordinates.count else { 
+            
+            // Check if run is no longer active due to terminal state
+            if let run = currentRun, run.status.isTerminal {
+                #if DEBUG
+                print("DemoRunPlaybackController: Run reached terminal state (\(run.status.displayName)) during location update, stopping")
+                #endif
+                stop()
+            }
+            return 
+        }
         
         let currentLocation = routeCoordinates[currentRouteIndex]
+        
+        // Update playback tick tracking in DebugStateManager
+        Task { @MainActor in
+            DebugStateManager.shared.updatePlaybackTick()
+        }
         
         // Update location through existing service (throttled persistence)
         Task {
@@ -368,8 +424,22 @@ final class DemoRunPlaybackController: ObservableObject {
         guard isPlaybackActive,
               currentScriptIndex < playbackScript.count else { return }
         
+        // Check if current run has reached terminal state (lifecycle management)
+        if let run = currentRun, run.status.isTerminal {
+            #if DEBUG
+            print("DemoRunPlaybackController: Run reached terminal state (\(run.status.displayName)) during script processing, stopping")
+            #endif
+            stop()
+            return
+        }
+        
         let action = playbackScript[currentScriptIndex]
         let elapsed = Date().timeIntervalSince(Date()) // This would be tracked from start time in real implementation
+        
+        // Update playback tick tracking for script processing
+        Task { @MainActor in
+            DebugStateManager.shared.updatePlaybackTick()
+        }
         
         // For demo purposes, execute actions in sequence with simple timing
         if currentScriptIndex == 0 || elapsed >= action.delay {
@@ -405,11 +475,20 @@ final class DemoRunPlaybackController: ObservableObject {
                     
                 case .endRun:
                     try await runEventService.processDriverAction(.endRun, runId: run.id)
-                    stop() // Stop playback when run completes
+                    // Don't call stop() here - let the state monitoring handle it
                 }
                 
-                // Refresh current run state
+                // Refresh current run state and check for terminal state
                 currentRun = try await firebaseService.fetchRun(runId: run.id)
+                
+                // Automatic lifecycle management: stop if run reaches terminal state
+                if let updatedRun = currentRun, updatedRun.status.isTerminal {
+                    #if DEBUG
+                    print("DemoRunPlaybackController: Run reached terminal state (\(updatedRun.status.displayName)), stopping playback")
+                    #endif
+                    stop()
+                    return
+                }
                 
                 #if DEBUG
                 print("DemoRunPlaybackController: Executed action \(action)")
@@ -443,6 +522,52 @@ final class DemoRunPlaybackController: ObservableObject {
         #if DEBUG
         print("DemoRunPlaybackController: Resumed")
         #endif
+    }
+    
+    private func startRunStateMonitoring() {
+        // Monitor run state every 10 seconds to catch external changes
+        runStateMonitorTimer = Timer.publish(every: 10.0, on: .main, in: .common)
+            .autoconnect()
+            .sink { [weak self] _ in
+                self?.checkRunState()
+            }
+    }
+    
+    private func stopRunStateMonitoring() {
+        runStateMonitorTimer?.cancel()
+        runStateMonitorTimer = nil
+    }
+    
+    private func checkRunState() {
+        guard isPlaybackActive, let run = currentRun else { return }
+        
+        Task {
+            do {
+                let updatedRun = try await firebaseService.fetchRun(runId: run.id)
+                
+                await MainActor.run {
+                    currentRun = updatedRun
+                    
+                    // Stop if run reached terminal state
+                    if updatedRun.status.isTerminal {
+                        #if DEBUG
+                        print("DemoRunPlaybackController: Run state monitoring detected terminal state (\(updatedRun.status.displayName)), stopping")
+                        #endif
+                        stop()
+                    }
+                }
+            } catch {
+                #if DEBUG
+                print("DemoRunPlaybackController: Run state check failed - \(error)")
+                #endif
+            }
+        }
+    }
+    
+    private func debugLog(_ message: String) {
+        Task { @MainActor in
+            DebugStateManager.shared.logDebugAssertion(message, file: #file, line: #line)
+        }
     }
     
     deinit {

@@ -134,6 +134,12 @@ class DependencyContainer: ObservableObject {
         )
     }()
     
+    #if DEBUG
+    lazy var demoSeedDataService: DemoSeedDataService = {
+        return DemoSeedDataService(firebaseService: firebaseService)
+    }()
+    #endif
+    
     // MARK: - ViewModels
     
     lazy var homeDashboardViewModel: HomeDashboardViewModel = {
@@ -146,37 +152,91 @@ class DependencyContainer: ObservableObject {
     }()
     
     lazy var runCreationViewModel: RunCreationViewModel = {
+        // Use debug user mode selection for role context in DEBUG builds
+        // Requirements: 5.2, 5.4
+        #if DEBUG
+        let currentUser = AppConfig.isActiveRunOnlyMode ? AppConfig.currentDemoUser : User(
+            id: roleManagementService.currentUserId,
+            displayName: "Demo User",
+            role: roleManagementService.currentUserRole,
+            familyId: roleManagementService.currentFamilyId
+        )
+        #else
+        let currentUser = User(
+            id: roleManagementService.currentUserId,
+            displayName: "Demo User",
+            role: roleManagementService.currentUserRole,
+            familyId: roleManagementService.currentFamilyId
+        )
+        #endif
+        
         return RunCreationViewModel(
             runEventService: runEventService,
             firebaseService: firebaseService,
             roleContext: RoleContext(
-                userId: roleManagementService.currentUserId,
-                role: roleManagementService.currentUserRole,
-                familyId: roleManagementService.currentFamilyId
+                userId: currentUser.id,
+                role: currentUser.role,
+                familyId: currentUser.familyId
             )
         )
     }()
     
     func createDriverFocusModeViewModel(runId: String) -> DriverFocusModeViewModel {
+        // Use debug user mode selection for role context in DEBUG builds
+        // Requirements: 5.2, 5.4
+        #if DEBUG
+        let currentUser = AppConfig.isActiveRunOnlyMode ? AppConfig.currentDemoUser : User(
+            id: roleManagementService.currentUserId,
+            displayName: "Demo User",
+            role: roleManagementService.currentUserRole,
+            familyId: roleManagementService.currentFamilyId
+        )
+        #else
+        let currentUser = User(
+            id: roleManagementService.currentUserId,
+            displayName: "Demo User",
+            role: roleManagementService.currentUserRole,
+            familyId: roleManagementService.currentFamilyId
+        )
+        #endif
+        
         return DriverFocusModeViewModel(
             runId: runId,
             runEventService: runEventService,
             roleContext: RoleContext(
-                userId: roleManagementService.currentUserId,
-                role: roleManagementService.currentUserRole,
-                familyId: roleManagementService.currentFamilyId
+                userId: currentUser.id,
+                role: currentUser.role,
+                familyId: currentUser.familyId
             )
         )
     }
     
     func createObserverTrackingViewModel(runId: String) -> ObserverTrackingViewModel {
+        // Use debug user mode selection for role context in DEBUG builds
+        // Requirements: 5.2, 5.4
+        #if DEBUG
+        let currentUser = AppConfig.isActiveRunOnlyMode ? AppConfig.currentDemoUser : User(
+            id: roleManagementService.currentUserId,
+            displayName: "Demo User",
+            role: roleManagementService.currentUserRole,
+            familyId: roleManagementService.currentFamilyId
+        )
+        #else
+        let currentUser = User(
+            id: roleManagementService.currentUserId,
+            displayName: "Demo User",
+            role: roleManagementService.currentUserRole,
+            familyId: roleManagementService.currentFamilyId
+        )
+        #endif
+        
         return ObserverTrackingViewModel(
             runId: runId,
             runEventService: runEventService,
             roleContext: RoleContext(
-                userId: roleManagementService.currentUserId,
-                role: roleManagementService.currentUserRole,
-                familyId: roleManagementService.currentFamilyId
+                userId: currentUser.id,
+                role: currentUser.role,
+                familyId: currentUser.familyId
             )
         )
     }
@@ -215,11 +275,28 @@ class DependencyContainer: ObservableObject {
     // MARK: - Configuration
     
     private func setupInitialConfiguration() {
+        // Seed demo data in full app mode (DEBUG only)
+        #if DEBUG
+        if AppConfig.isFullAppMode {
+            Task {
+                await demoSeedDataService.seedIfNeeded()
+            }
+        }
+        
+        // Seed demo family in demo flow mode (DEBUG only)
+        // Requirements: 2.1, 2.2, 2.3, 2.7, 2.9
+        if AppConfig.isDemoFlowEnabled {
+            Task {
+                await demoSeedDataService.seedDemoFamily()
+            }
+        }
+        #endif
+        
         // Set up demo user data for Active Run Only mode
         if AppConfig.isActiveRunOnlyMode {
             setupDemoUserData()
             
-            // Start demo playback if enabled
+            // Start demo playback if enabled (idempotent - won't start if already running)
             if AppConfig.isDemoPlaybackEnabled {
                 demoRunPlaybackController.startIfNeeded()
             }
@@ -232,13 +309,22 @@ class DependencyContainer: ObservableObject {
     }
     
     /// Set up demo user data for testing Active Run Only mode
+    /// Uses AppConfig.currentDemoUser to respect debug user mode selection
+    /// Requirements: 5.2, 5.4
     private func setupDemoUserData() {
-        // Set up a demo user as driver
+        // Get current demo user based on debug mode selection
+        let currentUser = AppConfig.currentDemoUser
+        
+        // Set up user role based on debug mode selection
         roleManagementService.updateUserRole(
-            .driver,
-            userId: "demo_driver_user",
-            familyId: "demo_family"
+            currentUser.role,
+            userId: currentUser.id,
+            familyId: currentUser.familyId
         )
+        
+        // Create demo observer user for testing (Requirement 4.6)
+        // This ensures we have both driver and observer users available for debug mode switching
+        let _ = firebaseService.createDemoObserverUser()
     }
     
     // MARK: - Cleanup
