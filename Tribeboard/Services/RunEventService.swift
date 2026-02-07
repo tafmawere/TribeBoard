@@ -39,6 +39,9 @@ class RunEventService: ObservableObject {
     private var activeListeners: Set<String> = []
     private var cancellables = Set<AnyCancellable>()
     
+    // Demo playback controller (strong reference, only used in demo mode)
+    private var demoPlaybackController: DemoRunPlaybackController?
+    
     // MARK: - Test Support
     
     #if DEBUG
@@ -55,10 +58,28 @@ class RunEventService: ObservableObject {
         self.offlineSyncService = OfflineSyncService(firebaseService: firebaseService)
         self.errorHandlingService = errorHandlingService ?? ErrorHandlingService()
         self.logger = logger ?? PrivacyPreservingLogger()
+        
+        // DEBUG: Log ObjectIdentifier for retention verification
+        #if DEBUG
+        print("RunEventService init")
+        #endif
+        
         setupNetworkMonitoring()
+        setupStateChangeMonitoring()
     }
     
     // MARK: - Public Interface
+    
+    /// Set the demo playback controller for automatic playback management
+    /// This should be called by DependencyContainer during initialization
+    func setDemoPlaybackController(_ controller: DemoRunPlaybackController) {
+        self.demoPlaybackController = controller
+        
+        // DEBUG: Log ObjectIdentifier for retention verification
+        #if DEBUG
+        print("RunEventService: setDemoPlaybackController ObjectIdentifier=\(ObjectIdentifier(controller))")
+        #endif
+    }
     
     /// Publisher for real-time run events
     var eventPublisher: AnyPublisher<RunEvent, Never> {
@@ -107,6 +128,37 @@ class RunEventService: ObservableObject {
                 eventType: event.type
             )
             stateChangeSubject.send(stateChange)
+            
+            // Handle demo playback based on state transitions
+            handleDemoPlaybackForStateChange(stateChange)
+        }
+    }
+    
+    /// Handle demo playback controller based on state changes
+    /// Starts playback when run enters .activeEnroute
+    /// Stops playback when run enters terminal states
+    private func handleDemoPlaybackForStateChange(_ stateChange: RunStateChange) {
+        guard AppConfig.isDemoPlaybackEnabled else { return }
+        guard let playbackController = demoPlaybackController else { return }
+        
+        // Start playback when run becomes active
+        if stateChange.toState == .activeEnroute && stateChange.fromState != .activeEnroute {
+            logger.logInfo(
+                message: "Starting demo playback for run entering activeEnroute state",
+                context: .stateTransition,
+                additionalInfo: ["runId": stateChange.runId]
+            )
+            playbackController.startPlayback()
+        }
+        
+        // Stop playback when run reaches terminal state
+        if stateChange.toState.isTerminal {
+            logger.logInfo(
+                message: "Stopping demo playback for run entering terminal state",
+                context: .stateTransition,
+                additionalInfo: ["runId": stateChange.runId, "state": stateChange.toState.displayName]
+            )
+            playbackController.stopPlayback()
         }
     }
     
@@ -258,6 +310,15 @@ class RunEventService: ObservableObject {
             }
         }
         networkMonitor.start(queue: networkQueue)
+    }
+    
+    private func setupStateChangeMonitoring() {
+        // Subscribe to state changes to manage demo playback
+        stateChangePublisher
+            .sink { [weak self] stateChange in
+                self?.handleDemoPlaybackForStateChange(stateChange)
+            }
+            .store(in: &cancellables)
     }
     
     private func setupFirebaseListeners(for runId: String) {

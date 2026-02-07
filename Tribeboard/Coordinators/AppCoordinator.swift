@@ -32,13 +32,14 @@ class AppCoordinator: ObservableObject {
     init(dependencyContainer: DependencyContainer) {
         self.dependencyContainer = dependencyContainer
         setupNavigationObservers()
+        setupRunCreationCallback()
     }
     
     // MARK: - Navigation Methods
     
     /// Navigate to a specific screen
     func navigate(to screen: AppScreen) {
-        // Guard against navigation in Active Run Only mode
+        // Guard against navigation in Active Run Only mode (but allow demo flow mode)
         if AppConfig.isActiveRunOnlyMode {
             showAlert(message: "Navigation is not available in Active Run Only mode")
             return
@@ -48,6 +49,8 @@ class AppCoordinator: ObservableObject {
         
         switch screen {
         case .homeDashboard:
+            navigationPath = NavigationPath()
+        case .myRuns:
             navigationPath = NavigationPath()
         case .runDetail(let runId):
             navigationPath.append(RunDetailDestination(runId: runId))
@@ -73,7 +76,7 @@ class AppCoordinator: ObservableObject {
     
     /// Present a sheet
     func presentSheet(_ sheet: SheetType) {
-        // Guard against sheet presentation in Active Run Only mode
+        // Guard against sheet presentation in Active Run Only mode (but allow demo flow mode)
         if AppConfig.isActiveRunOnlyMode {
             showAlert(message: "This feature is not available in Active Run Only mode")
             return
@@ -150,6 +153,12 @@ class AppCoordinator: ObservableObject {
         }
     }
     
+    /// Show run scheduled confirmation screen
+    func showRunScheduledConfirmation(run: Run) {
+        dismissSheet()
+        presentedSheet = .runScheduledConfirmation(run: run)
+    }
+    
     /// Handle run action completion
     func handleRunActionCompletion(runId: String, action: String) {
         showAlert(message: "\(action) completed successfully")
@@ -174,10 +183,19 @@ class AppCoordinator: ObservableObject {
             HomeDashboardView()
                 .withDependencyContainer(dependencyContainer)
                 .environmentObject(self)
-        case .runDetail(let runId):
-            RunDetailView(runId: runId)
+        case .myRuns:
+            MyRunsView(viewModel: dependencyContainer.homeDashboardViewModel)
                 .withDependencyContainer(dependencyContainer)
                 .environmentObject(self)
+        case .runDetail(let runId):
+            RunFocusView(
+                runId: runId,
+                firebaseService: dependencyContainer.firebaseService,
+                roleManagementService: dependencyContainer.roleManagementService,
+                runEventService: dependencyContainer.runEventService
+            )
+            .withDependencyContainer(dependencyContainer)
+            .environmentObject(self)
         case .driverFocusMode(let runId):
             DriverFocusModeView(
                 runId: runId,
@@ -230,9 +248,14 @@ class AppCoordinator: ObservableObject {
             }
         case .runDetail(let runId):
             NavigationView {
-                RunDetailView(runId: runId)
-                    .withDependencyContainer(dependencyContainer)
-                    .environmentObject(self)
+                RunFocusView(
+                    runId: runId,
+                    firebaseService: dependencyContainer.firebaseService,
+                    roleManagementService: dependencyContainer.roleManagementService,
+                    runEventService: dependencyContainer.runEventService
+                )
+                .withDependencyContainer(dependencyContainer)
+                .environmentObject(self)
             }
         case .activityStream(let runId):
             NavigationView {
@@ -243,10 +266,28 @@ class AppCoordinator: ObservableObject {
                 .withDependencyContainer(dependencyContainer)
                 .environmentObject(self)
             }
+        case .runScheduledConfirmation(let run):
+            RunScheduledConfirmationView(
+                run: run,
+                onViewRun: { [weak self] in
+                    self?.dismissSheet()
+                    self?.navigate(to: .runDetail(runId: run.id))
+                },
+                onBackToDashboard: { [weak self] in
+                    self?.dismissSheet()
+                    self?.navigate(to: .myRuns)
+                }
+            )
         }
     }
     
     // MARK: - Private Methods
+    
+    private func setupRunCreationCallback() {
+        dependencyContainer.runCreationViewModel.onRunCreated = { [weak self] run in
+            self?.showRunScheduledConfirmation(run: run)
+        }
+    }
     
     private func setupNavigationObservers() {
         // Listen for role changes and update navigation accordingly
@@ -330,6 +371,7 @@ class AppCoordinator: ObservableObject {
 
 enum AppScreen: Hashable {
     case homeDashboard
+    case myRuns
     case runDetail(runId: String)
     case driverFocusMode(runId: String)
     case observerTracking(runId: String)
@@ -341,6 +383,7 @@ enum SheetType: Identifiable {
     case runCreation
     case runDetail(runId: String)
     case activityStream(runId: String)
+    case runScheduledConfirmation(run: Run)
     
     var id: String {
         switch self {
@@ -350,6 +393,8 @@ enum SheetType: Identifiable {
             return "runDetail-\(runId)"
         case .activityStream(let runId):
             return "activityStream-\(runId)"
+        case .runScheduledConfirmation(let run):
+            return "runScheduledConfirmation-\(run.id)"
         }
     }
 }

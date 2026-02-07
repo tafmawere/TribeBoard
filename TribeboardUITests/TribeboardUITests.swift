@@ -30,6 +30,36 @@ final class TribeboardUITests: XCTestCase {
 
         // Use XCTAssert and related functions to verify your tests produce the correct results.
     }
+    
+    /// Test that My Runs screen displays correctly in demo flow mode
+    /// Validates: Requirement 3.1 - My Runs screen shows three tabs
+    @MainActor
+    func testMyRunsScreenDisplays() throws {
+        let app = XCUIApplication()
+        app.launch()
+        
+        // Wait for the app to load
+        let timeout: TimeInterval = 5.0
+        
+        // Verify user switcher is present (demo flow mode indicator)
+        let userSwitcher = app.staticTexts["Switch User"]
+        XCTAssertTrue(userSwitcher.waitForExistence(timeout: timeout), "User switcher should be visible in demo flow mode")
+        
+        // Verify the segmented control with user names exists
+        let rueButton = app.buttons["Rue Mawere"]
+        XCTAssertTrue(rueButton.exists, "Rue Mawere user option should exist")
+        
+        // Verify My Runs screen tabs are present
+        let todayTab = app.buttons["Today"]
+        let upcomingTab = app.buttons["Upcoming"]
+        let historyTab = app.buttons["History"]
+        
+        XCTAssertTrue(todayTab.waitForExistence(timeout: timeout), "Today tab should be visible")
+        XCTAssertTrue(upcomingTab.exists, "Upcoming tab should be visible")
+        XCTAssertTrue(historyTab.exists, "History tab should be visible")
+        
+        print("✅ My Runs screen displays correctly with all three tabs")
+    }
 
     @MainActor
     func testLaunchPerformance() throws {

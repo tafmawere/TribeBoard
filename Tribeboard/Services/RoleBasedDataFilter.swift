@@ -106,6 +106,11 @@ class RoleBasedDataFilter {
             actions.append(.acknowledgeUpdate)
         }
         
+        // Share run status (available for all active runs)
+        if run.status.isActive {
+            actions.append(.shareRunStatus)
+        }
+        
         return actions
     }
     
@@ -292,6 +297,7 @@ enum ObserverAction {
     case viewTimeline
     case contactDriver
     case acknowledgeUpdate
+    case shareRunStatus
     
     var displayName: String {
         switch self {
@@ -299,6 +305,7 @@ enum ObserverAction {
         case .viewTimeline: return "View Timeline"
         case .contactDriver: return "Contact Driver"
         case .acknowledgeUpdate: return "Acknowledge Update"
+        case .shareRunStatus: return "Share Run Status"
         }
     }
 }

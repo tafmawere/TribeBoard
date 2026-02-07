@@ -85,11 +85,12 @@ class DependencyContainer: ObservableObject {
     }()
     
     lazy var runEventService: RunEventService = {
-        return RunEventService(
+        let service = RunEventService(
             firebaseService: firebaseService,
             errorHandlingService: errorHandlingService,
             logger: privacyPreservingLogger
         )
+        return service
     }()
     
     lazy var synchronizationCoordinator: SynchronizationCoordinator = {
@@ -125,14 +126,7 @@ class DependencyContainer: ObservableObject {
     
     // MARK: - Demo Services
     
-    lazy var demoRunPlaybackController: DemoRunPlaybackController = {
-        return DemoRunPlaybackController(
-            runEventService: runEventService,
-            locationService: locationService,
-            firebaseService: firebaseService,
-            coreDataService: coreDataService
-        )
-    }()
+    private(set) var demoRunPlaybackController: DemoRunPlaybackController!
     
     #if DEBUG
     lazy var demoSeedDataService: DemoSeedDataService = {
@@ -270,6 +264,24 @@ class DependencyContainer: ObservableObject {
     
     init() {
         setupInitialConfiguration()
+        
+        // Initialize demo playback controller after other services (strong reference)
+        self.demoRunPlaybackController = DemoRunPlaybackController(
+            runEventService: runEventService,
+            locationService: locationService,
+            firebaseService: firebaseService,
+            coreDataService: coreDataService
+        )
+        
+        // Wire demo playback controller to RunEventService
+        if AppConfig.isDemoPlaybackEnabled {
+            runEventService.setDemoPlaybackController(demoRunPlaybackController)
+        }
+        
+        // DEBUG: Log ObjectIdentifier for retention verification
+        #if DEBUG
+        print("DependencyContainer init: demoRunPlaybackController ObjectIdentifier=\(ObjectIdentifier(demoRunPlaybackController))")
+        #endif
     }
     
     // MARK: - Configuration
@@ -283,13 +295,8 @@ class DependencyContainer: ObservableObject {
             }
         }
         
-        // Seed demo family in demo flow mode (DEBUG only)
-        // Requirements: 2.1, 2.2, 2.3, 2.7, 2.9
-        if AppConfig.isDemoFlowEnabled {
-            Task {
-                await demoSeedDataService.seedDemoFamily()
-            }
-        }
+        // Note: Demo flow mode seed is handled in LaunchRootView.setupUserAndLoadData()
+        // to ensure it completes before the UI tries to load data
         #endif
         
         // Set up demo user data for Active Run Only mode
@@ -298,7 +305,7 @@ class DependencyContainer: ObservableObject {
             
             // Start demo playback if enabled (idempotent - won't start if already running)
             if AppConfig.isDemoPlaybackEnabled {
-                demoRunPlaybackController.startIfNeeded()
+                demoRunPlaybackController.startPlayback()
             }
         }
         
@@ -332,7 +339,7 @@ class DependencyContainer: ObservableObject {
     func cleanup() {
         // Stop demo playback
         if AppConfig.isActiveRunOnlyMode && AppConfig.isDemoPlaybackEnabled {
-            demoRunPlaybackController.stop()
+            demoRunPlaybackController.stopPlayback()
         }
         
         // Notify app lifecycle manager of termination

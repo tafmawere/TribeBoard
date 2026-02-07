@@ -8,6 +8,7 @@
 import Foundation
 import Combine
 import UIKit
+import CoreLocation
 
 /// Singleton manager for debug overlay state
 /// Aggregates system state from various sources for debug display
@@ -31,6 +32,8 @@ class DebugStateManager: ObservableObject {
     @Published var isPlaybackRunning: Bool = false
     @Published var lastPlaybackTick: Date? = nil
     @Published var playbackTickCount: Int = 0
+    @Published var lastPlaybackCoordinate: CLLocationCoordinate2D? = nil
+    @Published var lastObserverLocationUpdate: Date? = nil
     
     // MARK: - Private Properties
     
@@ -47,9 +50,12 @@ class DebugStateManager: ObservableObject {
     // MARK: - Public Methods
     
     /// Update playback tick information
-    func updatePlaybackTick() {
+    func updatePlaybackTick(coordinate: CLLocationCoordinate2D? = nil) {
         lastPlaybackTick = Date()
         playbackTickCount += 1
+        if let coordinate = coordinate {
+            lastPlaybackCoordinate = coordinate
+        }
     }
     
     /// Log debug assertion with file and line information
@@ -91,6 +97,11 @@ class DebugStateManager: ObservableObject {
     func updateCurrentUser(id: String?, mode: String) {
         currentUserId = id
         userMode = mode
+    }
+    
+    /// Update observer location update time
+    func updateObserverLocationUpdate(_ date: Date?) {
+        lastObserverLocationUpdate = date
     }
     
     // MARK: - Private Methods

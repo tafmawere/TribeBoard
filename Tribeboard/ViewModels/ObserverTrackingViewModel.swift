@@ -21,6 +21,7 @@ class ObserverTrackingViewModel: ObservableObject, ObserverTrackingContract {
     @Published var error: ObserverTrackingError?
     @Published var isConnected: Bool = true
     @Published var lastUpdateTime: Date?
+    @Published var lastLocationUpdateDate: Date? // DEBUG: Track when location updates are received
     
     // Contract inputs (computed from internal state)
     var runId: String { _runId }
@@ -44,6 +45,10 @@ class ObserverTrackingViewModel: ObservableObject, ObserverTrackingContract {
     // Current run data
     private var currentRun: Run?
     var acknowledgedEvents: Set<String> = []
+    
+    // DEBUG: Throttle location update logs
+    private var lastLocationLogTime: Date?
+    private let locationLogThrottle: TimeInterval = 3.0 // Log at most once per 3 seconds
     
     // MARK: - Initialization
     
@@ -275,6 +280,21 @@ class ObserverTrackingViewModel: ObservableObject, ObserverTrackingContract {
         // Update driver location if available
         if let location = event.location {
             _driverLocation = location.coordinate
+            lastLocationUpdateDate = Date()
+            
+            // Update DebugStateManager
+            Task { @MainActor in
+                DebugStateManager.shared.updateObserverLocationUpdate(Date())
+            }
+            
+            // DEBUG: Throttled logging of location updates
+            let now = Date()
+            if lastLocationLogTime == nil || now.timeIntervalSince(lastLocationLogTime!) >= locationLogThrottle {
+                #if DEBUG
+                print("ObserverTrackingViewModel received location update lat=\(location.coordinate.latitude) lng=\(location.coordinate.longitude) for runId=\(_runId)")
+                #endif
+                lastLocationLogTime = now
+            }
         }
         
         // Refresh full data for significant events

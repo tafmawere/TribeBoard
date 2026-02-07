@@ -236,6 +236,16 @@ class MockFirebaseRunService: ObservableObject {
         
         mockRuns[runId] = run
         self.currentRun = run
+        
+        // Log location update event for real-time tracking
+        await logRunEvent(
+            runId: runId,
+            type: .locationUpdated,
+            stateBefore: run.status,
+            stateAfter: run.status,
+            currentStopIndex: run.currentStopIndex,
+            location: GeoPoint(latitude: location.latitude, longitude: location.longitude)
+        )
     }
     
     func updatePassengerStatus(runId: String, passengerId: String, status: PassengerStatus) async throws {

@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import CoreLocation
 
 /// Debug overlay component that displays system state information
 /// Positioned in top-right corner with low opacity background
@@ -27,9 +28,10 @@ struct DebugOverlayView: View {
                 debugInfoRow("Run ID:", debugState.activeRunId ?? "nil")
                 debugInfoRow("State:", debugState.activeRunState?.displayName ?? "nil")
                 debugInfoRow("Stop:", debugState.currentStopIndex?.description ?? "nil")
-                debugInfoRow("Location:", formatTimestamp(debugState.lastLocationUpdate))
                 debugInfoRow("Playback:", debugState.isPlaybackRunning ? "ON" : "OFF")
-                debugInfoRow("Tick:", formatTimestamp(debugState.lastPlaybackTick))
+                debugInfoRow("LastTick:", formatTimestamp(debugState.lastPlaybackTick))
+                debugInfoRow("LastCoord:", formatCoordinate(debugState.lastPlaybackCoordinate))
+                debugInfoRow("ObsUpdate:", formatTimestamp(debugState.lastObserverLocationUpdate))
             }
         }
         .padding(8)
@@ -61,6 +63,11 @@ struct DebugOverlayView: View {
         let formatter = DateFormatter()
         formatter.dateFormat = "HH:mm:ss"
         return formatter.string(from: date)
+    }
+    
+    private func formatCoordinate(_ coordinate: CLLocationCoordinate2D?) -> String {
+        guard let coordinate = coordinate else { return "nil" }
+        return String(format: "%.4f,%.4f", coordinate.latitude, coordinate.longitude)
     }
 }
 

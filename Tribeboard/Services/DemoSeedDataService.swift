@@ -74,6 +74,15 @@ class DemoSeedDataService {
                 print("ℹ️ Demo family already exists, skipping seed")
                 print("   - Family ID: \(DemoSeedDataService.demoFamilyId)")
                 print("   - Members: \(existingFamily.count)")
+                
+                // Check if runs exist and log them
+                let existingRuns = try await firebaseService.listRuns(forFamilyId: DemoSeedDataService.demoFamilyId)
+                if !existingRuns.isEmpty {
+                    print("   - Existing runs: \(existingRuns.count)")
+                    for run in existingRuns {
+                        print("     DEBUG: runId=\(run.id) status=\(run.status.displayName) driverId=\(run.driverId) passengers=\(run.passengers.count) stops=\(run.stops.count)")
+                    }
+                }
                 return
             }
             
@@ -81,15 +90,12 @@ class DemoSeedDataService {
             let users = createDemoFamilyUsers()
             try await persistDemoUsers(users)
             
-            // Create ONE scheduled demo run if no runs exist
-            let existingRuns = try await firebaseService.listRuns(forFamilyId: DemoSeedDataService.demoFamilyId)
-            if existingRuns.isEmpty {
-                let demoRun = createInitialDemoRun()
-                try await persistDemoRuns([demoRun])
-                print("   - Created 1 scheduled demo run")
-            } else {
-                print("   - Runs already exist, skipping run creation")
-            }
+            // Create ONE scheduled demo run
+            let demoRun = createInitialDemoRun()
+            try await persistDemoRuns([demoRun])
+            
+            // DEBUG: Log created run details
+            print("   DEBUG: Created runId=\(demoRun.id) status=\(demoRun.status.displayName) driverId=\(demoRun.driverId) passengers=\(demoRun.passengers.count) stops=\(demoRun.stops.count)")
             
             print("✅ Demo family seeded successfully")
             print("   - Family ID: \(DemoSeedDataService.demoFamilyId)")

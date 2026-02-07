@@ -18,6 +18,8 @@ struct ObserverTrackingView: View {
     @State private var selectedEvent: RunEvent?
     @State private var showingDelayDetails = false
     @State private var selectedDelay: DelayNotification?
+    @State private var showingShareSheet = false
+    @State private var shareText = ""
     @State private var mapRegion = MKCoordinateRegion(
         center: CLLocationCoordinate2D(latitude: 37.7749, longitude: -122.4194),
         span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
@@ -97,6 +99,9 @@ struct ObserverTrackingView: View {
             }
             .sheet(item: $selectedDelay) { delay in
                 delayDetailSheet(delay: delay)
+            }
+            .sheet(isPresented: $showingShareSheet) {
+                ShareSheet(activityItems: [shareText])
             }
         }
         .debugOverlay()
@@ -847,6 +852,9 @@ struct ObserverTrackingView: View {
             }
         case .acknowledgeUpdate:
             viewModel.acknowledgeUpdate()
+        case .shareRunStatus:
+            shareText = generateShareText()
+            showingShareSheet = true
         }
     }
     
@@ -916,6 +924,8 @@ struct ObserverTrackingView: View {
             return "phone"
         case .acknowledgeUpdate:
             return "checkmark.circle"
+        case .shareRunStatus:
+            return "square.and.arrow.up"
         }
     }
     
@@ -936,6 +946,47 @@ struct ObserverTrackingView: View {
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .abbreviated
         return formatter.localizedString(for: date, relativeTo: Date())
+    }
+    
+    private func generateShareText() -> String {
+        guard let runInfo = viewModel.getCurrentRunInfo() else {
+            return "Run status unavailable"
+        }
+        
+        let run = runInfo.run
+        var text = "📍 TribeBoard Run Status\n\n"
+        text += "Run: \(run.title)\n"
+        
+        // Driver information - find driver from passengers list
+        if let driver = run.passengers.first(where: { $0.id == run.driverId }) {
+            text += "Driver: \(driver.displayName)\n"
+        }
+        
+        // Status
+        text += "Status: \(runInfo.statusDescription)\n"
+        
+        // ETA
+        if let eta = viewModel.eta {
+            let updatedETA = delayNotificationService.calculateUpdatedETA(for: viewModel.runId, originalETA: eta)
+            text += "ETA: \(formatTime(updatedETA))\n"
+        }
+        
+        // Passenger count
+        if let passengerSummary = viewModel.getPassengerStatusSummary() {
+            text += "Passengers: \(passengerSummary.total) (\(passengerSummary.droppedOff) delivered, \(passengerSummary.onboard) onboard, \(passengerSummary.waiting) waiting)\n"
+        }
+        
+        // Progress
+        text += "Progress: \(Int(runInfo.progress * 100))% complete\n"
+        
+        // Delay information
+        if runInfo.isDelayed, let reason = runInfo.delayReason {
+            text += "\n⚠️ Delayed: \(reason)\n"
+        }
+        
+        text += "\nShared from TribeBoard"
+        
+        return text
     }
 }
 
@@ -969,6 +1020,21 @@ struct Badge: View {
             .padding(.vertical, 2)
             .background(color)
             .clipShape(Capsule())
+    }
+}
+
+// MARK: - ShareSheet
+
+struct ShareSheet: UIViewControllerRepresentable {
+    let activityItems: [Any]
+    
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        let controller = UIActivityViewController(activityItems: activityItems, applicationActivities: nil)
+        return controller
+    }
+    
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {
+        // No update needed
     }
 }
 

@@ -22,6 +22,7 @@ class RunCreationViewModel: ObservableObject {
     @Published var canProceedToNext: Bool = false
     @Published var isCreatingRun: Bool = false
     @Published var createdRunId: String?
+    @Published var createdRun: Run?
     
     // Step ViewModels
     @Published var step1ViewModel: Step1MetadataViewModel
@@ -35,6 +36,7 @@ class RunCreationViewModel: ObservableObject {
     private let firebaseService: MockFirebaseRunService
     private let roleContext: RoleContext
     private var cancellables = Set<AnyCancellable>()
+    var onRunCreated: ((Run) -> Void)?
     
     // MARK: - Initialization
     
@@ -164,6 +166,10 @@ class RunCreationViewModel: ObservableObject {
     private func handleCreationSuccess(_ run: Run) async {
         print("Run created successfully: \(run.title) (ID: \(run.id))")
         
+        // Store the created run
+        createdRun = run
+        createdRunId = run.id
+        
         // Notify observers through the run event service
         let creationEvent = RunEvent(
             runId: run.id,
@@ -176,6 +182,9 @@ class RunCreationViewModel: ObservableObject {
         )
         
         runEventService.broadcastEvent(creationEvent)
+        
+        // Call the callback to show confirmation screen
+        onRunCreated?(run)
         
         // Reset the workflow for potential next run creation
         reset()

@@ -24,6 +24,12 @@ import UIKit
 /// 7. Watch complete run cycle: start → arrive → pickup → next stop → arrive → dropoff → complete
 final class DemoRunPlaybackController: ObservableObject {
     
+    // MARK: - Published Properties (for diagnostics)
+    
+    @Published var isPlaybackRunning: Bool = false
+    @Published var lastTick: Date? = nil
+    @Published var lastCoordinate: CLLocationCoordinate2D? = nil
+    
     // MARK: - Private Properties
     
     private let runEventService: RunEventService
@@ -56,13 +62,18 @@ final class DemoRunPlaybackController: ObservableObject {
         self.firebaseService = firebaseService
         self.coreDataService = coreDataService
         
+        // DEBUG: Log ObjectIdentifier for retention verification
+        #if DEBUG
+        print("DemoRunPlaybackController init: ObjectIdentifier=\(ObjectIdentifier(self))")
+        #endif
+        
         setupNotificationObservers()
     }
     
     // MARK: - Public API
     
     /// Start demo playback if conditions are met
-    func startIfNeeded() {
+    func startPlayback() {
         // Idempotent behavior: only start if conditions are met and not already running
         guard AppConfig.launchMode == .activeRunOnly else {
             #if DEBUG
@@ -87,6 +98,12 @@ final class DemoRunPlaybackController: ObservableObject {
         }
         
         isStartupInProgress = true
+        isPlaybackRunning = true // Set published property
+        
+        // Update DebugStateManager
+        Task { @MainActor in
+            DebugStateManager.shared.updatePlaybackStatus(true)
+        }
         
         Task {
             await loadAndStartDemo()
@@ -95,11 +112,17 @@ final class DemoRunPlaybackController: ObservableObject {
     }
     
     /// Stop demo playback and cleanup resources
-    func stop() {
+    func stopPlayback() {
         isPlaybackActive = false
+        isPlaybackRunning = false // Set published property
         stopLocationUpdates()
         stopPlaybackScript()
         stopRunStateMonitoring()
+        
+        // Update DebugStateManager
+        Task { @MainActor in
+            DebugStateManager.shared.updatePlaybackStatus(false)
+        }
         
         #if DEBUG
         print("DemoRunPlaybackController: Stopped")
@@ -113,7 +136,7 @@ final class DemoRunPlaybackController: ObservableObject {
     
     /// Reset demo to initial state (optional - only if needed)
     func resetDemo() {
-        stop()
+        stopPlayback()
         currentRouteIndex = 0
         currentScriptIndex = 0
         playbackScript = []
@@ -145,7 +168,7 @@ final class DemoRunPlaybackController: ObservableObject {
         
         NotificationCenter.default.publisher(for: UIApplication.willTerminateNotification)
             .sink { [weak self] _ in
-                self?.stop()
+                self?.stopPlayback()
             }
             .store(in: &cancellables)
     }
@@ -344,16 +367,20 @@ final class DemoRunPlaybackController: ObservableObject {
                 #if DEBUG
                 print("DemoRunPlaybackController: Run reached terminal state (\(run.status.displayName)) during location update, stopping")
                 #endif
-                stop()
+                stopPlayback()
             }
             return 
         }
         
         let currentLocation = routeCoordinates[currentRouteIndex]
         
+        // Update published properties for diagnostics
+        lastTick = Date()
+        lastCoordinate = currentLocation
+        
         // Update playback tick tracking in DebugStateManager
         Task { @MainActor in
-            DebugStateManager.shared.updatePlaybackTick()
+            DebugStateManager.shared.updatePlaybackTick(coordinate: currentLocation)
         }
         
         // Update location through existing service (throttled persistence)
@@ -429,7 +456,7 @@ final class DemoRunPlaybackController: ObservableObject {
             #if DEBUG
             print("DemoRunPlaybackController: Run reached terminal state (\(run.status.displayName)) during script processing, stopping")
             #endif
-            stop()
+            stopPlayback()
             return
         }
         
@@ -437,6 +464,7 @@ final class DemoRunPlaybackController: ObservableObject {
         let elapsed = Date().timeIntervalSince(Date()) // This would be tracked from start time in real implementation
         
         // Update playback tick tracking for script processing
+        lastTick = Date()
         Task { @MainActor in
             DebugStateManager.shared.updatePlaybackTick()
         }
@@ -486,7 +514,7 @@ final class DemoRunPlaybackController: ObservableObject {
                     #if DEBUG
                     print("DemoRunPlaybackController: Run reached terminal state (\(updatedRun.status.displayName)), stopping playback")
                     #endif
-                    stop()
+                    stopPlayback()
                     return
                 }
                 
@@ -553,7 +581,7 @@ final class DemoRunPlaybackController: ObservableObject {
                         #if DEBUG
                         print("DemoRunPlaybackController: Run state monitoring detected terminal state (\(updatedRun.status.displayName)), stopping")
                         #endif
-                        stop()
+                        stopPlayback()
                     }
                 }
             } catch {
@@ -571,8 +599,13 @@ final class DemoRunPlaybackController: ObservableObject {
     }
     
     deinit {
-        stop()
+        isPlaybackRunning = false
+        stopPlayback()
         cancellables.removeAll()
+        
+        #if DEBUG
+        print("DemoRunPlaybackController deinit: ObjectIdentifier=\(ObjectIdentifier(self))")
+        #endif
     }
 }
 

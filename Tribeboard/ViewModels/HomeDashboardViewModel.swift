@@ -35,7 +35,7 @@ class HomeDashboardViewModel: ObservableObject, HomeDashboardContract {
     private var _todayEvents: [Event] = []
     
     private let runEventService: RunEventService
-    private let roleContext: RoleContext
+    private var roleContext: RoleContext
     private var cancellables = Set<AnyCancellable>()
     
     // Role-based data filtering
@@ -92,6 +92,30 @@ class HomeDashboardViewModel: ObservableObject, HomeDashboardContract {
     func updateDependencies(firebaseService: MockFirebaseRunService, roleManagementService: RoleManagementService, roleBasedDataFilter: RoleBasedDataFilter, runEventService: RunEventService) {
         // This method allows updating dependencies after initialization
         // In a real app, this would be handled by proper DI container
+    }
+    
+    /// Update role context and reload data (for user switching)
+    func updateRoleContext(userId: String, displayName: String, role: FamilyRole, familyId: String) {
+        _currentUser = User(
+            id: userId,
+            displayName: displayName,
+            role: role,
+            familyId: familyId
+        )
+        
+        // Update internal role context (CRITICAL: must update the stored roleContext)
+        self.roleContext = RoleContext(
+            userId: userId,
+            role: role,
+            familyId: familyId
+        )
+        
+        // Force reload with new context
+        Task {
+            await loadDashboardData()
+        }
+        
+        print("📱 HomeDashboardViewModel updated for user: \(displayName) (familyId: \(familyId))")
     }
     
     /// Load initial data
@@ -191,6 +215,14 @@ class HomeDashboardViewModel: ObservableObject, HomeDashboardContract {
         }
     }
     
+    /// Start a run by processing the startRun driver action
+    func startRun(runId: String) async throws {
+        try await runEventService.processDriverAction(.startRun, runId: runId)
+        
+        // Reload dashboard to reflect the new active run
+        await loadDashboardData()
+    }
+    
     // MARK: - Private Methods
     
     private func setupDataBinding() {
@@ -252,10 +284,15 @@ class HomeDashboardViewModel: ObservableObject, HomeDashboardContract {
     private func loadAllRunsFromService() async -> [Run] {
         do {
             // Fetch runs for the user's family from Firebase service
+            print("📋 Loading runs for familyId: \(roleContext.familyId)")
             let runs = try await firebaseService.listRuns(forFamilyId: roleContext.familyId)
+            print("📋 Loaded \(runs.count) runs from service")
+            for run in runs {
+                print("   - Run: \(run.title) (id: \(run.id), status: \(run.status.displayName))")
+            }
             return runs
         } catch {
-            print("Error loading runs: \(error.localizedDescription)")
+            print("❌ Error loading runs: \(error.localizedDescription)")
             self.error = .loadingFailed(error.localizedDescription)
             return []
         }

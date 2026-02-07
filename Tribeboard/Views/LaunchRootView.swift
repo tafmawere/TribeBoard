@@ -48,6 +48,9 @@ struct LaunchRootView: View {
     
     @ViewBuilder
     private var demoFlowContent: some View {
+        // Create AppCoordinator for navigation
+        let appCoordinator = AppCoordinator(dependencyContainer: dependencyContainer)
+        
         VStack(spacing: 0) {
             // User switcher at the top
             userSwitcherView
@@ -55,32 +58,10 @@ struct LaunchRootView: View {
                 .background(Color(.systemBackground))
                 .shadow(color: Color.black.opacity(0.1), radius: 2, y: 1)
             
-            // TODO: Task 5 - Replace with MyRunsView
-            // For now, show placeholder
-            VStack(spacing: 16) {
-                Text("Demo Flow Mode")
-                    .font(.title)
-                Text("MyRunsView will be implemented in Task 5")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                
-                // Show current user info
-                VStack(spacing: 8) {
-                    Text("Current User:")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    Text(getCurrentUserDisplayName())
-                        .font(.headline)
-                    Text("Role: \(dependencyContainer.roleManagementService.currentUserRole.displayName)")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                }
-                .padding()
-                .background(Color(.secondarySystemBackground))
-                .cornerRadius(8)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color(.systemBackground))
+            // MyRunsView - Task 5 implementation
+            MyRunsView(viewModel: dependencyContainer.homeDashboardViewModel)
+                .withDependencyContainer(dependencyContainer)
+                .environmentObject(appCoordinator)
         }
     }
     
@@ -126,6 +107,14 @@ struct LaunchRootView: View {
         let (displayName, role) = getUserInfo(for: userId)
         
         dependencyContainer.roleManagementService.setCurrentUser(
+            userId: userId,
+            displayName: displayName,
+            role: role,
+            familyId: DemoSeedDataService.demoFamilyId
+        )
+        
+        // Update ViewModel with new role context and reload data
+        dependencyContainer.homeDashboardViewModel.updateRoleContext(
             userId: userId,
             displayName: displayName,
             role: role,
@@ -191,12 +180,14 @@ struct LaunchRootView: View {
     
     @ViewBuilder
     private var activeRunOnlyContent: some View {
-        if isLoading {
-            loadingView
-        } else if let activeRun = activeRun {
-            activeRunView(activeRun)
-        } else {
-            EmptyStateView(onRefresh: loadActiveRun)
+        Group {
+            if isLoading {
+                loadingView
+            } else if let activeRun = activeRun {
+                activeRunView(activeRun)
+            } else {
+                EmptyStateView(onRefresh: loadActiveRun)
+            }
         }
     }
     
@@ -258,7 +249,10 @@ struct LaunchRootView: View {
         }
         
         if AppConfig.isDemoFlowEnabled {
-            // In demo flow mode, set up initial user (Rue by default)
+            // In demo flow mode, wait for seed to complete first
+            await dependencyContainer.demoSeedDataService.seedDemoFamily()
+            
+            // Then set up initial user (Rue by default)
             switchUser(to: selectedUserId)
             return
         }
