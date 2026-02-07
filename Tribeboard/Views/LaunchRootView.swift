@@ -48,9 +48,6 @@ struct LaunchRootView: View {
     
     @ViewBuilder
     private var demoFlowContent: some View {
-        // Create AppCoordinator for navigation
-        let appCoordinator = AppCoordinator(dependencyContainer: dependencyContainer)
-        
         VStack(spacing: 0) {
             // User switcher at the top
             userSwitcherView
@@ -58,10 +55,8 @@ struct LaunchRootView: View {
                 .background(Color(.systemBackground))
                 .shadow(color: Color.black.opacity(0.1), radius: 2, y: 1)
             
-            // MyRunsView - Task 5 implementation
-            MyRunsView(viewModel: dependencyContainer.homeDashboardViewModel)
-                .withDependencyContainer(dependencyContainer)
-                .environmentObject(appCoordinator)
+            // Main tab navigation
+            MainNavigationView(dependencyContainer: dependencyContainer)
         }
     }
     

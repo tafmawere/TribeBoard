@@ -12,6 +12,14 @@ import SwiftUI
 struct MainNavigationView: View {
     @StateObject private var appCoordinator: AppCoordinator
     @Environment(\.dependencyContainer) private var dependencyContainer
+    @State private var selectedTab: MainTab = .myRuns
+    
+    enum MainTab {
+        case myRuns
+        case family
+        case activity
+        case settings
+    }
     
     init(dependencyContainer: DependencyContainer) {
         self._appCoordinator = StateObject(wrappedValue: AppCoordinator(dependencyContainer: dependencyContainer))
@@ -24,65 +32,135 @@ struct MainNavigationView: View {
                 .foregroundColor(.secondary)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Color(.systemBackground))
+        } else if AppConfig.isDemoFlowEnabled {
+            // Demo Flow mode - use tab-based navigation
+            demoFlowTabView
         } else {
-            NavigationStack(path: $appCoordinator.navigationPath) {
-                // Root view is always Home Dashboard
-                HomeDashboardView()
+            // Full app mode - use original navigation
+            fullAppNavigationView
+        }
+    }
+    
+    // MARK: - Demo Flow Tab View
+    
+    private var demoFlowTabView: some View {
+        TabView(selection: $selectedTab) {
+            // Tab 1: My Runs
+            MyRunsView(viewModel: dependencyContainer.homeDashboardViewModel)
+                .withDependencyContainer(dependencyContainer)
+                .environmentObject(appCoordinator)
+                .tabItem {
+                    Label("My Runs", systemImage: "car.fill")
+                }
+                .tag(MainTab.myRuns)
+            
+            // Tab 2: Family
+            FamilyView(viewModel: createFamilyViewModel())
+                .withDependencyContainer(dependencyContainer)
+                .environmentObject(appCoordinator)
+                .tabItem {
+                    Label("Family", systemImage: "person.3.fill")
+                }
+                .tag(MainTab.family)
+            
+            // Tab 3: Activity
+            ActivityPlaceholderView()
+                .withDependencyContainer(dependencyContainer)
+                .environmentObject(appCoordinator)
+                .tabItem {
+                    Label("Activity", systemImage: "list.bullet")
+                }
+                .tag(MainTab.activity)
+            
+            // Tab 4: Settings
+            SettingsPlaceholderView()
+                .withDependencyContainer(dependencyContainer)
+                .tabItem {
+                    Label("Settings", systemImage: "gear")
+                }
+                .tag(MainTab.settings)
+        }
+        .sheet(item: $appCoordinator.presentedSheet) { sheet in
+            appCoordinator.createSheetView(for: sheet)
+        }
+        .alert("TribeBoard", isPresented: $appCoordinator.showingAlert) {
+            Button("OK") { }
+        } message: {
+            Text(appCoordinator.alertMessage)
+        }
+        .environment(\.appCoordinator, appCoordinator)
+    }
+    
+    // MARK: - Full App Navigation View
+    
+    private var fullAppNavigationView: some View {
+        NavigationStack(path: $appCoordinator.navigationPath) {
+            // Root view is always Home Dashboard
+            HomeDashboardView()
+                .withDependencyContainer(dependencyContainer)
+                .environmentObject(appCoordinator)
+                .navigationDestination(for: RunDetailDestination.self) { destination in
+                    RunDetailView(runId: destination.runId)
+                        .withDependencyContainer(dependencyContainer)
+                        .environmentObject(appCoordinator)
+                }
+                .navigationDestination(for: DriverFocusModeDestination.self) { destination in
+                    DriverFocusModeView(
+                        runId: destination.runId,
+                        runEventService: dependencyContainer.runEventService,
+                        roleContext: RoleContext(
+                            userId: dependencyContainer.roleManagementService.currentUserId,
+                            role: dependencyContainer.roleManagementService.currentUserRole,
+                            familyId: dependencyContainer.roleManagementService.currentFamilyId
+                        )
+                    )
                     .withDependencyContainer(dependencyContainer)
                     .environmentObject(appCoordinator)
-                    .navigationDestination(for: RunDetailDestination.self) { destination in
-                        RunDetailView(runId: destination.runId)
-                            .withDependencyContainer(dependencyContainer)
-                            .environmentObject(appCoordinator)
-                    }
-                    .navigationDestination(for: DriverFocusModeDestination.self) { destination in
-                        DriverFocusModeView(
-                            runId: destination.runId,
-                            runEventService: dependencyContainer.runEventService,
-                            roleContext: RoleContext(
-                                userId: dependencyContainer.roleManagementService.currentUserId,
-                                role: dependencyContainer.roleManagementService.currentUserRole,
-                                familyId: dependencyContainer.roleManagementService.currentFamilyId
-                            )
+                }
+                .navigationDestination(for: ObserverTrackingDestination.self) { destination in
+                    ObserverTrackingView(
+                        runId: destination.runId,
+                        runEventService: dependencyContainer.runEventService,
+                        roleContext: RoleContext(
+                            userId: dependencyContainer.roleManagementService.currentUserId,
+                            role: dependencyContainer.roleManagementService.currentUserRole,
+                            familyId: dependencyContainer.roleManagementService.currentFamilyId
                         )
-                        .withDependencyContainer(dependencyContainer)
-                        .environmentObject(appCoordinator)
-                    }
-                    .navigationDestination(for: ObserverTrackingDestination.self) { destination in
-                        ObserverTrackingView(
-                            runId: destination.runId,
-                            runEventService: dependencyContainer.runEventService,
-                            roleContext: RoleContext(
-                                userId: dependencyContainer.roleManagementService.currentUserId,
-                                role: dependencyContainer.roleManagementService.currentUserRole,
-                                familyId: dependencyContainer.roleManagementService.currentFamilyId
-                            )
-                        )
-                        .withDependencyContainer(dependencyContainer)
-                        .environmentObject(appCoordinator)
-                    }
-                    .navigationDestination(for: ActivityStreamDestination.self) { destination in
-                        ActivityStreamView(
-                            runId: destination.runId,
-                            runEventService: dependencyContainer.runEventService
-                        )
-                        .withDependencyContainer(dependencyContainer)
-                        .environmentObject(appCoordinator)
-                    }
-            }
-            .sheet(item: $appCoordinator.presentedSheet) { sheet in
-                appCoordinator.createSheetView(for: sheet)
-            }
-            .alert("TribeBoard", isPresented: $appCoordinator.showingAlert) {
-                Button("OK") { }
-            } message: {
-                Text(appCoordinator.alertMessage)
-            }
-            .environment(\.appCoordinator, appCoordinator)
-            .onOpenURL { url in
-                appCoordinator.handleDeepLink(url)
-            }
+                    )
+                    .withDependencyContainer(dependencyContainer)
+                    .environmentObject(appCoordinator)
+                }
+                .navigationDestination(for: ActivityStreamDestination.self) { destination in
+                    ActivityStreamView(
+                        runId: destination.runId,
+                        runEventService: dependencyContainer.runEventService
+                    )
+                    .withDependencyContainer(dependencyContainer)
+                    .environmentObject(appCoordinator)
+                }
         }
+        .sheet(item: $appCoordinator.presentedSheet) { sheet in
+            appCoordinator.createSheetView(for: sheet)
+        }
+        .alert("TribeBoard", isPresented: $appCoordinator.showingAlert) {
+            Button("OK") { }
+        } message: {
+            Text(appCoordinator.alertMessage)
+        }
+        .environment(\.appCoordinator, appCoordinator)
+        .onOpenURL { url in
+            appCoordinator.handleDeepLink(url)
+        }
+    }
+    
+    // MARK: - Helper Methods
+    
+    private func createFamilyViewModel() -> FamilyViewModel {
+        return FamilyViewModel(
+            roleManagementService: dependencyContainer.roleManagementService,
+            firebaseService: dependencyContainer.firebaseService,
+            homeDashboardViewModel: dependencyContainer.homeDashboardViewModel
+        )
     }
 }
 
