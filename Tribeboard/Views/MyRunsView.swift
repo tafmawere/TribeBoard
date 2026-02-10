@@ -16,14 +16,19 @@ struct MyRunsView: View {
     @EnvironmentObject private var appCoordinator: AppCoordinator
     @State private var selectedTab: RunTab = .today
     
+    // Schedule preview support
+    private let scheduleRunGenerator: ScheduleRunGenerator
+    @State private var schedulePreviews: [ScheduledRunPreview] = []
+    
     enum RunTab: String, CaseIterable {
         case today = "Today"
         case upcoming = "Upcoming"
         case history = "History"
     }
     
-    init(viewModel: HomeDashboardViewModel) {
+    init(viewModel: HomeDashboardViewModel, scheduleRunGenerator: ScheduleRunGenerator) {
         _viewModel = StateObject(wrappedValue: viewModel)
+        self.scheduleRunGenerator = scheduleRunGenerator
     }
     
     var body: some View {
@@ -53,10 +58,20 @@ struct MyRunsView: View {
                             
                             // Run List
                             let filteredRuns = getFilteredRuns()
-                            if filteredRuns.isEmpty {
+                            let filteredPreviews = getFilteredPreviews()
+                            
+                            if filteredRuns.isEmpty && filteredPreviews.isEmpty {
                                 emptyStateView()
                             } else {
-                                runListSection(runs: filteredRuns)
+                                // Schedule previews section (if any)
+                                if !filteredPreviews.isEmpty {
+                                    schedulePreviewsSection(previews: filteredPreviews)
+                                }
+                                
+                                // Regular runs section (if any)
+                                if !filteredRuns.isEmpty {
+                                    runListSection(runs: filteredRuns)
+                                }
                             }
                         }
                         .padding()
@@ -66,15 +81,30 @@ struct MyRunsView: View {
             .navigationTitle("My Runs")
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: {
-                        appCoordinator.presentSheet(.runCreation)
-                    }) {
-                        Image(systemName: "plus")
+                    HStack(spacing: 16) {
+                        Button(action: {
+                            appCoordinator.presentSheet(.calendar)
+                        }) {
+                            Image(systemName: "calendar")
+                        }
+                        
+                        Button(action: {
+                            appCoordinator.presentSheet(.runCreation)
+                        }) {
+                            Image(systemName: "plus")
+                        }
                     }
                 }
             }
             .refreshable {
                 await viewModel.refreshData()
+                loadSchedulePreviews()
+            }
+            .task {
+                loadSchedulePreviews()
+            }
+            .onChange(of: selectedTab) {
+                loadSchedulePreviews()
             }
             .sheet(item: $appCoordinator.presentedSheet) { sheet in
                 appCoordinator.createSheetView(for: sheet)
@@ -167,6 +197,29 @@ struct MyRunsView: View {
         }
     }
     
+    // MARK: - Schedule Previews Section
+    
+    @ViewBuilder
+    private func schedulePreviewsSection(previews: [ScheduledRunPreview]) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Scheduled (from Calendar)")
+                .font(.headline)
+                .padding(.horizontal, 4)
+            
+            ForEach(previews) { preview in
+                Button(action: {
+                    // Navigate to DayScheduleListView for the preview's date
+                    let calendar = Calendar.current
+                    let date = calendar.startOfDay(for: preview.occurrenceDateTime)
+                    appCoordinator.presentSheet(.dayScheduleList(date: date))
+                }) {
+                    SchedulePreviewCard(preview: preview)
+                }
+                .buttonStyle(PlainButtonStyle())
+            }
+        }
+    }
+    
     // MARK: - Actions
     
     /// Start a run and navigate to driver focus mode
@@ -223,6 +276,39 @@ struct MyRunsView: View {
     }
     
     // MARK: - Helper Methods
+    
+    /// Load schedule previews based on selected tab
+    private func loadSchedulePreviews() {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        
+        switch selectedTab {
+        case .today:
+            // Load previews for today
+            schedulePreviews = scheduleRunGenerator.occurrences(on: today)
+                .sorted { $0.occurrenceDateTime < $1.occurrenceDateTime }
+            
+        case .upcoming:
+            // Load previews for next 7-14 days
+            guard let startDate = calendar.date(byAdding: .day, value: 1, to: today),
+                  let endDate = calendar.date(byAdding: .day, value: 14, to: today) else {
+                schedulePreviews = []
+                return
+            }
+            
+            schedulePreviews = scheduleRunGenerator.occurrences(in: startDate...endDate)
+                .sorted { $0.occurrenceDateTime < $1.occurrenceDateTime }
+            
+        case .history:
+            // No schedule previews in history
+            schedulePreviews = []
+        }
+    }
+    
+    /// Get filtered schedule previews based on selected tab
+    private func getFilteredPreviews() -> [ScheduledRunPreview] {
+        return schedulePreviews
+    }
     
     private func getFilteredRuns() -> [Run] {
         let allRuns = viewModel.getDisplayRuns()

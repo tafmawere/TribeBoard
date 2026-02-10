@@ -90,6 +90,17 @@ class AppCoordinator: ObservableObject {
         presentedSheet = nil
     }
     
+    /// Navigate to calendar view
+    func navigateToCalendar() {
+        // Guard against navigation in Active Run Only mode (but allow demo flow mode)
+        if AppConfig.isActiveRunOnlyMode {
+            showAlert(message: "Calendar is not available in Active Run Only mode")
+            return
+        }
+        
+        presentSheet(.calendar)
+    }
+    
     /// Show alert with message
     func showAlert(message: String) {
         alertMessage = message
@@ -184,7 +195,10 @@ class AppCoordinator: ObservableObject {
                 .withDependencyContainer(dependencyContainer)
                 .environmentObject(self)
         case .myRuns:
-            MyRunsView(viewModel: dependencyContainer.homeDashboardViewModel)
+            MyRunsView(
+                viewModel: dependencyContainer.homeDashboardViewModel,
+                scheduleRunGenerator: dependencyContainer.scheduleRunGenerator
+            )
                 .withDependencyContainer(dependencyContainer)
                 .environmentObject(self)
         case .runDetail(let runId):
@@ -278,6 +292,22 @@ class AppCoordinator: ObservableObject {
                     self?.navigate(to: .myRuns)
                 }
             )
+        case .calendar:
+            CalendarView(viewModel: dependencyContainer.createCalendarViewModel())
+                .environmentObject(self)
+        case .dayScheduleList(let date):
+            NavigationView {
+                DayScheduleListView(
+                    date: date,
+                    viewModel: dependencyContainer.createDayScheduleViewModel(appCoordinator: self)
+                )
+                .environmentObject(self)
+            }
+        case .scheduleEditor(let schedule):
+            ScheduleEditorView(
+                viewModel: dependencyContainer.createScheduleEditorViewModel(existingSchedule: schedule)
+            )
+            .environmentObject(self)
         }
     }
     
@@ -384,6 +414,9 @@ enum SheetType: Identifiable {
     case runDetail(runId: String)
     case activityStream(runId: String)
     case runScheduledConfirmation(run: Run)
+    case calendar
+    case dayScheduleList(date: Date)
+    case scheduleEditor(schedule: RunSchedule?)
     
     var id: String {
         switch self {
@@ -395,6 +428,18 @@ enum SheetType: Identifiable {
             return "activityStream-\(runId)"
         case .runScheduledConfirmation(let run):
             return "runScheduledConfirmation-\(run.id)"
+        case .calendar:
+            return "calendar"
+        case .dayScheduleList(let date):
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = [.withFullDate]
+            return "dayScheduleList-\(formatter.string(from: date))"
+        case .scheduleEditor(let schedule):
+            if let schedule = schedule {
+                return "scheduleEditor-\(schedule.id)"
+            } else {
+                return "scheduleEditor-new"
+            }
         }
     }
 }

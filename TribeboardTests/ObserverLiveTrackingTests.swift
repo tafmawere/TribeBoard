@@ -41,7 +41,7 @@ final class ObserverLiveTrackingTests: XCTestCase {
     }
     
     override func tearDown() async throws {
-        demoPlaybackController.stop()
+        demoPlaybackController.stopPlayback()
         cancellables.removeAll()
         observerViewModel = nil
         demoPlaybackController = nil
@@ -481,7 +481,7 @@ final class ObserverLiveTrackingTests: XCTestCase {
         // demoPlaybackController.startIfNeeded()
         
         // Verify controller can be stopped cleanly
-        demoPlaybackController.stop()
+        demoPlaybackController.stopPlayback()
         XCTAssertFalse(demoPlaybackController.isRunning, "Controller should stop cleanly")
         
         print("✅ DemoRunPlaybackController integration:")

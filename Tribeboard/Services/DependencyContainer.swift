@@ -130,9 +130,51 @@ class DependencyContainer: ObservableObject {
     
     #if DEBUG
     lazy var demoSeedDataService: DemoSeedDataService = {
-        return DemoSeedDataService(firebaseService: firebaseService)
+        return DemoSeedDataService(firebaseService: firebaseService, scheduleStore: scheduleStore)
     }()
     #endif
+    
+    // MARK: - Scheduling Services
+    
+    lazy var scheduleStore: ScheduleStore = {
+        do {
+            return try ScheduleStore()
+        } catch {
+            fatalError("Failed to initialize ScheduleStore: \(error)")
+        }
+    }()
+    
+    lazy var scheduleRunGenerator: ScheduleRunGenerator = {
+        return ScheduleRunGenerator(scheduleStore: scheduleStore)
+    }()
+    
+    lazy var runMaterializer: RunMaterializer = {
+        // Use debug user mode selection for role context in DEBUG builds
+        #if DEBUG
+        let currentUser = AppConfig.isActiveRunOnlyMode ? AppConfig.currentDemoUser : User(
+            id: roleManagementService.currentUserId,
+            displayName: "Demo User",
+            role: roleManagementService.currentUserRole,
+            familyId: roleManagementService.currentFamilyId
+        )
+        #else
+        let currentUser = User(
+            id: roleManagementService.currentUserId,
+            displayName: "Demo User",
+            role: roleManagementService.currentUserRole,
+            familyId: roleManagementService.currentFamilyId
+        )
+        #endif
+        
+        return RunMaterializer(
+            firebaseService: firebaseService,
+            roleContext: RoleContext(
+                userId: currentUser.id,
+                role: currentUser.role,
+                familyId: currentUser.familyId
+            )
+        )
+    }()
     
     // MARK: - ViewModels
     
@@ -258,6 +300,27 @@ class DependencyContainer: ObservableObject {
     
     func createStep4StopsViewModel() -> Step4StopsViewModel {
         return Step4StopsViewModel()
+    }
+    
+    // MARK: - Calendar ViewModels
+    
+    func createCalendarViewModel() -> CalendarViewModel {
+        return CalendarViewModel(generator: scheduleRunGenerator)
+    }
+    
+    func createDayScheduleViewModel(appCoordinator: AppCoordinator) -> DayScheduleViewModel {
+        return DayScheduleViewModel(
+            generator: scheduleRunGenerator,
+            materializer: runMaterializer,
+            appCoordinator: appCoordinator
+        )
+    }
+    
+    func createScheduleEditorViewModel(existingSchedule: RunSchedule? = nil) -> ScheduleEditorViewModel {
+        return ScheduleEditorViewModel(
+            scheduleStore: scheduleStore,
+            existingSchedule: existingSchedule
+        )
     }
     
     // MARK: - Initialization

@@ -27,12 +27,14 @@ class DemoSeedDataService {
     // MARK: - Properties
     
     private let firebaseService: MockFirebaseRunService
+    private let scheduleStore: ScheduleStore
     private var hasSeeded = false
     
     // MARK: - Initialization
     
-    init(firebaseService: MockFirebaseRunService) {
+    init(firebaseService: MockFirebaseRunService, scheduleStore: ScheduleStore) {
         self.firebaseService = firebaseService
+        self.scheduleStore = scheduleStore
     }
     
     // MARK: - Public Methods
@@ -52,11 +54,15 @@ class DemoSeedDataService {
             let runs = createDemoRuns()
             try await persistDemoRuns(runs)
             
+            // Seed demo schedules
+            try await scheduleStore.seedIfNeeded()
+            
             hasSeeded = true
             print("✅ Demo data seeded successfully")
             print("   - Family ID: \(DemoSeedDataService.demoFamilyId)")
             print("   - Users: Rue (parent), Tafadzwa (parent), TJ (child), Tawana (child)")
             print("   - Runs: 2 scheduled runs created")
+            print("   - Schedules: Demo schedules seeded")
         } catch {
             print("❌ Failed to seed demo data: \(error.localizedDescription)")
         }
@@ -83,6 +89,10 @@ class DemoSeedDataService {
                         print("     DEBUG: runId=\(run.id) status=\(run.status.displayName) driverId=\(run.driverId) passengers=\(run.passengers.count) stops=\(run.stops.count)")
                     }
                 }
+                
+                // Seed schedules even if family exists (idempotent)
+                try await scheduleStore.seedIfNeeded()
+                
                 return
             }
             
@@ -94,6 +104,9 @@ class DemoSeedDataService {
             let demoRun = createInitialDemoRun()
             try await persistDemoRuns([demoRun])
             
+            // Seed demo schedules
+            try await scheduleStore.seedIfNeeded()
+            
             // DEBUG: Log created run details
             print("   DEBUG: Created runId=\(demoRun.id) status=\(demoRun.status.displayName) driverId=\(demoRun.driverId) passengers=\(demoRun.passengers.count) stops=\(demoRun.stops.count)")
             
@@ -103,6 +116,7 @@ class DemoSeedDataService {
             print("   - Tafadzwa Mawere: Parent/Admin/Driver (+1-555-0102)")
             print("   - TJ: Child/Passenger")
             print("   - Tawana: Child/Passenger")
+            print("   - Schedules: Demo schedules seeded")
         } catch {
             print("❌ Failed to seed demo family: \(error.localizedDescription)")
         }

@@ -46,7 +46,10 @@ struct MainNavigationView: View {
     private var demoFlowTabView: some View {
         TabView(selection: $selectedTab) {
             // Tab 1: My Runs
-            MyRunsView(viewModel: dependencyContainer.homeDashboardViewModel)
+            MyRunsView(
+                viewModel: dependencyContainer.homeDashboardViewModel,
+                scheduleRunGenerator: dependencyContainer.scheduleRunGenerator
+            )
                 .withDependencyContainer(dependencyContainer)
                 .environmentObject(appCoordinator)
                 .tabItem {
