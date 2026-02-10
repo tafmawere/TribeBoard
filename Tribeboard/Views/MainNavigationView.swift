@@ -73,7 +73,7 @@ struct MainNavigationView: View {
                 .tag(MainTab.activity)
             
             // Tab 4: Settings
-            SettingsPlaceholderView()
+            SettingsView()
                 .withDependencyContainer(dependencyContainer)
                 .tabItem {
                     Label("Settings", systemImage: "gear")

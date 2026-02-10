@@ -17,6 +17,7 @@ struct FamilyMemberDisplay: Identifiable, Hashable {
     let phone: String?
     let roleBadges: [RoleBadge]
     let capabilities: [String]
+    let isLocationSharingEnabled: Bool
     
     /// Role badge for display
     struct RoleBadge: Hashable {
@@ -42,7 +43,8 @@ struct FamilyMemberDisplay: Identifiable, Hashable {
             isParent: isParent,
             phone: phone,
             roleBadges: badges,
-            capabilities: capabilities
+            capabilities: capabilities,
+            isLocationSharingEnabled: true // Default to enabled for demo
         )
     }
     

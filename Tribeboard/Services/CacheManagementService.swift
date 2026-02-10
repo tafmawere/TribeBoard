@@ -504,7 +504,7 @@ class CacheManagementService: ObservableObject {
     
     /// Delete events for a specific run
     nonisolated private func deleteEventsForRun(runId: String, context: NSManagedObjectContext) throws {
-        let eventFetchRequest: NSFetchRequest<RunEventEntity> = RunEventEntity.fetchRequest()
+        let eventFetchRequest = NSFetchRequest<RunEventEntity>(entityName: "RunEventEntity")
         eventFetchRequest.predicate = NSPredicate(format: "runId == %@", runId)
         
         let events = try context.fetch(eventFetchRequest)
@@ -575,6 +575,7 @@ class CacheManagementService: ObservableObject {
                     
                     // Remove orphaned events
                     if !orphanedEvents.isEmpty {
+                        let orphanedCount = orphanedEvents.count
                         orphanedEvents.forEach { context.delete($0) }
                         try context.save()
                         
@@ -582,7 +583,7 @@ class CacheManagementService: ObservableObject {
                             self.logger.logInfo(
                                 message: "Removed orphaned events during cache validation",
                                 context: .cacheManagement,
-                                additionalInfo: ["orphanedEventsCount": String(orphanedEvents.count)]
+                                additionalInfo: ["orphanedEventsCount": String(orphanedCount)]
                             )
                         }
                     }

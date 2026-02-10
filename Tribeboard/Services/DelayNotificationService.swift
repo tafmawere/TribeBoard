@@ -44,7 +44,7 @@ class DelayNotificationService: ObservableObject {
     
     /// Handle delay event and notify observers
     /// Requirement 3.5
-    func handleDelayEvent(_ event: RunEvent) {
+    func handleDelayEvent(_ event: RunEvent) async {
         guard event.type == .runDelayed else { return }
         
         let delayNotification = DelayNotification(
@@ -60,7 +60,7 @@ class DelayNotificationService: ObservableObject {
         activeDelays.append(delayNotification)
         
         // Send push notification
-        sendDelayNotification(delayNotification)
+        await sendDelayNotification(delayNotification)
         
         // Update ETA calculations
         updateETAForDelay(runId: event.runId, delay: delayNotification)
@@ -71,7 +71,7 @@ class DelayNotificationService: ObservableObject {
     
     /// Handle delay cleared event
     /// Requirement 3.5
-    func handleDelayClearedEvent(_ event: RunEvent) {
+    func handleDelayClearedEvent(_ event: RunEvent) async {
         guard event.type == .runDelayCleared else { return }
         
         // Move delay from active to history
@@ -82,7 +82,7 @@ class DelayNotificationService: ObservableObject {
             delayHistory.append(delayNotification)
             
             // Send delay cleared notification
-            sendDelayClearedNotification(delayNotification)
+            await sendDelayClearedNotification(delayNotification)
             
             // Stop monitoring
             stopDelayMonitoring(for: event.runId)
@@ -168,9 +168,9 @@ class DelayNotificationService: ObservableObject {
             .sink { [weak self] event in
                 Task { @MainActor in
                     if event.type == .runDelayed {
-                        self?.handleDelayEvent(event)
+                        await self?.handleDelayEvent(event)
                     } else if event.type == .runDelayCleared {
-                        self?.handleDelayClearedEvent(event)
+                        await self?.handleDelayClearedEvent(event)
                     }
                 }
             }
@@ -201,7 +201,7 @@ class DelayNotificationService: ObservableObject {
         }
     }
     
-    private func sendDelayNotification(_ delay: DelayNotification) {
+    private func sendDelayNotification(_ delay: DelayNotification) async {
         guard isNotificationEnabled else { return }
         
         let content = UNMutableNotificationContent()
@@ -223,14 +223,14 @@ class DelayNotificationService: ObservableObject {
             trigger: nil // Send immediately
         )
         
-        notificationCenter.add(request) { error in
-            if let error = error {
-                print("Failed to send delay notification: \(error)")
-            }
+        do {
+            try await notificationCenter.add(request)
+        } catch {
+            print("Failed to send delay notification: \(error)")
         }
     }
     
-    private func sendDelayClearedNotification(_ delay: DelayNotification) {
+    private func sendDelayClearedNotification(_ delay: DelayNotification) async {
         guard isNotificationEnabled else { return }
         
         let content = UNMutableNotificationContent()
@@ -249,10 +249,10 @@ class DelayNotificationService: ObservableObject {
             trigger: nil
         )
         
-        notificationCenter.add(request) { error in
-            if let error = error {
-                print("Failed to send delay cleared notification: \(error)")
-            }
+        do {
+            try await notificationCenter.add(request)
+        } catch {
+            print("Failed to send delay cleared notification: \(error)")
         }
     }
     
@@ -306,10 +306,10 @@ class DelayNotificationService: ObservableObject {
             trigger: nil
         )
         
-        notificationCenter.add(request) { error in
-            if let error = error {
-                print("Failed to send delay update notification: \(error)")
-            }
+        do {
+            try await notificationCenter.add(request)
+        } catch {
+            print("Failed to send delay update notification: \(error)")
         }
     }
     

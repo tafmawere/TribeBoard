@@ -325,3 +325,178 @@ Parents and admins now have full control over their family management:
 - ✅ Clear permissions preview for new members
 
 All features are intuitive, well-organized, and follow iOS design patterns.
+
+---
+
+## Member Profile UI Redesign
+
+### Overview
+The Family Member Profile screen has been redesigned to match TribeBoard's visual language with soft, rounded cards, calm colors, and clear hierarchy. This is a UI-only update with no backend changes.
+
+### Visual Design
+
+**Design System:**
+- Off-white background (#F9FAFB)
+- White cards with 20pt corner radius
+- Subtle shadows for depth
+- Consistent 16pt spacing between cards
+- 20pt internal card padding
+- Soft blue accents (#6366F1)
+
+**Card Structure:**
+```
+┌─────────────────────────────────────┐
+│ [Back]        Profile        [Done] │
+├─────────────────────────────────────┤
+│                                     │
+│ ┌─────────────────────────────────┐ │
+│ │         [Avatar]                │ │
+│ │      Sarah Doe                  │ │
+│ │      Mom                        │ │
+│ │  [ADMIN] [DRIVER]               │ │
+│ └─────────────────────────────────┘ │
+│                                     │
+│ ┌─────────────────────────────────┐ │
+│ │  Permissions                    │ │
+│ │  ✓ Can create runs              │ │
+│ │  ✓ Can start/drive runs         │ │
+│ └─────────────────────────────────┘ │
+│                                     │
+│ ┌─────────────────────────────────┐ │
+│ │  Location Sharing               │ │
+│ │  ● Enabled                      │ │
+│ └─────────────────────────────────┘ │
+│                                     │
+│ ┌─────────────────────────────────┐ │
+│ │  Contact                        │ │
+│ │  📞 +1-555-0100                 │ │
+│ │  [Call Driver]                  │ │
+│ └─────────────────────────────────┘ │
+│                                     │
+│ ┌─────────────────────────────────┐ │
+│ │  Activity                       │ │
+│ │  🚗 2 assigned runs             │ │
+│ │  👁 5 visible runs              │ │
+│ └─────────────────────────────────┘ │
+└─────────────────────────────────────┘
+```
+
+### Components
+
+**Reusable Components Created:**
+1. **ProfileCard** - White card wrapper with shadow and padding
+2. **SectionHeader** - 17pt semibold section titles
+3. **RoleBadge** - Colored role indicators with uppercase text
+4. **PermissionRow** - Checkmark + permission text
+5. **StatRow** - Icon + statistic text
+
+**Design System Constants:**
+- Colors: Screen background, card background, primary blue, status colors, badge colors, text colors
+- Spacing: 4pt, 8pt, 12pt, 16pt, 20pt, 24pt, 32pt
+- Corner Radius: Small (8pt), Medium (12pt), Large (20pt), XLarge (24pt)
+
+### Card Details
+
+**1. Header Card**
+- 80x80pt circular avatar with deterministic color
+- Member name (22pt bold)
+- Relationship label ("Mom" or "Child")
+- Role badges in flow layout (wraps to multiple rows)
+- Center-aligned layout
+
+**2. Permissions Card**
+- Lists all capabilities from member's roles
+- Green checkmark icon (14pt)
+- Permission text (15pt)
+- 12pt spacing between items
+
+**3. Location Sharing Card**
+- Status indicator: 8pt circle (green=enabled, gray=disabled)
+- Status text: "Enabled" or "Disabled"
+- Description: "Used for real-time tracking during runs"
+
+**4. Contact Card**
+- Phone icon (16pt, info blue) + phone number
+- "Call Driver" button (full width, 48pt height)
+- Only shows button if member has Driver role
+- Falls back to "No contact information" if no phone
+
+**5. Activity Card**
+- Assigned runs stat (drivers only) with car icon
+- Visible runs stat (all members) with eye icon
+- 12pt spacing between rows
+- Data from viewModel.getRunStats()
+
+**6. Demo Card** (Demo mode only)
+- Orange section header "Demo Only"
+- "View as this user" button
+- Caption explaining purpose
+- Only visible when AppConfig.isDemoFlowEnabled
+
+### Accessibility Features
+
+**VoiceOver Labels:**
+- Avatar: "Profile picture for [Name]"
+- Role badges: "[Role] role"
+- Permissions: "Permission: [capability]"
+- Location status: "Location sharing [enabled/disabled]"
+- Call button: "Call [Name]"
+- Demo button: "Switch to [Name]'s view"
+
+**Dynamic Type:**
+- All text scales with system font size
+- Minimum touch targets: 44x44pt
+- Badges wrap to multiple lines if needed
+
+**Color Contrast:**
+- Text on white meets WCAG AA standards
+- Status indicators use text + icon (not color alone)
+
+### Implementation Details
+
+**Files Modified:**
+- `MemberProfileView.swift` - Complete redesign with card-based layout
+- `DesignSystem.swift` - Added corner radius constants
+- `FamilyMemberDisplay.swift` - Added isLocationSharingEnabled field
+
+**Files Created:**
+- `ProfileCard.swift` - Reusable card wrapper
+- `SectionHeader.swift` - Reusable section header
+- `RoleBadge.swift` - Reusable role badge
+- `PermissionRow.swift` - Reusable permission row
+- `StatRow.swift` - Reusable stat row
+
+**Helper Functions:**
+- `avatarColor` - Deterministic color selection based on user ID hash
+- `badgeColor(for:)` - Maps badge color enum to design system colors
+- `FlowLayout` - Custom layout for wrapping badges
+
+### Testing Scenarios
+
+**Visual Testing:**
+- ✓ Profile displays correctly for parent with Admin + Driver roles
+- ✓ Profile displays correctly for child with Observer role
+- ✓ Avatar colors are consistent for same user
+- ✓ Badges wrap correctly with many roles
+- ✓ Cards have proper spacing and shadows
+- ✓ Text is readable and properly sized
+
+**Interaction Testing:**
+- ✓ "Done" button dismisses profile
+- ✓ "Call Driver" button initiates phone call
+- ✓ Demo "Switch User" shows confirmation alert
+- ✓ Demo switch updates context and dismisses
+- ✓ ScrollView scrolls smoothly
+
+**Edge Cases:**
+- ✓ Profile handles missing phone number gracefully
+- ✓ Profile handles long names without breaking layout
+- ✓ Profile handles many role badges with wrapping
+- ✓ Demo section only appears when demo mode enabled
+
+### Design Goals Achieved
+
+✅ **Visual Consistency** - Matches TribeBoard's design language
+✅ **Clarity** - Member's roles and permissions are immediately clear
+✅ **Usability** - Profile loads quickly, navigation is intuitive
+✅ **Emotional Tone** - Calm, reassuring, family-safe, premium but approachable

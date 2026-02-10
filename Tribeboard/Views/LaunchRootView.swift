@@ -48,96 +48,8 @@ struct LaunchRootView: View {
     
     @ViewBuilder
     private var demoFlowContent: some View {
-        VStack(spacing: 0) {
-            // User switcher at the top
-            userSwitcherView
-                .padding()
-                .background(Color(.systemBackground))
-                .shadow(color: Color.black.opacity(0.1), radius: 2, y: 1)
-            
-            // Main tab navigation
-            MainNavigationView(dependencyContainer: dependencyContainer)
-        }
-    }
-    
-    /// User switcher control for demo mode
-    @ViewBuilder
-    private var userSwitcherView: some View {
-        VStack(spacing: 12) {
-            Text("Switch User")
-                .font(.caption)
-                .foregroundColor(.secondary)
-            
-            Picker("User", selection: $selectedUserId) {
-                Text("Rue Mawere").tag(DemoSeedDataService.rueId)
-                Text("Tafadzwa Mawere").tag(DemoSeedDataService.tafadzwaId)
-                Text("TJ").tag(DemoSeedDataService.tjId)
-                Text("Tawana").tag(DemoSeedDataService.tawanaId)
-            }
-            .pickerStyle(.segmented)
-            .onChange(of: selectedUserId) { oldValue, newValue in
-                switchUser(to: newValue)
-            }
-        }
-    }
-    
-    /// Get display name for current user
-    private func getCurrentUserDisplayName() -> String {
-        switch selectedUserId {
-        case DemoSeedDataService.rueId:
-            return "Rue Mawere"
-        case DemoSeedDataService.tafadzwaId:
-            return "Tafadzwa Mawere"
-        case DemoSeedDataService.tjId:
-            return "TJ"
-        case DemoSeedDataService.tawanaId:
-            return "Tawana"
-        default:
-            return "Unknown"
-        }
-    }
-    
-    /// Switch to a different demo user
-    private func switchUser(to userId: String) {
-        let (displayName, role) = getUserInfo(for: userId)
-        
-        dependencyContainer.roleManagementService.setCurrentUser(
-            userId: userId,
-            displayName: displayName,
-            role: role,
-            familyId: DemoSeedDataService.demoFamilyId
-        )
-        
-        // Update ViewModel with new role context and reload data
-        dependencyContainer.homeDashboardViewModel.updateRoleContext(
-            userId: userId,
-            displayName: displayName,
-            role: role,
-            familyId: DemoSeedDataService.demoFamilyId
-        )
-        
-        // Update debug overlay
-        #if DEBUG
-        DebugStateManager.shared.updateCurrentUser(id: userId, mode: role.displayName)
-        #endif
-        
-        print("🔄 Switched to user: \(displayName) (role: \(role.displayName))")
-    }
-    
-    /// Get user info for a given user ID
-    private func getUserInfo(for userId: String) -> (displayName: String, role: FamilyRole) {
-        switch userId {
-        case DemoSeedDataService.rueId:
-            return ("Rue Mawere", .observer) // Parent/Admin/Observer
-        case DemoSeedDataService.tafadzwaId:
-            return ("Tafadzwa Mawere", .driver) // Parent/Admin/Driver
-        case DemoSeedDataService.tjId:
-            return ("TJ", .observer) // Child/Passenger
-        case DemoSeedDataService.tawanaId:
-            return ("Tawana", .observer) // Child/Passenger
-        default:
-            return ("Unknown", .observer)
-        }
+        // Main tab navigation (user switching now in Settings)
+        MainNavigationView(dependencyContainer: dependencyContainer)
     }
     
     #if DEBUG
@@ -247,14 +159,45 @@ struct LaunchRootView: View {
             // In demo flow mode, wait for seed to complete first
             await dependencyContainer.demoSeedDataService.seedDemoFamily()
             
-            // Then set up initial user (Rue by default)
-            switchUser(to: selectedUserId)
+            // Set up initial user (Rue by default)
+            let (displayName, role) = getUserInfo(for: selectedUserId)
+            dependencyContainer.roleManagementService.setCurrentUser(
+                userId: selectedUserId,
+                displayName: displayName,
+                role: role,
+                familyId: DemoSeedDataService.demoFamilyId
+            )
+            
+            dependencyContainer.homeDashboardViewModel.updateRoleContext(
+                userId: selectedUserId,
+                displayName: displayName,
+                role: role,
+                familyId: DemoSeedDataService.demoFamilyId
+            )
+            
+            DebugStateManager.shared.updateCurrentUser(id: selectedUserId, mode: role.displayName)
             return
         }
         #endif
         
         // In active run only mode, load the active run
         await loadActiveRun()
+    }
+    
+    /// Get user info for a given user ID
+    private func getUserInfo(for userId: String) -> (displayName: String, role: FamilyRole) {
+        switch userId {
+        case DemoSeedDataService.rueId:
+            return ("Rue Mawere", .observer) // Parent/Admin/Observer
+        case DemoSeedDataService.tafadzwaId:
+            return ("Tafadzwa Mawere", .driver) // Parent/Admin/Driver
+        case DemoSeedDataService.tjId:
+            return ("TJ", .observer) // Child/Passenger
+        case DemoSeedDataService.tawanaId:
+            return ("Tawana", .observer) // Child/Passenger
+        default:
+            return ("Unknown", .observer)
+        }
     }
     
     @MainActor
