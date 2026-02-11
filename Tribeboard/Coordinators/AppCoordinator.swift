@@ -308,6 +308,10 @@ class AppCoordinator: ObservableObject {
                 viewModel: dependencyContainer.createScheduleEditorViewModel(existingSchedule: schedule)
             )
             .environmentObject(self)
+        case .settings:
+            SettingsView()
+                .withDependencyContainer(dependencyContainer)
+                .environmentObject(self)
         }
     }
     
@@ -417,6 +421,7 @@ enum SheetType: Identifiable {
     case calendar
     case dayScheduleList(date: Date)
     case scheduleEditor(schedule: RunSchedule?)
+    case settings
     
     var id: String {
         switch self {
@@ -440,6 +445,8 @@ enum SheetType: Identifiable {
             } else {
                 return "scheduleEditor-new"
             }
+        case .settings:
+            return "settings"
         }
     }
 }

@@ -107,39 +107,37 @@ struct CalendarView: View {
     // MARK: - Body
     
     var body: some View {
-        NavigationView {
-            VStack(spacing: 0) {
-                // Month navigation header
-                monthNavigationHeader
-                    .padding(.horizontal, DesignSystem.Spacing.spacing16)
-                    .padding(.vertical, DesignSystem.Spacing.spacing12)
-                
-                Divider()
-                
-                ScrollView {
-                    VStack(spacing: DesignSystem.Spacing.spacing20) {
-                        // Calendar grid
-                        monthGridView
+        VStack(spacing: 0) {
+            // Month navigation header
+            monthNavigationHeader
+                .padding(.horizontal, DesignSystem.Spacing.spacing16)
+                .padding(.vertical, DesignSystem.Spacing.spacing12)
+            
+            Divider()
+            
+            ScrollView {
+                VStack(spacing: DesignSystem.Spacing.spacing20) {
+                    // Calendar grid
+                    monthGridView
+                        .padding(.horizontal, DesignSystem.Spacing.spacing16)
+                        .padding(.top, DesignSystem.Spacing.spacing16)
+                    
+                    // Selected day occurrences
+                    if !viewModel.occurrences(for: selectedDate).isEmpty {
+                        selectedDayOccurrencesView
                             .padding(.horizontal, DesignSystem.Spacing.spacing16)
-                            .padding(.top, DesignSystem.Spacing.spacing16)
-                        
-                        // Selected day occurrences
-                        if !viewModel.occurrences(for: selectedDate).isEmpty {
-                            selectedDayOccurrencesView
-                                .padding(.horizontal, DesignSystem.Spacing.spacing16)
-                        }
                     }
-                    .padding(.bottom, DesignSystem.Spacing.spacing20)
                 }
-                .background(DesignSystem.Colors.screenBackground)
+                .padding(.bottom, DesignSystem.Spacing.spacing20)
             }
-            .navigationTitle("Calendar")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        dismiss()
-                    }
+            .background(DesignSystem.Colors.screenBackground)
+        }
+        .navigationTitle("Calendar")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button("Done") {
+                    dismiss()
                 }
             }
         }

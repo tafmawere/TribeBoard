@@ -15,20 +15,22 @@ enum DesignSystem {
     // MARK: - Colors
     
     enum Colors {
-        // Background
-        static let screenBackground = Color(hex: "F9FAFB")
-        static let cardBackground = Color.white
+        // Background - Semantic colors that adapt to dark mode
+        static let screenBackground = Color(.systemBackground)
+        static let cardBackground = Color(.systemBackground)
+        static let cardBackgroundSecondary = Color(.secondarySystemBackground)
         
-        // Primary Actions
+        // Primary Actions - Fixed brand color that works in both modes
+        static let primaryBrand = Color(hex: "6B81F1")  // Periwinkle Blue - Primary brand color
         static let primaryBlue = Color(hex: "6366F1")
         static let primaryBlueLight = Color(hex: "6366F1").opacity(0.1)
         
-        // Status Colors
+        // Status Colors - Fixed colors that work in both modes
         static let successGreen = Color(hex: "10B981")
         static let warningOrange = Color(hex: "F59E0B")
         static let infoBlue = Color(hex: "3B82F6")
         
-        // Badge Colors
+        // Badge Colors - Fixed colors that work in both modes
         static let adminBadge = Color(hex: "F59E0B")      // Orange
         static let driverBadge = Color(hex: "6366F1")     // Indigo-blue
         static let observerBadge = Color(hex: "8B5CF6")   // Purple
@@ -36,10 +38,10 @@ enum DesignSystem {
         static let childBadge = Color(hex: "3B82F6")      // Blue
         static let passengerBadge = Color(hex: "10B981")  // Green
         
-        // Text
-        static let textPrimary = Color(hex: "1F2937")
-        static let textSecondary = Color(hex: "6B7280")
-        static let textTertiary = Color(hex: "9CA3AF")
+        // Text - Semantic colors that adapt to dark mode
+        static let textPrimary = Color(.label)
+        static let textSecondary = Color(.secondaryLabel)
+        static let textTertiary = Color(.tertiaryLabel)
     }
     
     // MARK: - Spacing
@@ -78,12 +80,50 @@ enum DesignSystem {
     // MARK: - Shadows
     
     enum Shadow {
+        // Card shadows for home dashboard redesign
+        // Note: Shadow opacity adapts automatically in dark mode via Color(.systemGray)
         static let card: (color: Color, radius: CGFloat, x: CGFloat, y: CGFloat) = (
-            Color.black.opacity(0.04), 8, 0, 2
+            Color.black.opacity(0.1), 8, 0, 2
         )
         static let cardSecondary: (color: Color, radius: CGFloat, x: CGFloat, y: CGFloat) = (
             Color.black.opacity(0.02), 2, 0, 1
         )
+        
+        // Floating button shadow
+        static let floating: (color: Color, radius: CGFloat, x: CGFloat, y: CGFloat) = (
+            Color.black.opacity(0.3), 8, 0, 4
+        )
+        
+        // Dark mode aware shadow color
+        static var adaptiveShadow: Color {
+            Color(.systemGray).opacity(0.3)
+        }
+    }
+    
+    // MARK: - Typography
+    
+    enum Typography {
+        // Font sizes for home dashboard with Dynamic Type support
+        static let title: Font = .title2
+        static let heading: Font = .headline
+        static let body: Font = .body
+        static let caption: Font = .caption
+        static let captionBold: Font = .caption.bold()
+        
+        // Custom scalable fonts for specific use cases
+        static func scaledFont(size: CGFloat, weight: Font.Weight = .regular) -> Font {
+            return .system(size: size, weight: weight)
+        }
+    }
+    
+    // MARK: - Accessibility
+    
+    enum Accessibility {
+        /// Minimum touch target size (44x44pt per Apple HIG)
+        static let minimumTouchTarget: CGFloat = 44
+        
+        /// Recommended touch target size for primary actions
+        static let recommendedTouchTarget: CGFloat = 48
     }
 }
 
@@ -114,4 +154,88 @@ extension Color {
             opacity: Double(a) / 255
         )
     }
+}
+
+// MARK: - StatusBadgeView Component
+
+/// Reusable badge component for displaying status information
+/// Supports primary, secondary, success, and warning styles
+struct StatusBadgeView: View {
+    let text: String
+    let style: BadgeStyle
+    
+    enum BadgeStyle {
+        case primary
+        case secondary
+        case success
+        case warning
+        
+        var backgroundColor: Color {
+            switch self {
+            case .primary:
+                return DesignSystem.Colors.primaryBrand
+            case .secondary:
+                // Use semantic color that adapts to dark mode
+                return Color(.secondarySystemFill)
+            case .success:
+                return DesignSystem.Colors.successGreen
+            case .warning:
+                return DesignSystem.Colors.warningOrange
+            }
+        }
+        
+        var textColor: Color {
+            switch self {
+            case .primary, .success, .warning:
+                return .white
+            case .secondary:
+                // Use semantic text color that adapts to dark mode
+                return Color(.label)
+            }
+        }
+    }
+    
+    var body: some View {
+        Text(text.uppercased())
+            .font(DesignSystem.Typography.captionBold)
+            .foregroundColor(style.textColor)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(
+                Capsule()
+                    .fill(style.backgroundColor)
+            )
+    }
+}
+
+// MARK: - StatusBadgeView Previews
+
+#Preview("Primary Badge") {
+    StatusBadgeView(text: "1 Active Run", style: .primary)
+        .padding()
+}
+
+#Preview("Secondary Badge") {
+    StatusBadgeView(text: "Sync: Just Now", style: .secondary)
+        .padding()
+}
+
+#Preview("Success Badge") {
+    StatusBadgeView(text: "Completed", style: .success)
+        .padding()
+}
+
+#Preview("Warning Badge") {
+    StatusBadgeView(text: "Delayed", style: .warning)
+        .padding()
+}
+
+#Preview("All Badge Styles") {
+    VStack(spacing: 16) {
+        StatusBadgeView(text: "Primary", style: .primary)
+        StatusBadgeView(text: "Secondary", style: .secondary)
+        StatusBadgeView(text: "Success", style: .success)
+        StatusBadgeView(text: "Warning", style: .warning)
+    }
+    .padding()
 }

@@ -219,11 +219,8 @@ class CacheManagementService: ObservableObject {
                 stats.eventsCount = try context.count(for: eventFetchRequest)
                 
             } catch {
-                logger.logError(
-                    error,
-                    context: .cacheManagement,
-                    additionalInfo: ["operation": "cache_statistics"]
-                )
+                // Silently fail - statistics gathering is non-critical
+                // Partial stats will be returned with zero counts for failed operations
             }
         }
         

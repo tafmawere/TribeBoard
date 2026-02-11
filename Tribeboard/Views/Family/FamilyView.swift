@@ -20,24 +20,23 @@ struct FamilyView: View {
     }
     
     var body: some View {
-        NavigationView {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    // Family name header (editable for admins)
-                    if viewModel.isAdmin {
-                        familyNameHeader
-                    }
-                    
-                    // Demo hint
-                    HStack {
-                        Image(systemName: "info.circle")
-                            .foregroundColor(.blue)
-                        Text("Demo family — can be removed later")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                    .padding(.horizontal)
-                    .padding(.top, viewModel.isAdmin ? 0 : 8)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                // Family name header (editable for admins)
+                if viewModel.isAdmin {
+                    familyNameHeader
+                }
+                
+                // Demo hint
+                HStack {
+                    Image(systemName: "info.circle")
+                        .foregroundColor(.blue)
+                    Text("Demo family — can be removed later")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .padding(.horizontal)
+                .padding(.top, viewModel.isAdmin ? 0 : 8)
                     
                     // Family members grid
                     if viewModel.isLoading {
@@ -77,19 +76,18 @@ struct FamilyView: View {
                         }
                     }
                 }
-            }
-            .sheet(item: $selectedMember) { member in
-                MemberProfileView(member: member, viewModel: viewModel)
-            }
-            .sheet(isPresented: $showingFamilySettings) {
-                FamilySettingsView(viewModel: viewModel)
-            }
-            .sheet(isPresented: $showingAddMember) {
-                AddFamilyMemberView(viewModel: viewModel)
-            }
-            .onAppear {
-                viewModel.loadFamilyMembers()
-            }
+        }
+        .sheet(item: $selectedMember) { member in
+            MemberProfileView(member: member, viewModel: viewModel)
+        }
+        .sheet(isPresented: $showingFamilySettings) {
+            FamilySettingsView(viewModel: viewModel)
+        }
+        .sheet(isPresented: $showingAddMember) {
+            AddFamilyMemberView(viewModel: viewModel)
+        }
+        .onAppear {
+            viewModel.loadFamilyMembers()
         }
     }
     

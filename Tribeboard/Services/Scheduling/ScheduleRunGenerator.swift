@@ -112,7 +112,7 @@ class ScheduleRunGenerator {
                 currentDate = nextDate
             }
             
-        case .weekly(let weekdays):
+        case .weekly(_):
             // Generate preview only on specified weekdays
             var currentDate = effectiveStartDate
             while currentDate <= effectiveEndDate {

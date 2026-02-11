@@ -32,22 +32,21 @@ struct MyRunsView: View {
     }
     
     var body: some View {
-        NavigationView {
-            VStack(spacing: 0) {
-                // Tab Selector
-                Picker("", selection: $selectedTab) {
-                    ForEach(RunTab.allCases, id: \.self) { tab in
-                        Text(tab.rawValue).tag(tab)
-                    }
+        VStack(spacing: 0) {
+            // Tab Selector
+            Picker("", selection: $selectedTab) {
+                ForEach(RunTab.allCases, id: \.self) { tab in
+                    Text(tab.rawValue).tag(tab)
                 }
-                .pickerStyle(.segmented)
-                .padding()
-                
-                // Content
-                if viewModel.isLoading {
-                    Spacer()
-                    ProgressView()
-                    Spacer()
+            }
+            .pickerStyle(.segmented)
+            .padding()
+            
+            // Content
+            if viewModel.isLoading {
+                Spacer()
+                ProgressView()
+                Spacer()
                 } else {
                     ScrollView {
                         VStack(spacing: 16) {
@@ -78,37 +77,36 @@ struct MyRunsView: View {
                     }
                 }
             }
-            .navigationTitle("My Runs")
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    HStack(spacing: 16) {
-                        Button(action: {
-                            appCoordinator.presentSheet(.calendar)
-                        }) {
-                            Image(systemName: "calendar")
-                        }
-                        
-                        Button(action: {
-                            appCoordinator.presentSheet(.runCreation)
-                        }) {
-                            Image(systemName: "plus")
-                        }
+        .navigationTitle("My Runs")
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                HStack(spacing: 16) {
+                    Button(action: {
+                        appCoordinator.presentSheet(.calendar)
+                    }) {
+                        Image(systemName: "calendar")
+                    }
+                    
+                    Button(action: {
+                        appCoordinator.presentSheet(.runCreation)
+                    }) {
+                        Image(systemName: "plus")
                     }
                 }
             }
-            .refreshable {
-                await viewModel.refreshData()
-                loadSchedulePreviews()
-            }
-            .task {
-                loadSchedulePreviews()
-            }
-            .onChange(of: selectedTab) {
-                loadSchedulePreviews()
-            }
-            .sheet(item: $appCoordinator.presentedSheet) { sheet in
-                appCoordinator.createSheetView(for: sheet)
-            }
+        }
+        .refreshable {
+            await viewModel.refreshData()
+            loadSchedulePreviews()
+        }
+        .task {
+            loadSchedulePreviews()
+        }
+        .onChange(of: selectedTab) {
+            loadSchedulePreviews()
+        }
+        .sheet(item: $appCoordinator.presentedSheet) { sheet in
+            appCoordinator.createSheetView(for: sheet)
         }
     }
     

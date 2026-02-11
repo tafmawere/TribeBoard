@@ -12,14 +12,7 @@ import SwiftUI
 struct MainNavigationView: View {
     @StateObject private var appCoordinator: AppCoordinator
     @Environment(\.dependencyContainer) private var dependencyContainer
-    @State private var selectedTab: MainTab = .myRuns
-    
-    enum MainTab {
-        case myRuns
-        case family
-        case activity
-        case settings
-    }
+    @State private var selectedTab: MainTab = .home
     
     init(dependencyContainer: DependencyContainer) {
         self._appCoordinator = StateObject(wrappedValue: AppCoordinator(dependencyContainer: dependencyContainer))
@@ -45,44 +38,43 @@ struct MainNavigationView: View {
     
     private var demoFlowTabView: some View {
         TabView(selection: $selectedTab) {
-            // Tab 1: My Runs
+            HomeDashboardView()
+                .tabItem {
+                    Label("Home", systemImage: "house.fill")
+                }
+                .tag(MainTab.home)
+            
             MyRunsView(
                 viewModel: dependencyContainer.homeDashboardViewModel,
                 scheduleRunGenerator: dependencyContainer.scheduleRunGenerator
             )
-                .withDependencyContainer(dependencyContainer)
-                .environmentObject(appCoordinator)
-                .tabItem {
-                    Label("My Runs", systemImage: "car.fill")
-                }
-                .tag(MainTab.myRuns)
+            .tabItem {
+                Label("Runs", systemImage: "car.fill")
+            }
+            .tag(MainTab.runs)
             
-            // Tab 2: Family
-            FamilyView(viewModel: createFamilyViewModel())
-                .withDependencyContainer(dependencyContainer)
-                .environmentObject(appCoordinator)
-                .tabItem {
-                    Label("Family", systemImage: "person.3.fill")
-                }
-                .tag(MainTab.family)
+            NavigationStack {
+                CalendarView(viewModel: CalendarViewModel(generator: dependencyContainer.scheduleRunGenerator))
+            }
+            .tabItem {
+                Label("Calendar", systemImage: "calendar")
+            }
+            .tag(MainTab.calendar)
             
-            // Tab 3: Activity
             ActivityPlaceholderView()
-                .withDependencyContainer(dependencyContainer)
-                .environmentObject(appCoordinator)
                 .tabItem {
-                    Label("Activity", systemImage: "list.bullet")
+                    Label("Feed", systemImage: "list.bullet")
                 }
-                .tag(MainTab.activity)
+                .tag(MainTab.feed)
             
-            // Tab 4: Settings
-            SettingsView()
-                .withDependencyContainer(dependencyContainer)
+            FamilyView(viewModel: createFamilyViewModel())
                 .tabItem {
-                    Label("Settings", systemImage: "gear")
+                    Label("Tribe", systemImage: "person.3.fill")
                 }
-                .tag(MainTab.settings)
+                .tag(MainTab.tribe)
         }
+        .withDependencyContainer(dependencyContainer)
+        .environmentObject(appCoordinator)
         .sheet(item: $appCoordinator.presentedSheet) { sheet in
             appCoordinator.createSheetView(for: sheet)
         }
@@ -184,69 +176,103 @@ struct HomeDashboardView: View {
     }
     
     var body: some View {
-        VStack(spacing: 20) {
-            // Header
-            HStack {
-                VStack(alignment: .leading) {
-                    Text("TribeBoard")
-                        .font(.largeTitle)
-                        .fontWeight(.bold)
+        ZStack(alignment: .bottomTrailing) {
+            ScrollView {
+                VStack(spacing: 20) {
+                    // Modern Header
+                    ModernHeaderView(
+                        userDisplayName: viewModel.currentUser.displayName,
+                        profileImageURL: viewModel.currentUser.avatarURL,
+                        onSettingsTap: {
+                            appCoordinator.presentSheet(.settings)
+                        }
+                    )
+                    .accessibilityElement(children: .contain)
                     
-                    Text("Welcome, \(viewModel.currentUser.displayName)")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                }
-                
-                Spacer()
-                
-                // Role indicator
-                RoleIndicatorView(role: dependencyContainer.roleManagementService.currentUserRole)
-            }
-            .padding(.horizontal)
-            
-            // Quick Actions
-            QuickActionsView()
-            
-            // Active Run Section
-            if let activeRun = viewModel.activeRun {
-                ActiveRunCardView(run: activeRun) {
-                    appCoordinator.navigateBasedOnRole(for: activeRun)
-                }
-            }
-            
-            // Next Run Section
-            if let nextRun = viewModel.nextRun {
-                NextRunCardView(run: nextRun) {
-                    appCoordinator.navigate(to: .runDetail(runId: nextRun.id))
-                }
-            }
-            
-            // Today's Events
-            if !viewModel.todayEvents.isEmpty {
-                TodayEventsView(events: viewModel.todayEvents) { event in
-                    if let runId = event.runId {
-                        appCoordinator.navigate(to: .runDetail(runId: runId))
+                    // Loading indicator during refresh
+                    if viewModel.refreshing {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle())
+                            .padding(.top, 8)
+                            .accessibilityLabel("Loading")
                     }
+                    
+                    // Date and Status
+                    DateAndStatusView(
+                        currentDate: Date(),
+                        activeRunCount: viewModel.activeRunCount,
+                        lastSyncTime: viewModel.lastSyncTime
+                    )
+                    .padding(.horizontal)
+                    
+                    // What's Next Section
+                    if let _ = viewModel.featuredEventData,
+                       let nextRun = viewModel.nextRun {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("What's Next")
+                                .font(.title2)
+                                .fontWeight(.bold)
+                                .padding(.horizontal)
+                                .accessibilityAddTraits(.isHeader)
+                            
+                            FeaturedEventCard(
+                                run: nextRun,
+                                onViewDetails: {
+                                    appCoordinator.navigate(to: .runDetail(runId: nextRun.id))
+                                },
+                                onShare: {
+                                    // TODO: Implement share functionality
+                                    appCoordinator.showAlert(message: "Share coming soon")
+                                }
+                            )
+                            .padding(.horizontal)
+                        }
+                    }
+                    
+                    // Today's Runs Section
+                    if !viewModel.todayRunCards.isEmpty {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Today's Runs")
+                                .font(.title2)
+                                .fontWeight(.bold)
+                                .padding(.horizontal)
+                                .accessibilityAddTraits(.isHeader)
+                            
+                            LazyVStack(spacing: 12) {
+                                ForEach(viewModel.todayRunCards, id: \.id) { runCard in
+                                    if let run = viewModel.getDisplayRuns().first(where: { $0.id == runCard.id }) {
+                                        CompactRunCard(run: run) {
+                                            appCoordinator.navigate(to: .runDetail(runId: run.id))
+                                        }
+                                    }
+                                }
+                            }
+                            .padding(.horizontal)
+                        }
+                    }
+                    
+                    // Bottom padding to account for floating button and navigation
+                    Spacer()
+                        .frame(height: 100)
                 }
+                .padding(.top)
             }
+            .refreshable {
+                await viewModel.refreshData()
+            }
+            .accessibilityElement(children: .contain)
             
-            Spacer()
-        }
-        .navigationTitle("Home")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button("Create Run") {
-                    appCoordinator.presentSheet(.runCreation)
-                }
+            // Floating Create Button
+            FloatingCreateButton {
+                appCoordinator.presentSheet(.runCreation)
             }
+            .padding(.trailing, 16)
+            .padding(.bottom, 80) // Account for bottom navigation
         }
+        .navigationBarHidden(true)
         .onAppear {
             // Load initial data
             viewModel.loadData()
-        }
-        .refreshable {
-            await viewModel.refreshData()
         }
     }
 }
@@ -325,7 +351,7 @@ struct QuickActionButton: View {
                     .multilineTextAlignment(.center)
             }
             .frame(width: 80, height: 80)
-            .background(Color.gray.opacity(0.1))
+            .background(Color(.secondarySystemFill))
             .cornerRadius(12)
         }
         .buttonStyle(PlainButtonStyle())
