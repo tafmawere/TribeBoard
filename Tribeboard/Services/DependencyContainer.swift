@@ -302,26 +302,8 @@ class DependencyContainer: ObservableObject {
         return Step4StopsViewModel()
     }
     
-    // MARK: - Calendar ViewModels
-    
-    func createCalendarViewModel() -> CalendarViewModel {
-        return CalendarViewModel(generator: scheduleRunGenerator)
-    }
-    
-    func createDayScheduleViewModel(appCoordinator: AppCoordinator) -> DayScheduleViewModel {
-        return DayScheduleViewModel(
-            generator: scheduleRunGenerator,
-            materializer: runMaterializer,
-            appCoordinator: appCoordinator
-        )
-    }
-    
-    func createScheduleEditorViewModel(existingSchedule: RunSchedule? = nil) -> ScheduleEditorViewModel {
-        return ScheduleEditorViewModel(
-            scheduleStore: scheduleStore,
-            existingSchedule: existingSchedule
-        )
-    }
+    // MARK: - Calendar ViewModels (REMOVED - Backend Clean Build)
+    // All calendar ViewModels removed in backend-only build
     
     // MARK: - Initialization
     
