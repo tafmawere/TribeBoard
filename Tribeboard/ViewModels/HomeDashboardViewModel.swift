@@ -61,6 +61,7 @@ class HomeDashboardViewModel: ObservableObject, HomeDashboardContract {
         #if DEBUG
         if AppConfig.isActiveRunOnlyMode {
             self._currentUser = AppConfig.currentDemoUser
+            print("🔍 DIAGNOSTIC [Init]: Using AppConfig.currentDemoUser - id: \(AppConfig.currentDemoUser.id), familyId: \(AppConfig.currentDemoUser.familyId), role: \(AppConfig.currentDemoUser.role)")
         } else {
             self._currentUser = User(
                 id: roleManagementService.currentUserId,
@@ -68,6 +69,7 @@ class HomeDashboardViewModel: ObservableObject, HomeDashboardContract {
                 role: roleManagementService.currentUserRole,
                 familyId: roleManagementService.currentFamilyId
             )
+            print("🔍 DIAGNOSTIC [Init]: Using RoleManagementService - id: \(roleManagementService.currentUserId), familyId: \(roleManagementService.currentFamilyId), role: \(roleManagementService.currentUserRole)")
         }
         #else
         self._currentUser = User(
@@ -76,6 +78,7 @@ class HomeDashboardViewModel: ObservableObject, HomeDashboardContract {
             role: roleManagementService.currentUserRole,
             familyId: roleManagementService.currentFamilyId
         )
+        print("🔍 DIAGNOSTIC [Init]: Using RoleManagementService (Release) - id: \(roleManagementService.currentUserId), familyId: \(roleManagementService.currentFamilyId), role: \(roleManagementService.currentUserRole)")
         #endif
         
         self.roleContext = RoleContext(
@@ -274,8 +277,17 @@ class HomeDashboardViewModel: ObservableObject, HomeDashboardContract {
         // Load all runs from service (this would be a real service call)
         let allRuns = await loadAllRunsFromService()
         
+        // DIAGNOSTIC: Log role context
+        print("🔍 DIAGNOSTIC: Role context - userId: \(roleContext.userId), role: \(roleContext.role), familyId: \(roleContext.familyId)")
+        print("🔍 DIAGNOSTIC: All runs count before filtering: \(allRuns.count)")
+        
         // Filter runs based on user role using RoleBasedDataFilter
         filteredRuns = RoleBasedDataFilter.filterRuns(allRuns, for: roleContext)
+        
+        print("🔍 DIAGNOSTIC: Filtered runs count after filtering: \(filteredRuns.count)")
+        for run in filteredRuns {
+            print("   - Filtered run: \(run.title) (id: \(run.id), status: \(run.status.displayName), scheduledTime: \(run.scheduledTime))")
+        }
         
         // Update next and active runs from filtered results
         updateNextAndActiveRuns()
@@ -303,8 +315,14 @@ class HomeDashboardViewModel: ObservableObject, HomeDashboardContract {
         let today = Calendar.current.startOfDay(for: Date())
         let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: today)!
         
+        print("🔍 DIAGNOSTIC: Today's range: \(today) to \(tomorrow)")
+        print("🔍 DIAGNOSTIC: Checking \(filteredRuns.count) filtered runs for today's events")
+        
         let allEvents: [Event] = filteredRuns.compactMap { run in
-            guard run.scheduledTime >= today && run.scheduledTime < tomorrow else { return nil }
+            let isToday = run.scheduledTime >= today && run.scheduledTime < tomorrow
+            print("   - Run '\(run.title)' scheduled at \(run.scheduledTime): isToday=\(isToday)")
+            
+            guard isToday else { return nil }
             
             let eventType: EventType
             switch run.status {
@@ -328,6 +346,8 @@ class HomeDashboardViewModel: ObservableObject, HomeDashboardContract {
             )
         }
         
+        print("🔍 DIAGNOSTIC: Today events before role filter: \(allEvents.count)")
+        
         // Filter events based on role using RoleBasedDataFilter
         _todayEvents = RoleBasedDataFilter.filterDashboardData(
             runs: filteredRuns,
@@ -335,18 +355,35 @@ class HomeDashboardViewModel: ObservableObject, HomeDashboardContract {
             roleContext: roleContext
         ).events
         
+        print("🔍 DIAGNOSTIC: Today events after role filter: \(_todayEvents.count)")
+        
         // Sort events by time
         _todayEvents.sort { $0.time < $1.time }
     }
     
     private func updateNextAndActiveRuns() {
+        // DIAGNOSTIC: Log current time and candidates
+        let now = Date()
+        print("🔍 DIAGNOSTIC: Current time: \(now)")
+        print("🔍 DIAGNOSTIC: Checking for next run from \(filteredRuns.count) filtered runs")
+        
+        let scheduledFutureRuns = filteredRuns.filter { $0.status == .scheduled && $0.scheduledTime > Date() }
+        print("🔍 DIAGNOSTIC: Scheduled future runs count: \(scheduledFutureRuns.count)")
+        for run in scheduledFutureRuns {
+            print("   - Candidate: \(run.title) scheduled at \(run.scheduledTime) (in \(run.scheduledTime.timeIntervalSince(now)) seconds)")
+        }
+        
         // Find next scheduled run
         _nextRun = filteredRuns
             .filter { $0.status == .scheduled && $0.scheduledTime > Date() }
             .min { $0.scheduledTime < $1.scheduledTime }
         
+        print("🔍 DIAGNOSTIC: Next run selected: \(_nextRun?.title ?? "nil")")
+        
         // Find active run
         _activeRun = filteredRuns.first { $0.status.isActive }
+        
+        print("🔍 DIAGNOSTIC: Active run selected: \(_activeRun?.title ?? "nil")")
     }
     
     /// Update available actions based on user role - Requirements 5.2, 5.3, 5.4
