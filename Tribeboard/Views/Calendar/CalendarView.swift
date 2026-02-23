@@ -1,0 +1,426 @@
+import SwiftUI
+import Foundation
+
+enum CalendarMockModel {
+    struct UIStop: Identifiable, Hashable {
+        let id: UUID
+        var type: String
+        var label: String
+        var address: String
+
+        init(id: UUID = UUID(), type: String, label: String, address: String) {
+            self.id = id
+            self.type = type
+            self.label = label
+            self.address = address
+        }
+    }
+
+    struct UISchedule: Identifiable, Hashable {
+        let id: UUID
+        var title: String
+        var timeString: String
+        var recurrenceLabel: String
+        var driverName: String
+        var passengerNames: [String]
+        var isEnabled: Bool
+        var stops: [UIStop]
+
+        init(
+            id: UUID = UUID(),
+            title: String,
+            timeString: String,
+            recurrenceLabel: String,
+            driverName: String,
+            passengerNames: [String],
+            isEnabled: Bool,
+            stops: [UIStop]
+        ) {
+            self.id = id
+            self.title = title
+            self.timeString = timeString
+            self.recurrenceLabel = recurrenceLabel
+            self.driverName = driverName
+            self.passengerNames = passengerNames
+            self.isEnabled = isEnabled
+            self.stops = stops
+        }
+    }
+
+    enum OccurrenceStatus: Hashable {
+        case none
+        case alreadyCreated
+    }
+
+    struct UIScheduleOccurrence: Identifiable, Hashable {
+        let id: UUID
+        var schedule: UISchedule
+        var date: Date
+        var status: OccurrenceStatus
+        var subtitle: String
+
+        init(
+            id: UUID = UUID(),
+            schedule: UISchedule,
+            date: Date,
+            status: OccurrenceStatus,
+            subtitle: String
+        ) {
+            self.id = id
+            self.schedule = schedule
+            self.date = date
+            self.status = status
+            self.subtitle = subtitle
+        }
+    }
+}
+
+struct CalendarView: View {
+    @State private var monthDate = Date()
+    @State private var selectedDate = Date()
+    @State private var goToDaySchedule = false
+    @State private var dayScheduleDate = Date()
+
+    @State private var schedules: [CalendarMockModel.UISchedule] = CalendarView.seedSchedules()
+    @State private var createdOccurrenceIDs: Set<UUID> = []
+
+    @State private var editorMode: ScheduleEditorView.Mode = .create
+    @State private var isShowingEditor = false
+
+    private let calendar = Calendar.current
+    private let weekdays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+
+    var body: some View {
+        ZStack {
+            CalendarUITheme.offWhite.ignoresSafeArea()
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    monthHeader
+                    monthGridCard
+                    selectedDaySchedulesSection
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 20)
+            }
+        }
+        .navigationTitle("Calendar")
+        .navigationBarTitleDisplayMode(.inline)
+        .navigationDestination(isPresented: $goToDaySchedule) {
+            DayScheduleListView(
+                date: dayScheduleDate,
+                occurrences: occurrencesForDay(dayScheduleDate)
+            )
+        }
+        .sheet(isPresented: $isShowingEditor) {
+            ScheduleEditorView(mode: editorMode) { savedSchedule in
+                if let index = schedules.firstIndex(where: { $0.id == savedSchedule.id }) {
+                    schedules[index] = savedSchedule
+                } else {
+                    schedules.append(savedSchedule)
+                }
+            }
+        }
+    }
+
+    private var monthHeader: some View {
+        HStack {
+            Button {
+                shiftMonth(-1)
+            } label: {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(CalendarUITheme.textPrimary)
+                    .frame(minWidth: 44, minHeight: 44)
+            }
+
+            Spacer()
+
+            Text(formattedMonth(monthDate))
+                .font(.system(size: 24, weight: .bold))
+                .foregroundStyle(CalendarUITheme.textPrimary)
+
+            Spacer()
+
+            Button {
+                shiftMonth(1)
+            } label: {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(CalendarUITheme.textPrimary)
+                    .frame(minWidth: 44, minHeight: 44)
+            }
+        }
+    }
+
+    private var monthGridCard: some View {
+        CalendarCard {
+            VStack(spacing: 10) {
+                HStack {
+                    ForEach(weekdays, id: \.self) { day in
+                        Text(day)
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(CalendarUITheme.textSecondary)
+                            .frame(maxWidth: .infinity)
+                    }
+                }
+
+                let grid = monthGrid(for: monthDate)
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 7), spacing: 8) {
+                    ForEach(grid.indices, id: \.self) { index in
+                        let item = grid[index]
+                        CalendarDayCell(
+                            dayNumber: item.dayNumber,
+                            isToday: item.date.map(calendar.isDateInToday) ?? false,
+                            isSelected: item.date.map { calendar.isDate($0, inSameDayAs: selectedDate) } ?? false,
+                            hasOccurrences: item.date.map { !occurrencesForDay($0).isEmpty } ?? false
+                        ) {
+                            guard let date = item.date else { return }
+                            selectedDate = date
+                            dayScheduleDate = date
+                            goToDaySchedule = true
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private var selectedDaySchedulesSection: some View {
+        let dayOccurrences = occurrencesForDay(selectedDate).sorted { $0.date < $1.date }
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("Runs for \(formattedDayHeader(selectedDate))")
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundStyle(CalendarUITheme.textPrimary)
+                Spacer()
+            }
+
+            if dayOccurrences.isEmpty {
+                CalendarCard {
+                    VStack(spacing: 10) {
+                        Image(systemName: "calendar.badge.clock")
+                            .font(.system(size: 28, weight: .semibold))
+                            .foregroundStyle(CalendarUITheme.indigo)
+                        Text("No runs scheduled for this day.")
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundStyle(CalendarUITheme.textPrimary)
+                        Button {
+                            editorMode = .create
+                            isShowingEditor = true
+                        } label: {
+                            Text("Create Run")
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 44)
+                                .background(CalendarUITheme.indigo)
+                                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+            } else {
+                ForEach(dayOccurrences) { occurrence in
+                    CalendarOccurrenceCard(
+                        title: occurrence.schedule.title,
+                        time: occurrence.schedule.timeString,
+                        driver: occurrence.schedule.driverName,
+                        passengers: occurrence.schedule.passengerNames,
+                        isCreated: occurrence.status == .alreadyCreated,
+                        subtitle: occurrence.subtitle,
+                        onTap: {
+                            editorMode = .edit(occurrence.schedule)
+                            isShowingEditor = true
+                        },
+                        onCreateRunNow: {
+                            createdOccurrenceIDs.insert(occurrence.id)
+                        },
+                        showsCreateAction: false,
+                        isCompact: true
+                    )
+                }
+                Button {
+                    dayOccurrences.forEach { createdOccurrenceIDs.insert($0.id) }
+                } label: {
+                    Text("Create Runs for This Day")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 48)
+                        .background(CalendarUITheme.indigo)
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 6)
+            }
+        }
+    }
+
+    private func occurrencesForDay(_ date: Date) -> [CalendarMockModel.UIScheduleOccurrence] {
+        occurrencesForMonth(containing: monthDate).filter { calendar.isDate($0.date, inSameDayAs: date) }
+    }
+
+    private func occurrencesForMonth(containing date: Date) -> [CalendarMockModel.UIScheduleOccurrence] {
+        guard
+            let interval = calendar.dateInterval(of: .month, for: date),
+            let range = calendar.range(of: .day, in: .month, for: date)
+        else {
+            return []
+        }
+
+        var generated: [CalendarMockModel.UIScheduleOccurrence] = []
+        for day in range {
+            guard let dayDate = calendar.date(byAdding: .day, value: day - 1, to: interval.start) else { continue }
+            let weekday = calendar.component(.weekday, from: dayDate)
+            let isWeekday = (2...6).contains(weekday)
+
+            for schedule in schedules where schedule.isEnabled {
+                guard shouldOccur(schedule: schedule, isWeekday: isWeekday) else { continue }
+
+                var timeParts = schedule.timeString.replacingOccurrences(of: " ", with: "").uppercased()
+                let isPM = timeParts.hasSuffix("PM")
+                timeParts = timeParts.replacingOccurrences(of: "AM", with: "").replacingOccurrences(of: "PM", with: "")
+                let components = timeParts.split(separator: ":")
+                let parsedHour = Int(components.first ?? "") ?? 7
+                let parsedMinute = Int(components.dropFirst().first ?? "") ?? 0
+                var hour24 = parsedHour % 12
+                if isPM { hour24 += 12 }
+
+                var dc = calendar.dateComponents([.year, .month, .day], from: dayDate)
+                dc.hour = hour24
+                dc.minute = parsedMinute
+                let occurrenceDate = calendar.date(from: dc) ?? dayDate
+
+                var occurrence = CalendarMockModel.UIScheduleOccurrence(
+                    id: deterministicOccurrenceID(scheduleID: schedule.id, date: dayDate),
+                    schedule: schedule,
+                    date: occurrenceDate,
+                    status: .none,
+                    subtitle: schedule.recurrenceLabel
+                )
+                if createdOccurrenceIDs.contains(occurrence.id) {
+                    occurrence.status = .alreadyCreated
+                }
+                generated.append(occurrence)
+            }
+        }
+        return generated.sorted { $0.date < $1.date }
+    }
+
+    private func shouldOccur(schedule: CalendarMockModel.UISchedule, isWeekday: Bool) -> Bool {
+        if schedule.recurrenceLabel.lowercased().contains("weekday") {
+            return isWeekday
+        }
+        return true
+    }
+
+    private func deterministicOccurrenceID(scheduleID: UUID, date: Date) -> UUID {
+        let dayKey = Int(calendar.startOfDay(for: date).timeIntervalSince1970)
+        let seed = scheduleID.uuidString + "-\(dayKey)"
+        let hash = abs(seed.hashValue)
+        let hex = String(format: "%032llx", UInt64(hash))
+        let uuidString = "\(hex.prefix(8))-\(hex.dropFirst(8).prefix(4))-\(hex.dropFirst(12).prefix(4))-\(hex.dropFirst(16).prefix(4))-\(hex.dropFirst(20).prefix(12))"
+        return UUID(uuidString: uuidString) ?? UUID()
+    }
+
+    private func shiftMonth(_ value: Int) {
+        guard let shifted = calendar.date(byAdding: .month, value: value, to: monthDate) else { return }
+        monthDate = shifted
+        if !calendar.isDate(selectedDate, equalTo: shifted, toGranularity: .month) {
+            selectedDate = calendar.startOfDay(for: shifted)
+        }
+    }
+
+    private func formattedMonth(_ date: Date) -> String {
+        let f = DateFormatter()
+        f.dateFormat = "MMMM yyyy"
+        return f.string(from: date)
+    }
+
+    private func formattedDayHeader(_ date: Date) -> String {
+        let f = DateFormatter()
+        f.dateFormat = "EEE, d MMM"
+        return f.string(from: date)
+    }
+
+    private func monthGrid(for month: Date) -> [CalendarGridDay] {
+        guard
+            let monthStart = calendar.date(from: calendar.dateComponents([.year, .month], from: month)),
+            let dayRange = calendar.range(of: .day, in: .month, for: monthStart)
+        else {
+            return []
+        }
+
+        let weekday = calendar.component(.weekday, from: monthStart) // Sun=1
+        let mondayBasedOffset = (weekday + 5) % 7
+
+        var result: [CalendarGridDay] = Array(repeating: CalendarGridDay(date: nil, dayNumber: nil), count: mondayBasedOffset)
+        for day in dayRange {
+            if let date = calendar.date(byAdding: .day, value: day - 1, to: monthStart) {
+                result.append(CalendarGridDay(date: date, dayNumber: day))
+            }
+        }
+        while result.count % 7 != 0 {
+            result.append(CalendarGridDay(date: nil, dayNumber: nil))
+        }
+        return result
+    }
+
+    private static func seedSchedules() -> [CalendarMockModel.UISchedule] {
+        [
+            CalendarMockModel.UISchedule(
+                title: "School Dropoff",
+                timeString: "06:45 AM",
+                recurrenceLabel: "Weekdays",
+                driverName: "Tafadzwa",
+                passengerNames: ["TJ", "Tawana"],
+                isEnabled: true,
+                stops: [
+                    .init(type: "Pickup", label: "Home", address: "123 Maple St"),
+                    .init(type: "Dropoff", label: "School", address: "456 School Ave")
+                ]
+            ),
+            CalendarMockModel.UISchedule(
+                title: "School Pickup",
+                timeString: "02:30 PM",
+                recurrenceLabel: "Weekdays",
+                driverName: "Tafadzwa",
+                passengerNames: ["TJ", "Tawana"],
+                isEnabled: true,
+                stops: [
+                    .init(type: "Pickup", label: "School", address: "456 School Ave"),
+                    .init(type: "Dropoff", label: "Home", address: "123 Maple St")
+                ]
+            )
+        ]
+    }
+}
+
+private struct CalendarGridDay {
+    let date: Date?
+    let dayNumber: Int?
+}
+
+struct CalendarPreviewRootView: View {
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 16) {
+                Text("Manual Preview Entry")
+                    .font(.system(size: 22, weight: .bold))
+                NavigationLink("Open Calendar") {
+                    CalendarView()
+                }
+                .font(.system(size: 17, weight: .semibold))
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(CalendarUITheme.offWhite)
+            .navigationTitle("Preview")
+        }
+    }
+}
+
+#Preview {
+    CalendarPreviewRootView()
+}
