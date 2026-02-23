@@ -8,6 +8,13 @@ enum RunsOverviewTab: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
+private enum ActiveRunRole: String, CaseIterable, Identifiable {
+    case driver = "Driver"
+    case observer = "Observer"
+
+    var id: String { rawValue }
+}
+
 struct RunsOverviewView: View {
     @Binding var selectedTab: RunsOverviewTab
     let todayRuns: [UIRun]
@@ -16,6 +23,7 @@ struct RunsOverviewView: View {
     let activeRun: UIRun?
     let onOpenRunDetails: (UIRun) -> Void
     let onOpenObserver: (UIRun) -> Void
+    @State private var selectedActiveRole: ActiveRunRole = .driver
 
     private var currentRuns: [UIRun] {
         switch selectedTab {
@@ -41,13 +49,20 @@ struct RunsOverviewView: View {
 
                         activeRunCard(activeRun)
 
-                        HStack(spacing: 12) {
-                            observerButton(for: activeRun)
-                            UIPrimaryButton(title: "Open Driver View", icon: "steeringwheel") {
+                        activeRunRoleSelector
+                            .padding(.top, 10)
+
+                        UIPrimaryButton(
+                            title: selectedActiveRole == .driver ? "Open Driver View" : "Track Live",
+                            icon: selectedActiveRole == .driver ? "steeringwheel" : "location.viewfinder"
+                        ) {
+                            if selectedActiveRole == .driver {
                                 onOpenRunDetails(activeRun)
+                            } else {
+                                onOpenObserver(activeRun)
                             }
                         }
-                        .padding(.top, 8)
+                        .padding(.top, 2)
                     }
 
                     Text(selectedTab == .history ? "Past Runs" : "Runs")
@@ -127,6 +142,26 @@ struct RunsOverviewView: View {
         }
     }
 
+    private var activeRunRoleSelector: some View {
+        HStack(spacing: 6) {
+            ForEach(ActiveRunRole.allCases) { role in
+                Button {
+                    selectedActiveRole = role
+                } label: {
+                    Text(role.rawValue)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(selectedActiveRole == role ? .white : UIRunDesignSystem.textSecondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .padding(.horizontal, 2)
+                        .background(selectedActiveRole == role ? UIRunDesignSystem.primary : Color.white)
+                        .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
     private var upcomingEmptyState: some View {
         UICard {
             VStack(spacing: 12) {
@@ -160,10 +195,9 @@ struct RunsOverviewView: View {
 
     private func activeRunCard(_ run: UIRun) -> some View {
         let mockProgress: CGFloat = 0.40
-        Button {
+        return Button {
             onOpenRunDetails(run)
-        }
-        label: {
+        } label: {
             UICard {
                 VStack(alignment: .leading, spacing: 11) {
                     Text(run.status.rawValue.uppercased())
@@ -222,27 +256,6 @@ struct RunsOverviewView: View {
         .buttonStyle(.plain)
     }
 
-    private func observerButton(for run: UIRun) -> some View {
-        Button {
-            onOpenObserver(run)
-        } label: {
-            HStack(spacing: 8) {
-                Image(systemName: "location.viewfinder")
-                Text("Track as Observer")
-                    .font(.system(size: 15, weight: .semibold))
-            }
-            .foregroundStyle(UIRunDesignSystem.primary.opacity(0.75))
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 12)
-            .background(Color.white)
-            .overlay {
-                Capsule()
-                    .stroke(UIRunDesignSystem.primary.opacity(0.25), lineWidth: 1)
-            }
-            .clipShape(Capsule())
-        }
-        .buttonStyle(.plain)
-    }
 }
 
 #Preview {
