@@ -22,7 +22,7 @@ struct TribeDirectoryView: View {
 
             VStack(spacing: 0) {
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 14) {
                         Text("Tribe Directory")
                             .font(.system(size: 32, weight: .bold))
                             .foregroundStyle(TribeTheme.textPrimary)
@@ -33,6 +33,7 @@ struct TribeDirectoryView: View {
                             Text("\(tribe.name) · \(tribe.tribeCode)")
                                 .font(.system(size: 14, weight: .medium))
                                 .foregroundStyle(TribeTheme.textSecondary)
+                                .padding(.bottom, 2)
                         }
 
                         MemberSectionHeader(title: "Adults", count: adults.count)

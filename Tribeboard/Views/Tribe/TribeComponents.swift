@@ -102,10 +102,8 @@ struct MemberRow: View {
     var onRowTap: (() -> Void)? = nil
     var onAvatarTap: (() -> Void)? = nil
 
-    private var initials: String {
-        let pieces = member.fullName.split(separator: " ")
-        let chars = pieces.prefix(2).compactMap { $0.first }.map { String($0) }
-        return chars.joined().uppercased()
+    private var shouldShowSubtitle: Bool {
+        member.memberType == .child
     }
 
     var body: some View {
@@ -121,9 +119,11 @@ struct MemberRow: View {
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(TribeTheme.textPrimary)
 
-                Text(member.subtitle)
-                    .font(.system(size: 13, weight: .regular))
-                    .foregroundStyle(TribeTheme.textSecondary)
+                if shouldShowSubtitle {
+                    Text(member.subtitle)
+                        .font(.system(size: 13, weight: .regular))
+                        .foregroundStyle(TribeTheme.textSecondary)
+                }
 
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 6) {
@@ -164,12 +164,12 @@ struct MemberAvatarView: View {
 
     private var fallbackBackground: Color {
         let palette: [Color] = [
-            Color(red: 0.388, green: 0.400, blue: 0.945),
-            Color(red: 0.180, green: 0.588, blue: 0.796),
-            Color(red: 0.584, green: 0.400, blue: 0.933),
-            Color(red: 0.949, green: 0.412, blue: 0.357),
-            Color(red: 0.243, green: 0.705, blue: 0.482),
-            Color(red: 0.941, green: 0.612, blue: 0.180)
+            Color(red: 0.78, green: 0.84, blue: 0.97),
+            Color(red: 0.76, green: 0.89, blue: 0.94),
+            Color(red: 0.85, green: 0.82, blue: 0.96),
+            Color(red: 0.97, green: 0.82, blue: 0.84),
+            Color(red: 0.79, green: 0.91, blue: 0.85),
+            Color(red: 0.97, green: 0.90, blue: 0.78)
         ]
         let hash = member.id.uuidString.unicodeScalars.reduce(0) { partialResult, scalar in
             (partialResult &* 31 &+ Int(scalar.value))
@@ -228,10 +228,10 @@ struct MemberAvatarView: View {
 
     private var fallbackAvatar: some View {
         ZStack {
-            fallbackBackground.opacity(0.22)
+            fallbackBackground
             Text(initials)
                 .font(.system(size: max(12, size * 0.32), weight: .bold))
-                .foregroundStyle(fallbackBackground)
+                .foregroundStyle(TribeTheme.textPrimary.opacity(0.72))
         }
     }
 }

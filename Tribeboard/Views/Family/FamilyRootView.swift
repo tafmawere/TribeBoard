@@ -198,10 +198,10 @@ private struct FamilyMembersListView: View {
                 .font(.system(size: 20, weight: .bold))
                 .foregroundStyle(.primary)
 
-            HStack(spacing: 8) {
+            HStack(spacing: 7) {
                 MemberAvatarStackView(members: allMembersSorted, maxVisible: 3, avatarSize: 28, overlap: 10)
                 Text("\(store.members.count) Members")
-                    .font(.system(size: 13, weight: .medium))
+                    .font(.system(size: 13, weight: .regular))
                     .foregroundStyle(.secondary)
             }
 
@@ -217,8 +217,8 @@ private struct FamilyMembersListView: View {
                     copyInviteCode(tribe.tribeCode)
                 } label: {
                     Text(tribe.tribeCode)
-                        .font(.system(size: 14, weight: .semibold, design: .monospaced))
-                        .foregroundStyle(Color.indigo)
+                        .font(.system(size: 14, weight: .medium, design: .monospaced))
+                        .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
 
@@ -256,9 +256,11 @@ private struct FamilyMembersListView: View {
                 Text(member.fullName)
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(.primary)
-                Text(member.subtitle)
-                    .font(.system(size: 13))
-                    .foregroundStyle(.secondary)
+                if member.memberType == .child {
+                    Text(member.subtitle)
+                        .font(.system(size: 13))
+                        .foregroundStyle(.secondary)
+                }
                 HStack(spacing: 6) {
                     ForEach(member.roles.sorted(by: { $0.sortOrder < $1.sortOrder }).map(\.rawValue), id: \.self) { role in
                         Text(role)
