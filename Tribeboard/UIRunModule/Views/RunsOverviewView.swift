@@ -33,6 +33,21 @@ struct RunsOverviewView: View {
         }
     }
 
+    private var runsForCurrentSection: [UIRun] {
+        if selectedTab == .today {
+            return todayRuns.filter { $0.status != .active }
+        }
+        return currentRuns
+    }
+
+    private var situationalSummaryText: String {
+        let activeCount = (activeRun == nil ? 0 : 1)
+        let scheduledCount = todayRuns.filter { $0.status == .scheduled }.count
+        // Keep the weekly bucket mock-friendly while still data-driven.
+        let thisWeekCount = todayRuns.count + upcomingRuns.count
+        return "\(activeCount) Active • \(scheduledCount) Scheduled • \(thisWeekCount) This Week"
+    }
+
     var body: some View {
         ZStack {
             UIRunDesignSystem.background.ignoresSafeArea()
@@ -40,37 +55,70 @@ struct RunsOverviewView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
                     header
+                    Text(situationalSummaryText)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(UIRunDesignSystem.textSecondary)
                     tabs
 
-                    if selectedTab == .today, let activeRun {
+                    if selectedTab == .today {
                         Text("Active Run")
                             .font(.system(size: 18, weight: .bold))
                             .foregroundStyle(UIRunDesignSystem.textPrimary)
 
-                        activeRunCard(activeRun)
+                        if let activeRun {
+                            activeRunCard(activeRun)
 
-                        activeRunRoleSelector
-                            .padding(.top, 10)
+                            Text("Your Role")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(UIRunDesignSystem.textSecondary)
+                                .padding(.top, 10)
 
-                        UIPrimaryButton(
-                            title: selectedActiveRole == .driver ? "Open Driver View" : "Track Live",
-                            icon: selectedActiveRole == .driver ? "steeringwheel" : "location.viewfinder"
-                        ) {
-                            if selectedActiveRole == .driver {
-                                onOpenRunDetails(activeRun)
-                            } else {
-                                onOpenObserver(activeRun)
+                            activeRunRoleSelector
+                                .padding(.top, 2)
+
+                            UIPrimaryButton(
+                                title: selectedActiveRole == .driver ? "Open Driver View" : "Track Live",
+                                icon: selectedActiveRole == .driver ? "steeringwheel" : "location.viewfinder"
+                            ) {
+                                if selectedActiveRole == .driver {
+                                    onOpenRunDetails(activeRun)
+                                } else {
+                                    onOpenObserver(activeRun)
+                                }
+                            }
+                            .padding(.top, 2)
+                        } else {
+                            UICard {
+                                VStack(spacing: 10) {
+                                    Text("No active run right now.")
+                                        .font(.system(size: 16, weight: .semibold))
+                                        .foregroundStyle(UIRunDesignSystem.textPrimary)
+                                    subtleCreateRunButton
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.vertical, 4)
                             }
                         }
-                        .padding(.top, 2)
                     }
 
-                    Text(selectedTab == .history ? "Past Runs" : "Runs")
-                        .font(.system(size: 18, weight: .bold))
-                        .foregroundStyle(UIRunDesignSystem.textPrimary)
+                    Text(
+                        selectedTab == .history
+                        ? "Past Runs"
+                        : (selectedTab == .today ? "Up Next" : "Runs")
+                    )
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundStyle(UIRunDesignSystem.textPrimary)
 
-                    if currentRuns.isEmpty {
-                        if selectedTab == .upcoming {
+                    if runsForCurrentSection.isEmpty {
+                        if selectedTab == .today {
+                            UICard {
+                                Text("No upcoming runs today.")
+                                    .font(.system(size: 15, weight: .semibold))
+                                    .foregroundStyle(UIRunDesignSystem.textSecondary)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.vertical, 8)
+                            }
+                        } else if selectedTab == .upcoming {
                             upcomingEmptyState
                         } else {
                             UICard {
@@ -91,7 +139,7 @@ struct RunsOverviewView: View {
                             }
                         }
                     } else {
-                        ForEach(currentRuns) { run in
+                        ForEach(runsForCurrentSection) { run in
                             UIRunCard(run: run) {
                                 onOpenRunDetails(run)
                             }
@@ -191,6 +239,25 @@ struct RunsOverviewView: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 10)
         }
+    }
+
+    private var subtleCreateRunButton: some View {
+        Button {
+            selectedTab = .today
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "plus")
+                    .font(.system(size: 11, weight: .bold))
+                Text("Create Run")
+                    .font(.system(size: 14, weight: .semibold))
+            }
+            .foregroundStyle(UIRunDesignSystem.primary.opacity(0.90))
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .background(UIRunDesignSystem.primary.opacity(0.09))
+            .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
     }
 
     private func activeRunCard(_ run: UIRun) -> some View {
