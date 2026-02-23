@@ -41,12 +41,13 @@ struct RunsOverviewView: View {
 
                         activeRunCard(activeRun)
 
-                        HStack(spacing: 10) {
+                        HStack(spacing: 12) {
                             observerButton(for: activeRun)
                             UIPrimaryButton(title: "Open Driver View", icon: "steeringwheel") {
                                 onOpenRunDetails(activeRun)
                             }
                         }
+                        .padding(.top, 8)
                     }
 
                     Text(selectedTab == .history ? "Past Runs" : "Runs")
@@ -107,7 +108,7 @@ struct RunsOverviewView: View {
     }
 
     private var tabs: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
             ForEach(RunsOverviewTab.allCases) { tab in
                 Button {
                     selectedTab = tab
@@ -117,6 +118,7 @@ struct RunsOverviewView: View {
                         .foregroundStyle(selectedTab == tab ? .white : UIRunDesignSystem.textSecondary)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 10)
+                        .padding(.horizontal, 2)
                         .background(selectedTab == tab ? UIRunDesignSystem.primary : Color.white)
                         .clipShape(Capsule())
                 }
@@ -137,13 +139,17 @@ struct RunsOverviewView: View {
                 Button {
                     selectedTab = .today
                 } label: {
-                    Text("Create Run")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(UIRunDesignSystem.primary)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 8)
-                        .background(UIRunDesignSystem.primary.opacity(0.10))
-                        .clipShape(Capsule())
+                    HStack(spacing: 6) {
+                        Image(systemName: "plus")
+                            .font(.system(size: 11, weight: .bold))
+                        Text("Create Run")
+                            .font(.system(size: 14, weight: .semibold))
+                    }
+                    .foregroundStyle(UIRunDesignSystem.primary.opacity(0.90))
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(UIRunDesignSystem.primary.opacity(0.09))
+                    .clipShape(Capsule())
                 }
                 .buttonStyle(.plain)
             }
@@ -160,11 +166,11 @@ struct RunsOverviewView: View {
             UICard {
                 VStack(alignment: .leading, spacing: 11) {
                     Text(run.status.rawValue.uppercased())
-                        .font(.system(size: 11, weight: .bold))
+                        .font(.system(size: 11, weight: .heavy))
                         .foregroundStyle(UIRunDesignSystem.primary)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 6)
-                        .background(UIRunDesignSystem.primary.opacity(0.16))
+                        .background(UIRunDesignSystem.primary.opacity(0.24))
                         .clipShape(Capsule())
 
                     Text(run.title)
@@ -187,11 +193,15 @@ struct RunsOverviewView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
-                .padding(.vertical, 4)
+                .padding(.vertical, 8)
             }
-            .background(UIRunDesignSystem.primary.opacity(0.12))
+            .background(UIRunDesignSystem.primary.opacity(0.15))
+            .overlay {
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .stroke(UIRunDesignSystem.primary.opacity(0.16), lineWidth: 1)
+            }
             .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-            .shadow(color: UIRunDesignSystem.primary.opacity(0.20), radius: 14, x: 0, y: 8)
+            .shadow(color: UIRunDesignSystem.primary.opacity(0.14), radius: 10, x: 0, y: 6)
         }
         .buttonStyle(.plain)
     }
@@ -203,15 +213,15 @@ struct RunsOverviewView: View {
             HStack(spacing: 8) {
                 Image(systemName: "location.viewfinder")
                 Text("Track as Observer")
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.system(size: 15, weight: .semibold))
             }
-            .foregroundStyle(UIRunDesignSystem.primary.opacity(0.86))
+            .foregroundStyle(UIRunDesignSystem.primary.opacity(0.75))
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 14)
+            .padding(.vertical, 12)
             .background(Color.white)
             .overlay {
                 Capsule()
-                    .stroke(UIRunDesignSystem.primary.opacity(0.34), lineWidth: 1.2)
+                    .stroke(UIRunDesignSystem.primary.opacity(0.25), lineWidth: 1)
             }
             .clipShape(Capsule())
         }
