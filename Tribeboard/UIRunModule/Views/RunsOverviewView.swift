@@ -159,6 +159,7 @@ struct RunsOverviewView: View {
     }
 
     private func activeRunCard(_ run: UIRun) -> some View {
+        let mockProgress: CGFloat = 0.40
         Button {
             onOpenRunDetails(run)
         }
@@ -177,12 +178,27 @@ struct RunsOverviewView: View {
                         .font(.system(size: 22, weight: .bold))
                         .foregroundStyle(UIRunDesignSystem.textPrimary)
 
+                    Text("En route to pickup")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(UIRunDesignSystem.primary)
+
                     HStack(spacing: 14) {
                         Label(run.etaText, systemImage: "clock")
                         Label(run.distanceText, systemImage: "location")
                     }
                     .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(UIRunDesignSystem.textSecondary)
+
+                    GeometryReader { geometry in
+                        ZStack(alignment: .leading) {
+                            RoundedRectangle(cornerRadius: 4, style: .continuous)
+                                .fill(UIRunDesignSystem.primary.opacity(0.14))
+                            RoundedRectangle(cornerRadius: 4, style: .continuous)
+                                .fill(UIRunDesignSystem.primary)
+                                .frame(width: geometry.size.width * mockProgress)
+                        }
+                    }
+                    .frame(height: 5)
 
                     HStack {
                         Text("Driver: \(run.driverName)")
@@ -193,15 +209,15 @@ struct RunsOverviewView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
-                .padding(.vertical, 8)
+                .padding(.vertical, 10)
             }
-            .background(UIRunDesignSystem.primary.opacity(0.15))
+            .background(UIRunDesignSystem.primary.opacity(0.17))
             .overlay {
                 RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .stroke(UIRunDesignSystem.primary.opacity(0.16), lineWidth: 1)
+                    .stroke(UIRunDesignSystem.primary.opacity(0.18), lineWidth: 1)
             }
             .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-            .shadow(color: UIRunDesignSystem.primary.opacity(0.14), radius: 10, x: 0, y: 6)
+            .shadow(color: UIRunDesignSystem.primary.opacity(0.16), radius: 11, x: 0, y: 7)
         }
         .buttonStyle(.plain)
     }
