@@ -33,7 +33,7 @@ struct HomeView: View {
             }
         }
         .onAppear {
-            withAnimation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true)) {
+            withAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true)) {
                 isActivePulseOn = true
             }
         }
@@ -163,10 +163,10 @@ struct HomeView: View {
                                 .foregroundStyle(HomeTheme.primary)
                             Text("LIVE")
                                 .font(.system(size: 10, weight: .bold))
-                                .foregroundStyle(HomeTheme.primary)
+                                .foregroundStyle(Color.white)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 4)
-                                .background(HomeTheme.primary.opacity(0.14))
+                                .background(HomeTheme.primary.opacity(0.85))
                                 .clipShape(Capsule())
                         }
                         Text("School Pick-up is in progress")
@@ -177,9 +177,9 @@ struct HomeView: View {
                             .foregroundStyle(HomeTheme.textSecondary)
                     }
                 }
-                .background(HomeTheme.primary.opacity(0.09))
+                .background(HomeTheme.primary.opacity(0.12))
                 .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-                .shadow(color: HomeTheme.primary.opacity(0.10), radius: 10, x: 0, y: 6)
+                .shadow(color: HomeTheme.primary.opacity(0.14), radius: 12, x: 0, y: 7)
             } else {
                 HomeCard {
                     VStack(alignment: .leading, spacing: 8) {
@@ -196,7 +196,7 @@ struct HomeView: View {
                 }
             }
         }
-        .padding(.top, -6)
+        .padding(.top, -10)
     }
 
     private var todaysRunsSection: some View {

@@ -225,7 +225,7 @@ struct HomeHeroCard: View {
                             endPoint: .bottomTrailing
                         )
                     )
-                    .frame(height: 60)
+                    .frame(height: 52)
                     .overlay {
                         Image(systemName: "calendar")
                             .font(.system(size: 26, weight: .semibold))
@@ -292,7 +292,7 @@ struct TodayRunCard: View {
                         .clipShape(Capsule())
                 } else {
                     Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(Color.green)
+                        .foregroundStyle(Color.green.opacity(0.72))
                         .font(.system(size: 20, weight: .semibold))
                 }
             }
