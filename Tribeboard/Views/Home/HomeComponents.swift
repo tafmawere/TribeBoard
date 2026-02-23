@@ -225,7 +225,7 @@ struct HomeHeroCard: View {
                             endPoint: .bottomTrailing
                         )
                     )
-                    .frame(height: 76)
+                    .frame(height: 60)
                     .overlay {
                         Image(systemName: "calendar")
                             .font(.system(size: 26, weight: .semibold))

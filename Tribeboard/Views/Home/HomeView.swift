@@ -157,8 +157,7 @@ struct HomeView: View {
                             Circle()
                                 .fill(HomeTheme.primary)
                                 .frame(width: 8, height: 8)
-                                .scaleEffect(isActivePulseOn ? 1.35 : 0.9)
-                                .opacity(isActivePulseOn ? 0.45 : 1.0)
+                                .opacity(isActivePulseOn ? 0.4 : 1.0)
                             Text("Active Run")
                                 .font(.system(size: 12, weight: .semibold))
                                 .foregroundStyle(HomeTheme.primary)
@@ -173,13 +172,14 @@ struct HomeView: View {
                         Text("School Pick-up is in progress")
                             .font(.system(size: 20, weight: .bold))
                             .foregroundStyle(HomeTheme.textPrimary)
-                        Text("Live updates are available in Runs.")
+                        Text("Tap to view live progress.")
                             .font(.system(size: 14, weight: .regular))
                             .foregroundStyle(HomeTheme.textSecondary)
                     }
                 }
-                .background(HomeTheme.primary.opacity(0.06))
+                .background(HomeTheme.primary.opacity(0.09))
                 .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                .shadow(color: HomeTheme.primary.opacity(0.10), radius: 10, x: 0, y: 6)
             } else {
                 HomeCard {
                     VStack(alignment: .leading, spacing: 8) {
@@ -196,6 +196,7 @@ struct HomeView: View {
                 }
             }
         }
+        .padding(.top, -6)
     }
 
     private var todaysRunsSection: some View {
@@ -214,8 +215,14 @@ struct HomeView: View {
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
-                .background(HomeTheme.primary)
+                .padding(.vertical, 12)
+                .background(
+                    LinearGradient(
+                        colors: [HomeTheme.primary.opacity(0.96), HomeTheme.primary.opacity(0.84)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
                 .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                 .shadow(color: HomeTheme.primary.opacity(0.18), radius: 10, x: 0, y: 5)
         }
