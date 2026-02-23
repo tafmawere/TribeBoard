@@ -127,6 +127,10 @@ private struct FamilyMembersListView: View {
     let onSelectMember: (TribeMember) -> Void
     @State private var didCopyInviteCode = false
 
+    private var allMembersSorted: [TribeMember] {
+        store.members.sorted { $0.fullName < $1.fullName }
+    }
+
     private var admins: [TribeMember] {
         store.members
             .filter { $0.roles.contains(.admin) }
@@ -194,9 +198,12 @@ private struct FamilyMembersListView: View {
                 .font(.system(size: 20, weight: .bold))
                 .foregroundStyle(.primary)
 
-            Text("\(store.members.count) Members")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(.secondary)
+            HStack(spacing: 8) {
+                MemberAvatarStackView(members: allMembersSorted, maxVisible: 3, avatarSize: 28, overlap: 10)
+                Text("\(store.members.count) Members")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.secondary)
+            }
 
             HStack(spacing: 8) {
                 Image(systemName: "qrcode")
@@ -240,13 +247,9 @@ private struct FamilyMembersListView: View {
 
     private func memberRow(_ member: TribeMember) -> some View {
         HStack(spacing: 10) {
-            Circle()
-                .fill(Color.indigo.opacity(0.15))
-                .frame(width: 36, height: 36)
-                .overlay {
-                    Text(initials(member.fullName))
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(Color.indigo)
+            MemberAvatarView(member: member, size: 44)
+                .onTapGesture {
+                    onSelectMember(member)
                 }
 
             VStack(alignment: .leading, spacing: 4) {
@@ -274,11 +277,7 @@ private struct FamilyMembersListView: View {
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(.tertiary)
         }
-        .frame(minHeight: 44)
-    }
-
-    private func initials(_ name: String) -> String {
-        name.split(separator: " ").prefix(2).compactMap(\.first).map(String.init).joined().uppercased()
+        .frame(minHeight: 48)
     }
 
     private func copyInviteCode(_ code: String) {
