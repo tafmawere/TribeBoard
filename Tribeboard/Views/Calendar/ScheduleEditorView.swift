@@ -9,6 +9,7 @@ struct ScheduleEditorView: View {
     @Environment(\.dismiss) private var dismiss
 
     let mode: Mode
+    let isOnboardingContext: Bool
     let onSave: (CalendarMockModel.UISchedule) -> Void
 
     @State private var title: String
@@ -25,8 +26,13 @@ struct ScheduleEditorView: View {
     private let drivers = ["Tafadzwa", "Rue"]
     private let passengerPool = ["TJ", "Tawana", "Rue"]
 
-    init(mode: Mode, onSave: @escaping (CalendarMockModel.UISchedule) -> Void) {
+    init(
+        mode: Mode,
+        isOnboardingContext: Bool = false,
+        onSave: @escaping (CalendarMockModel.UISchedule) -> Void
+    ) {
         self.mode = mode
+        self.isOnboardingContext = isOnboardingContext
         self.onSave = onSave
 
         let now = Date()
@@ -74,7 +80,7 @@ struct ScheduleEditorView: View {
                 .padding(.bottom, 24)
             }
             .background(CalendarUITheme.offWhite.ignoresSafeArea())
-            .navigationTitle("New Schedule")
+            .navigationTitle(navTitle)
             .navigationBarTitleDisplayMode(.inline)
             .onChange(of: recurrence) { _, newValue in
                 if newValue == .schoolWeek {
@@ -88,10 +94,11 @@ struct ScheduleEditorView: View {
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Save") {
+                    Button("Save Run") {
                         saveSchedule()
                     }
                     .disabled(!canSave)
+                    .foregroundStyle(canSave ? CalendarUITheme.indigo : CalendarUITheme.textSecondary.opacity(0.8))
                 }
             }
         }
@@ -191,6 +198,14 @@ struct ScheduleEditorView: View {
             ForEach(stops.indices, id: \.self) { index in
                 stopCard(index: index)
             }
+
+            if showDropoffValidationHint {
+                Text("Add at least one dropoff to continue.")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 4)
+            }
         }
     }
 
@@ -217,6 +232,9 @@ struct ScheduleEditorView: View {
                 Text("\(recurrenceSummary) \u{2022} \(Self.formatTime(time))")
                     .font(.system(size: 14, weight: .regular))
                     .foregroundStyle(CalendarUITheme.textSecondary)
+                Text("Driver: \(driverName) \u{2022} \(passengerCountText)")
+                    .font(.system(size: 13, weight: .regular))
+                    .foregroundStyle(CalendarUITheme.textSecondary)
             }
         }
     }
@@ -233,6 +251,15 @@ struct ScheduleEditorView: View {
         case .oneTime: return "One-time"
         case .schoolWeek: return "Weekdays"
         case .custom: return "Custom"
+        }
+    }
+
+    private var navTitle: String {
+        switch mode {
+        case .create:
+            return isOnboardingContext ? "Create your first run" : "New Run"
+        case .edit:
+            return "Edit Run"
         }
     }
 
@@ -311,6 +338,15 @@ struct ScheduleEditorView: View {
         }
     }
 
+    private var passengerCountText: String {
+        let count = selectedPassengers.count
+        return count == 1 ? "1 passenger" : "\(count) passengers"
+    }
+
+    private var showDropoffValidationHint: Bool {
+        pickupStops.contains(where: isStopDefined) && !dropoffStops.contains(where: isStopDefined)
+    }
+
     private func isStopDefined(_ stop: CalendarMockModel.UIStop) -> Bool {
         !stop.label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
         !stop.address.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -385,10 +421,13 @@ struct ScheduleEditorView: View {
                     Image(systemName: "mappin")
                         .foregroundStyle(CalendarUITheme.textSecondary)
                     TextField("Search address", text: $stops[index].address)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(CalendarUITheme.textSecondary.opacity(0.8))
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 10)
-                .background(Color(red: 0.952, green: 0.957, blue: 0.965))
+                .background(Color(red: 0.952, green: 0.957, blue: 0.965).opacity(0.75))
                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             }
         }

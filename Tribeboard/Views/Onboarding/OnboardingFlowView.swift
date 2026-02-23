@@ -46,7 +46,7 @@ struct OnboardingFlowView: View {
                             driversCount: tribeStore.members.filter { $0.roles.contains(.driver) }.count
                         )
                     case .firstSchedule:
-                        ScheduleEditorView(mode: .create) { _ in
+                        ScheduleEditorView(mode: .create, isOnboardingContext: true) { _ in
                             flow.completeOnboarding()
                         }
                     }
