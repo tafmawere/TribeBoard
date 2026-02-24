@@ -95,7 +95,7 @@ struct CalendarView: View {
             CalendarUITheme.offWhite.ignoresSafeArea()
 
             ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 14) {
                     monthHeader
                     monthGridCard
                     selectedDaySchedulesSection
@@ -188,13 +188,19 @@ struct CalendarView: View {
 
     private var selectedDaySchedulesSection: some View {
         let dayOccurrences = occurrencesForDay(selectedDate).sorted { $0.date < $1.date }
-        VStack(alignment: .leading, spacing: 10) {
+        let completedCount = dayOccurrences.filter { $0.status == .alreadyCreated }.count
+        let scheduledCount = dayOccurrences.count
+        return VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text("Runs for \(formattedDayHeader(selectedDate))")
                     .font(.system(size: 20, weight: .bold))
                     .foregroundStyle(CalendarUITheme.textPrimary)
                 Spacer()
             }
+
+            Text("\(scheduledCount) Scheduled • \(completedCount) Completed")
+                .font(.system(size: 13, weight: .regular))
+                .foregroundStyle(CalendarUITheme.textSecondary)
 
             if dayOccurrences.isEmpty {
                 CalendarCard {
@@ -213,7 +219,7 @@ struct CalendarView: View {
                                 .font(.system(size: 15, weight: .semibold))
                                 .foregroundStyle(.white)
                                 .frame(maxWidth: .infinity)
-                                .frame(height: 44)
+                                .frame(height: 42)
                                 .background(CalendarUITheme.indigo)
                                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                         }
@@ -246,10 +252,14 @@ struct CalendarView: View {
                 } label: {
                     Text("Create Runs for This Day")
                         .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(CalendarUITheme.indigo)
                         .frame(maxWidth: .infinity)
-                        .frame(height: 48)
-                        .background(CalendarUITheme.indigo)
+                        .frame(height: 42)
+                        .background(Color.white)
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .stroke(CalendarUITheme.indigo.opacity(0.45), lineWidth: 1.2)
+                        }
                         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                 }
                 .buttonStyle(.plain)

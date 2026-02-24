@@ -83,7 +83,14 @@ struct CalendarDayCell: View {
                     .font(.system(size: 14, weight: isSelected ? .bold : .medium))
                     .foregroundStyle(textColor)
                     .frame(width: 30, height: 30)
-                    .background(isSelected ? CalendarUITheme.indigo.opacity(0.20) : (isToday ? CalendarUITheme.indigo.opacity(0.10) : .clear))
+                    .background(isSelected ? CalendarUITheme.indigo.opacity(0.20) : .clear)
+                    .overlay {
+                        Circle()
+                            .stroke(
+                                isToday ? CalendarUITheme.indigo.opacity(0.5) : .clear,
+                                lineWidth: isToday ? 1.2 : 0
+                            )
+                    }
                     .clipShape(Circle())
 
                 Circle()
