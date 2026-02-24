@@ -11,6 +11,8 @@ struct LiveTrackingView: View {
     @State private var routeStepIndex: Int = 1
     @State private var isSheetExpanded = false
     @State private var sheetDragOffset: CGFloat = 0
+    @State private var isShowingRunSummary = false
+    @State private var completionDate = Date()
 
     private let routeCoordinates: [CLLocationCoordinate2D]
     private let liveTimer = Timer.publish(every: 2.2, on: .main, in: .common).autoconnect()
@@ -97,7 +99,15 @@ struct LiveTrackingView: View {
         }
         .navigationTitle("Live Tracking")
         .navigationBarTitleDisplayMode(.inline)
+        .navigationDestination(isPresented: $isShowingRunSummary) {
+            RunSummaryView(
+                run: run,
+                routeCoordinates: routeCoordinates,
+                completionDate: completionDate
+            )
+        }
         .onReceive(liveTimer) { _ in
+            guard !isShowingRunSummary else { return }
             stepLiveLocation()
         }
     }
@@ -285,6 +295,13 @@ struct LiveTrackingView: View {
                     span: MKCoordinateSpan(latitudeDelta: 0.016, longitudeDelta: 0.016)
                 )
             )
+        }
+
+        if routeStepIndex == routeCoordinates.count - 1 {
+            completionDate = Date()
+            withAnimation(.easeInOut(duration: 0.25)) {
+                isShowingRunSummary = true
+            }
         }
     }
 
