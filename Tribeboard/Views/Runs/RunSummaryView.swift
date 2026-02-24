@@ -8,6 +8,7 @@ struct RunSummaryView: View {
     let completionDate: Date
 
     @State private var mapPosition: MapCameraPosition
+    @State private var isShowingReplay = false
 
     init(run: UIRun, routeCoordinates: [CLLocationCoordinate2D], completionDate: Date) {
         self.run = run
@@ -62,6 +63,13 @@ struct RunSummaryView: View {
         .background(UIRunDesignSystem.background.ignoresSafeArea())
         .navigationTitle("Run Summary")
         .navigationBarTitleDisplayMode(.inline)
+        .navigationDestination(isPresented: $isShowingReplay) {
+            RouteReplayView(
+                run: run,
+                routePoints: replayRoutePoints,
+                eventMarkers: replayEventMarkers
+            )
+        }
     }
 
     private var headerCard: some View {
@@ -101,14 +109,7 @@ struct RunSummaryView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
 
                 UISecondaryButton(title: "Replay Route", icon: "arrow.clockwise") {
-                    withAnimation(.easeInOut(duration: 0.6)) {
-                        mapPosition = .region(
-                            MKCoordinateRegion(
-                                center: startCoordinate,
-                                span: MKCoordinateSpan(latitudeDelta: 0.020, longitudeDelta: 0.020)
-                            )
-                        )
-                    }
+                    isShowingReplay = true
                 }
             }
         }
@@ -227,6 +228,48 @@ struct RunSummaryView: View {
             meters += start.distance(from: end)
         }
         return meters / 1609.34
+    }
+
+    private var replayRoutePoints: [ReplayRoutePoint] {
+        guard !routeCoordinates.isEmpty else { return [] }
+        var points: [ReplayRoutePoint] = []
+        var runningDate = completionDate.addingTimeInterval(-max(16 * 60, Double(routeCoordinates.count) * 80))
+
+        for index in routeCoordinates.indices {
+            if index > 0 {
+                let previous = routeCoordinates[index - 1]
+                let current = routeCoordinates[index]
+                let segmentMeters = CLLocation(latitude: previous.latitude, longitude: previous.longitude)
+                    .distance(from: CLLocation(latitude: current.latitude, longitude: current.longitude))
+                let segmentSeconds = max(8, min(140, segmentMeters / 10.0))
+                runningDate = runningDate.addingTimeInterval(segmentSeconds)
+            }
+            points.append(.init(coordinate: routeCoordinates[index], timestamp: runningDate))
+        }
+        return points
+    }
+
+    private var replayEventMarkers: [ReplayEventMarker] {
+        let points = replayRoutePoints
+        guard !points.isEmpty else { return [] }
+
+        let pickupIndex = min(points.count - 1, max(1, points.count / 3))
+        let dropoffIndex = min(points.count - 1, max(2, (points.count * 3) / 4))
+
+        return [
+            ReplayEventMarker(
+                title: "Pickup",
+                symbol: "figure.and.child.holdinghands",
+                coordinate: points[pickupIndex].coordinate,
+                timestamp: points[pickupIndex].timestamp
+            ),
+            ReplayEventMarker(
+                title: "Drop-off",
+                symbol: "flag.checkered",
+                coordinate: points[dropoffIndex].coordinate,
+                timestamp: points[dropoffIndex].timestamp
+            )
+        ]
     }
 }
 
