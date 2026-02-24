@@ -34,6 +34,7 @@ struct RunDetailView: View {
     @State private var liveState: OperationalRunState = .enRouteToPickup
     @State private var liveProgress: Double = 0.20
     @State private var routeStepIndex: Int = 1
+    @State private var isShowingLiveTracking = false
 
     private let routeCoordinates: [CLLocationCoordinate2D]
     private let liveTimer = Timer.publish(every: 2.4, on: .main, in: .common).autoconnect()
@@ -90,6 +91,9 @@ struct RunDetailView: View {
         .background(UIRunDesignSystem.background.ignoresSafeArea())
         .navigationTitle("Run Detail")
         .navigationBarTitleDisplayMode(.inline)
+        .navigationDestination(isPresented: $isShowingLiveTracking) {
+            LiveTrackingView(run: run)
+        }
         .onReceive(liveTimer) { _ in
             guard liveState != .completed else { return }
             stepLiveLocation()
@@ -225,7 +229,7 @@ struct RunDetailView: View {
                     }
                 } else {
                     UIPrimaryButton(title: "Track Live", icon: "location.viewfinder") {
-                        centerOnDriver()
+                        isShowingLiveTracking = true
                     }
                     UISecondaryButton(title: "Contact Driver", icon: "phone.fill") {
                         print("Contact Driver placeholder")
