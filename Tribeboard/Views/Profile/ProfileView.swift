@@ -14,7 +14,6 @@ struct ProfileView: View {
             VStack(spacing: 12) {
                 headerCard
                 roleSwitcherCard
-                accountCard
                 sessionCard
             }
             .padding(16)
@@ -53,30 +52,14 @@ struct ProfileView: View {
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(.secondary)
 
-            Picker("Active Role", selection: Binding(
-                get: { activeRole },
-                set: { activeRole = $0 }
-            )) {
+            Picker("Active Role", selection: $activeRoleRawValue) {
                 ForEach(ProfileSessionRole.allCases, id: \.self) { role in
-                    Text(role.title).tag(role)
+                    Text(role.title).tag(role.rawValue)
                 }
             }
             .pickerStyle(.segmented)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
-        .background(Color.white)
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
-    }
-
-    private var accountCard: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            sectionHeader("Account")
-            profileRow(title: "Manage Account")
-            profileRow(title: "Privacy & Safety")
-            profileRow(title: "Emergency Contacts")
-        }
         .padding(16)
         .background(Color.white)
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
@@ -97,6 +80,22 @@ struct ProfileView: View {
                 .padding(.vertical, 10)
             }
             .buttonStyle(.plain)
+
+            NavigationLink {
+                SettingsView()
+            } label: {
+                HStack(spacing: 8) {
+                    Text("Open Settings")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(.primary)
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.tertiary)
+                }
+                .padding(.vertical, 10)
+            }
+            .buttonStyle(.plain)
         }
         .padding(16)
         .background(Color.white)
@@ -108,29 +107,6 @@ struct ProfileView: View {
         Text(title)
             .font(.system(size: 13, weight: .semibold))
             .foregroundStyle(.secondary)
-    }
-
-    private func profileRow(title: String) -> some View {
-        NavigationLink {
-            Text("TODO: \(title)")
-                .font(.system(size: 16, weight: .semibold))
-                .navigationTitle(title)
-                .navigationBarTitleDisplayMode(.inline)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Color(white: 0.97))
-        } label: {
-            HStack(spacing: 8) {
-                Text(title)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(.primary)
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.tertiary)
-            }
-            .padding(.vertical, 10)
-        }
-        .buttonStyle(.plain)
     }
 
     private func rolePill(_ label: String) -> some View {
