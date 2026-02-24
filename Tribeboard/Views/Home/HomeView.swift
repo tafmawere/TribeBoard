@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct HomeView: View {
+    @EnvironmentObject private var flow: AppFlowState
     private let viewModel = HomeViewModel()
     var onOpenRuns: () -> Void = {}
     var onOpenCalendar: () -> Void = {}
@@ -40,7 +41,10 @@ struct HomeView: View {
         .sheet(isPresented: $showProfileSheet) {
             NavigationStack {
                 ProfileView()
+                    .environmentObject(flow)
             }
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
         }
     }
 

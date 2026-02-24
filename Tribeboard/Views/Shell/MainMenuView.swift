@@ -20,9 +20,6 @@ struct MainMenuView: View {
                 menuRow(title: "Manage Tribe", icon: "person.3.fill") {
                     path.append(Destination.settings)
                 }
-                menuRow(title: "Switch Role", icon: "arrow.triangle.2.circlepath") {
-                    path.append(Destination.permissionsConsent)
-                }
             }
 
             Section {
