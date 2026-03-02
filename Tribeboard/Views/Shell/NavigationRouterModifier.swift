@@ -52,8 +52,17 @@ struct DestinationNavigationRouter: ViewModifier {
                     EmergencyContactsView()
 
                 // General
+                case .calendarSync:
+                    CalendarSyncView()
+
                 case .settings:
                     SettingsView()
+
+                case .helpSupport:
+                    HelpSupportView()
+
+                case .about:
+                    AboutView()
 
                 case let .error(message):
                     ShellMessageErrorView(message: message)

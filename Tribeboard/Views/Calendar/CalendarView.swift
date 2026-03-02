@@ -76,6 +76,7 @@ enum CalendarMockModel {
 }
 
 struct CalendarView: View {
+    var suggestedRunsProvider: (() -> [RunSuggestion])? = nil
     @State private var monthDate = Date()
     @State private var selectedDate = Date()
     @State private var goToDaySchedule = false
@@ -188,6 +189,7 @@ struct CalendarView: View {
 
     private var selectedDaySchedulesSection: some View {
         let dayOccurrences = occurrencesForDay(selectedDate).sorted { $0.date < $1.date }
+        let daySuggestions = suggestedRunsForSelectedDate()
         let completedCount = dayOccurrences.filter { $0.status == .alreadyCreated }.count
         let scheduledCount = dayOccurrences.count
         return VStack(alignment: .leading, spacing: 10) {
@@ -201,6 +203,47 @@ struct CalendarView: View {
             Text("\(scheduledCount) Scheduled • \(completedCount) Completed")
                 .font(.system(size: 13, weight: .regular))
                 .foregroundStyle(CalendarUITheme.textSecondary)
+
+            if !daySuggestions.isEmpty {
+                Text("Suggested")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(CalendarUITheme.textPrimary)
+                    .padding(.top, 2)
+
+                ForEach(daySuggestions) { suggestion in
+                    CalendarCard {
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Text(suggestion.title)
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .foregroundStyle(CalendarUITheme.textPrimary)
+                                Spacer()
+                                Text("Suggested")
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundStyle(CalendarUITheme.indigo)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(CalendarUITheme.indigo.opacity(0.12))
+                                    .clipShape(Capsule())
+                            }
+
+                            Text("\(suggestion.originName) → \(suggestion.destinationName)")
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundStyle(CalendarUITheme.textSecondary)
+
+                            HStack {
+                                Text(timeString(suggestion.proposedStart))
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundStyle(CalendarUITheme.indigo)
+                                Spacer()
+                                Text(suggestion.driverName ?? "No driver set")
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundStyle(CalendarUITheme.textSecondary)
+                            }
+                        }
+                    }
+                }
+            }
 
             if dayOccurrences.isEmpty {
                 CalendarCard {
@@ -266,6 +309,18 @@ struct CalendarView: View {
                 .padding(.top, 6)
             }
         }
+    }
+
+    private func suggestedRunsForSelectedDate() -> [RunSuggestion] {
+        guard let provider = suggestedRunsProvider else { return [] }
+        let suggestions = provider()
+        return suggestions.filter { Calendar.current.isDate($0.proposedStart, inSameDayAs: selectedDate) }
+    }
+
+    private func timeString(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "h:mm a"
+        return formatter.string(from: date)
     }
 
     private func occurrencesForDay(_ date: Date) -> [CalendarMockModel.UIScheduleOccurrence] {

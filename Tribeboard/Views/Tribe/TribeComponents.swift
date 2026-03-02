@@ -29,13 +29,7 @@ struct RoleBadge: View {
     let title: String
 
     var body: some View {
-        Text(title)
-            .font(.system(size: 11, weight: .semibold))
-            .foregroundStyle(TribeTheme.primary)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(TribeTheme.primary.opacity(0.12))
-            .clipShape(Capsule())
+        AppBadge(text: title, style: .info)
     }
 }
 
@@ -152,87 +146,186 @@ struct MemberRow: View {
 }
 
 struct MemberAvatarView: View {
-    let member: TribeMember
-    var size: CGFloat = 46
-    var showsStatus: Bool = false
+    enum AvatarSize {
+        case small
+        case medium
+        case large
 
-    private var initials: String {
-        let pieces = member.fullName.split(separator: " ")
-        let chars = pieces.prefix(2).compactMap { $0.first }.map { String($0) }
-        return chars.joined().uppercased()
+        var dimension: CGFloat {
+            switch self {
+            case .small: return 34
+            case .medium: return 46
+            case .large: return 72
+            }
+        }
     }
 
-    private var fallbackBackground: Color {
-        let palette: [Color] = [
-            Color(red: 0.78, green: 0.84, blue: 0.97),
-            Color(red: 0.76, green: 0.89, blue: 0.94),
-            Color(red: 0.85, green: 0.82, blue: 0.96),
-            Color(red: 0.97, green: 0.82, blue: 0.84),
-            Color(red: 0.79, green: 0.91, blue: 0.85),
-            Color(red: 0.97, green: 0.90, blue: 0.78)
-        ]
-        let hash = member.id.uuidString.unicodeScalars.reduce(0) { partialResult, scalar in
-            (partialResult &* 31 &+ Int(scalar.value))
-        }
-        let index = abs(hash) % palette.count
-        return palette[index]
+    let member: MemberAvatarData
+    let size: CGFloat
+    var showCameraBadge: Bool = false
+    var onTap: (() -> Void)? = nil
+    var showsStatus: Bool = false
+    private var isOnline: Bool = false
+
+    init(
+        member: TribeMember,
+        size: CGFloat = 46,
+        showCameraBadge: Bool = false,
+        onTap: (() -> Void)? = nil,
+        showsStatus: Bool = false
+    ) {
+        self.member = member.avatar
+        self.size = size
+        self.showCameraBadge = showCameraBadge
+        self.onTap = onTap
+        self.showsStatus = showsStatus
+        self.isOnline = member.isOnline
+    }
+
+    init(
+        member: MemberAvatarData,
+        size: AvatarSize,
+        showCameraBadge: Bool = false,
+        onTap: (() -> Void)? = nil
+    ) {
+        self.member = member
+        self.size = size.dimension
+        self.showCameraBadge = showCameraBadge
+        self.onTap = onTap
+    }
+
+    init(
+        member: MemberAvatarData,
+        size: CGFloat = 46,
+        showCameraBadge: Bool = false,
+        onTap: (() -> Void)? = nil
+    ) {
+        self.member = member
+        self.size = size
+        self.showCameraBadge = showCameraBadge
+        self.onTap = onTap
     }
 
     var body: some View {
-        ZStack(alignment: .bottomTrailing) {
-            avatarContent
-                .frame(width: size, height: size)
-                .clipShape(Circle())
-                .overlay {
-                    Circle().stroke(Color.white, lineWidth: 1.5)
+        let avatar = baseAvatar
+            .frame(width: size, height: size)
+            .clipShape(Circle())
+            .overlay {
+                Circle().stroke(Color.white, lineWidth: 1.5)
+            }
+            .shadow(color: Color.black.opacity(0.10), radius: 5, x: 0, y: 2)
+            .overlay(alignment: .bottomTrailing) {
+                if showCameraBadge {
+                    cameraBadge
                 }
-                .shadow(color: Color.black.opacity(0.12), radius: 6, x: 0, y: 3)
+            }
+            .overlay(alignment: .bottomTrailing) {
+                if showsStatus {
+                    onlineStatusDot
+                }
+            }
+            .frame(width: size, height: size)
 
-            if showsStatus {
-                Circle()
-                    .fill(member.isOnline ? Color.green : Color.gray.opacity(0.4))
-                    .frame(width: 10, height: 10)
-                    .overlay {
-                        Circle().stroke(Color.white, lineWidth: 1.5)
-                    }
+        Group {
+            if let onTap {
+                Button(action: onTap) {
+                    avatar
+                }
+                .buttonStyle(.plain)
+            } else {
+                avatar
             }
         }
-        .frame(width: size, height: size)
     }
 
     @ViewBuilder
-    private var avatarContent: some View {
-        if let url = member.profileImageURL {
-            AsyncImage(url: url) { phase in
-                switch phase {
-                case .empty:
-                    ZStack {
-                        fallbackBackground.opacity(0.24)
-                        ProgressView()
-                            .tint(fallbackBackground)
+    private var baseAvatar: some View {
+        // Priority order is photo, then selected symbol, then initials fallback.
+        if let resolvedPhotoURL = AvatarPhotoStore.resolvePhotoURL(from: member.photoURL) {
+            if resolvedPhotoURL.isFileURL, let uiImage = UIImage(contentsOfFile: resolvedPhotoURL.path) {
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                AsyncImage(url: resolvedPhotoURL) { phase in
+                    switch phase {
+                    case .empty:
+                        fallbackTinted
+                    case .success(let image):
+                        image.resizable().scaledToFill()
+                    case .failure:
+                        fallbackTinted
+                    @unknown default:
+                        fallbackTinted
                     }
-                case .success(let image):
-                    image
-                        .resizable()
-                        .scaledToFill()
-                case .failure:
-                    fallbackAvatar
-                @unknown default:
-                    fallbackAvatar
                 }
             }
+        } else if let symbol = member.symbol ?? AvatarSymbol.fromLegacyImageName(member.imageReference) {
+            ZStack {
+                Circle().fill(Color(red: 0.388, green: 0.400, blue: 0.945).opacity(0.10))
+                Image(systemName: symbol.rawValue)
+                    .font(.system(size: max(12, size * 0.34), weight: .semibold))
+                    .foregroundStyle(Color(red: 0.388, green: 0.400, blue: 0.945))
+            }
         } else {
-            fallbackAvatar
+            fallbackTinted
         }
     }
 
-    private var fallbackAvatar: some View {
+    private var fallbackTinted: some View {
         ZStack {
-            fallbackBackground
-            Text(initials)
-                .font(.system(size: max(12, size * 0.32), weight: .bold))
-                .foregroundStyle(TribeTheme.textPrimary.opacity(0.72))
+            Circle().fill(Color(red: 0.388, green: 0.400, blue: 0.945).opacity(0.12))
+            Text(member.initials)
+                .font(.system(size: max(11, size * 0.30), weight: .bold))
+                .foregroundStyle(Color(red: 0.286, green: 0.357, blue: 0.769))
         }
+    }
+
+    private var cameraBadge: some View {
+        ZStack {
+            Circle()
+                .fill(Color(red: 0.388, green: 0.400, blue: 0.945).opacity(0.95))
+                .frame(width: max(16, size * 0.28), height: max(16, size * 0.28))
+            Image(systemName: "camera.fill")
+                .font(.system(size: max(7, size * 0.13), weight: .bold))
+                .foregroundStyle(.white)
+        }
+        .overlay {
+            Circle().stroke(Color.white, lineWidth: 1.1)
+        }
+        .offset(x: 1, y: 1)
+    }
+
+    private var onlineStatusDot: some View {
+        Circle()
+            .fill(isOnline ? Color.green : Color.gray.opacity(0.4))
+            .frame(width: 10, height: 10)
+            .overlay {
+                Circle().stroke(Color.white, lineWidth: 1.5)
+            }
+    }
+}
+
+struct AvatarView: View {
+    let name: String
+    let identity: String
+    var avatarSeed: String? = nil
+    var avatarURL: String? = nil
+    var imageName: String? = nil
+    var remoteImageURL: URL? = nil
+    var size: CGFloat = 44
+
+    var body: some View {
+        MemberAvatarView(
+            member: MemberAvatarData(
+                photoURL: remoteImageURL?.absoluteString ?? avatarURL,
+                imageReference: imageName,
+                symbol: AvatarSymbol.fromLegacyImageName(imageName),
+                seed: avatarSeed ?? identity,
+                name: name
+            ),
+            size: size
+        )
     }
 }
 

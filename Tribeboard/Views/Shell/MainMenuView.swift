@@ -44,20 +44,20 @@ struct MainMenuView: View {
                     path.append(Destination.settings)
                 }
                 menuRow(title: "Calendar Sync", icon: "calendar.badge.clock") {
-                    path.append(Destination.schedulesList)
+                    path.append(Destination.calendarSync)
                 }
             }
 
             Section {
                 sectionHeader("Support")
                 menuRow(title: "Help & Support", icon: "questionmark.circle.fill") {
-                    path.append(Destination.error(message: "Help & Support coming soon."))
+                    path.append(Destination.helpSupport)
                 }
                 menuRow(title: "Feedback", icon: "bubble.left.and.bubble.right.fill") {
                     path.append(Destination.quickContact)
                 }
                 menuRow(title: "About", icon: "info.circle.fill") {
-                    path.append(Destination.settings)
+                    path.append(Destination.about)
                 }
             }
 

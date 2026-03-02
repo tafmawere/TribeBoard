@@ -128,8 +128,9 @@ struct HomeView: View {
                 .fill(Color.black.opacity(0.05))
                 .frame(height: 1)
                 .frame(maxWidth: .infinity)
-                .padding(.top, 2)
+                .padding(.top, 4)
         }
+        .padding(.bottom, 2)
     }
 
     private var primaryRunSection: some View {
@@ -147,43 +148,49 @@ struct HomeView: View {
                         Image(systemName: "chevron.right")
                             .font(.system(size: 11, weight: .bold))
                     }
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(HomeTheme.primary)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(HomeTheme.textSecondary)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
             }
 
             if viewModel.activeRunCount > 0 {
-                HomeCard {
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack(spacing: 8) {
-                            Circle()
-                                .fill(HomeTheme.primary)
-                                .frame(width: 8, height: 8)
-                                .opacity(isActivePulseOn ? 0.4 : 1.0)
-                            Text("Active Run")
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundStyle(HomeTheme.primary)
-                            Text("LIVE")
-                                .font(.system(size: 10, weight: .bold))
-                                .foregroundStyle(Color.white)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(HomeTheme.primary.opacity(0.85))
-                                .clipShape(Capsule())
+                Button {
+                    onOpenRuns()
+                } label: {
+                    HomeCard {
+                        VStack(alignment: .leading, spacing: 10) {
+                            HStack(spacing: 8) {
+                                HStack(spacing: 8) {
+                                    Circle()
+                                        .fill(HomeTheme.primary)
+                                        .frame(width: 8, height: 8)
+                                        .opacity(isActivePulseOn ? 0.4 : 1.0)
+                                    Text("Active Run")
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundStyle(HomeTheme.primary)
+                                }
+                                Spacer()
+                                AppBadge(text: "LIVE", style: .live)
+                            }
+                            Text("School Pick-up is in progress")
+                                .font(.system(size: 21, weight: .bold))
+                                .foregroundStyle(HomeTheme.textPrimary)
+                            Text("Tap to view live progress.")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundStyle(HomeTheme.textSecondary)
                         }
-                        Text("School Pick-up is in progress")
-                            .font(.system(size: 20, weight: .bold))
-                            .foregroundStyle(HomeTheme.textPrimary)
-                        Text("Tap to view live progress.")
-                            .font(.system(size: 14, weight: .regular))
-                            .foregroundStyle(HomeTheme.textSecondary)
                     }
                 }
-                .background(HomeTheme.primary.opacity(0.12))
+                .buttonStyle(HomePressableCardButtonStyle())
+                .background(HomeTheme.primary.opacity(0.14))
                 .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-                .shadow(color: HomeTheme.primary.opacity(0.14), radius: 12, x: 0, y: 7)
+                .overlay {
+                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                        .stroke(HomeTheme.primary.opacity(0.14), lineWidth: 1)
+                }
+                .shadow(color: HomeCardStyle.activeShadow, radius: 16, x: 0, y: 10)
             } else {
                 HomeCard {
                     VStack(alignment: .leading, spacing: 8) {
@@ -200,7 +207,7 @@ struct HomeView: View {
                 }
             }
         }
-        .padding(.top, -10)
+        .padding(.top, -4)
     }
 
     private var todaysRunsSection: some View {

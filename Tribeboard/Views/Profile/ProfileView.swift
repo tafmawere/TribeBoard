@@ -1,12 +1,22 @@
 import SwiftUI
+import PhotosUI
+import UIKit
 
 struct ProfileView: View {
     @EnvironmentObject private var flow: AppFlowState
     @AppStorage("profile.activeRole") private var activeRoleRawValue = ProfileSessionRole.driver.rawValue
+    @State private var showingPhotoOptions = false
+    @State private var showingCameraPicker = false
+    @State private var showingPhotoLibrary = false
+    @State private var selectedPhotoItem: PhotosPickerItem?
 
     private var activeRole: ProfileSessionRole {
         get { ProfileSessionRole(rawValue: activeRoleRawValue) ?? .driver }
         set { activeRoleRawValue = newValue.rawValue }
+    }
+
+    private var currentMember: TribeMember? {
+        flow.tribeStore.members.first(where: { $0.memberType == .adult }) ?? flow.tribeStore.members.first
     }
 
     var body: some View {
@@ -21,16 +31,52 @@ struct ProfileView: View {
         .background(Color(white: 0.97))
         .navigationTitle("Profile")
         .navigationBarTitleDisplayMode(.inline)
+        .photosPicker(isPresented: $showingPhotoLibrary, selection: $selectedPhotoItem, matching: .images)
+        .onChange(of: selectedPhotoItem) { _, newItem in
+            guard let newItem else { return }
+            Task {
+                if let data = try? await newItem.loadTransferable(type: Data.self),
+                   let image = UIImage(data: data) {
+                    updateCurrentMemberPhotoURL(AvatarPhotoStore.saveAvatarPhoto(from: image, memberId: currentMember?.id ?? UUID()))
+                }
+                selectedPhotoItem = nil
+            }
+        }
+        .confirmationDialog("Edit Photo", isPresented: $showingPhotoOptions, titleVisibility: .visible) {
+            if UIImagePickerController.isSourceTypeAvailable(.camera) {
+                Button("Take Photo") {
+                    showingCameraPicker = true
+                }
+            }
+            Button("Choose Photo") {
+                showingPhotoLibrary = true
+            }
+            Button("Remove Photo", role: .destructive) {
+                    AvatarPhotoStore.deletePhoto(reference: currentMember?.avatarURL)
+                    updateCurrentMemberPhotoURL(nil)
+            }
+            Button("Cancel", role: .cancel) { }
+        }
+        .sheet(isPresented: $showingCameraPicker) {
+            CameraImagePicker { image in
+                    updateCurrentMemberPhotoURL(AvatarPhotoStore.saveAvatarPhoto(from: image, memberId: currentMember?.id ?? UUID()))
+            }
+            .ignoresSafeArea()
+        }
     }
 
     private var headerCard: some View {
         VStack(spacing: 10) {
-            Circle()
-                .fill(Color.indigo.opacity(0.14))
-                .frame(width: 72, height: 72)
-                .overlay(Text("TM").font(.title3).bold().foregroundStyle(Color.indigo))
+            if let member = currentMember {
+                MemberAvatarView(member: member, size: 72)
+                    .onTapGesture {
+                        showingPhotoOptions = true
+                    }
+            } else {
+                AvatarView(name: "You", identity: "profile-fallback", size: 72)
+            }
 
-            Text("Tafadzwa Mawere")
+            Text(currentMember?.fullName ?? "Your Profile")
                 .font(.title3.bold())
 
             HStack(spacing: 8) {
@@ -38,6 +84,11 @@ struct ProfileView: View {
                 rolePill("Admin")
                 rolePill(activeRole.title)
             }
+            Button("Edit Photo") {
+                showingPhotoOptions = true
+            }
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(Color.indigo)
         }
         .frame(maxWidth: .infinity)
         .padding(18)
@@ -117,6 +168,12 @@ struct ProfileView: View {
             .padding(.vertical, 5)
             .background(Color.indigo.opacity(0.12))
             .clipShape(Capsule())
+    }
+
+    private func updateCurrentMemberPhotoURL(_ photoURL: String?) {
+        guard var member = currentMember else { return }
+        member.avatarURL = photoURL
+        flow.tribeStore.updateMember(member)
     }
 }
 

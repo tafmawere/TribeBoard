@@ -8,22 +8,47 @@ enum RunsOverviewTab: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
-private enum ActiveRunRole: String, CaseIterable, Identifiable {
-    case driver = "Driver"
-    case observer = "Observer"
-
-    var id: String { rawValue }
-}
-
 struct RunsOverviewView: View {
     @Binding var selectedTab: RunsOverviewTab
     let todayRuns: [UIRun]
     let upcomingRuns: [UIRun]
     let historyRuns: [UIRun]
     let activeRun: UIRun?
+    let suggestedRuns: [RunSuggestion]
     let onOpenRunDetails: (UIRun) -> Void
     let onOpenObserver: (UIRun) -> Void
-    @State private var selectedActiveRole: ActiveRunRole = .driver
+    let onStartSuggestion: (RunSuggestion) -> Void
+    let onSnoozeSuggestion: (RunSuggestion) -> Void
+    let onDismissSuggestion: (RunSuggestion) -> Void
+    let onViewCalendar: (() -> Void)?
+
+    init(
+        selectedTab: Binding<RunsOverviewTab>,
+        todayRuns: [UIRun],
+        upcomingRuns: [UIRun],
+        historyRuns: [UIRun],
+        activeRun: UIRun?,
+        suggestedRuns: [RunSuggestion],
+        onOpenRunDetails: @escaping (UIRun) -> Void,
+        onOpenObserver: @escaping (UIRun) -> Void,
+        onStartSuggestion: @escaping (RunSuggestion) -> Void,
+        onSnoozeSuggestion: @escaping (RunSuggestion) -> Void,
+        onDismissSuggestion: @escaping (RunSuggestion) -> Void,
+        onViewCalendar: (() -> Void)? = nil
+    ) {
+        self._selectedTab = selectedTab
+        self.todayRuns = todayRuns
+        self.upcomingRuns = upcomingRuns
+        self.historyRuns = historyRuns
+        self.activeRun = activeRun
+        self.suggestedRuns = suggestedRuns
+        self.onOpenRunDetails = onOpenRunDetails
+        self.onOpenObserver = onOpenObserver
+        self.onStartSuggestion = onStartSuggestion
+        self.onSnoozeSuggestion = onSnoozeSuggestion
+        self.onDismissSuggestion = onDismissSuggestion
+        self.onViewCalendar = onViewCalendar
+    }
 
     private var currentRuns: [UIRun] {
         switch selectedTab {
@@ -48,6 +73,21 @@ struct RunsOverviewView: View {
         return "\(activeCount) Active • \(scheduledCount) Scheduled • \(thisWeekCount) This Week"
     }
 
+    private var quickActionRun: UIRun? {
+        if let activeRun {
+            return activeRun
+        }
+        return todayRuns.first(where: { $0.status == .scheduled }) ?? upcomingRuns.first
+    }
+
+    private var nextScheduledRun: UIRun? {
+        todayRuns.first(where: { $0.status == .scheduled }) ?? upcomingRuns.first
+    }
+
+    private var hasNoRunData: Bool {
+        activeRun == nil && todayRuns.isEmpty && upcomingRuns.isEmpty && suggestedRuns.isEmpty
+    }
+
     var body: some View {
         ZStack {
             UIRunDesignSystem.background.ignoresSafeArea()
@@ -61,42 +101,27 @@ struct RunsOverviewView: View {
                     tabs
 
                     if selectedTab == .today {
-                        Text("Active Run")
-                            .font(.system(size: 18, weight: .bold))
-                            .foregroundStyle(UIRunDesignSystem.textPrimary)
+                        todayAtAGlanceCard
+                        quickActionsCard
+
+                        if hasNoRunData {
+                            emptyRunsCard
+                        }
 
                         if let activeRun {
+                            Text("Active Run")
+                                .font(.system(size: 18, weight: .bold))
+                                .foregroundStyle(UIRunDesignSystem.textPrimary)
                             activeRunCard(activeRun)
+                        }
 
-                            Text("Your Role")
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundStyle(UIRunDesignSystem.textSecondary)
-                                .padding(.top, 10)
+                        if !suggestedRuns.isEmpty {
+                            Text("Suggested Runs")
+                                .font(.system(size: 18, weight: .bold))
+                                .foregroundStyle(UIRunDesignSystem.textPrimary)
 
-                            activeRunRoleSelector
-                                .padding(.top, 2)
-
-                            UIPrimaryButton(
-                                title: selectedActiveRole == .driver ? "Open Driver View" : "Track Live",
-                                icon: selectedActiveRole == .driver ? "steeringwheel" : "location.viewfinder"
-                            ) {
-                                if selectedActiveRole == .driver {
-                                    onOpenRunDetails(activeRun)
-                                } else {
-                                    onOpenObserver(activeRun)
-                                }
-                            }
-                            .padding(.top, 2)
-                        } else {
-                            UICard {
-                                VStack(spacing: 10) {
-                                    Text("No active run right now.")
-                                        .font(.system(size: 16, weight: .semibold))
-                                        .foregroundStyle(UIRunDesignSystem.textPrimary)
-                                    subtleCreateRunButton
-                                }
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.vertical, 4)
+                            ForEach(suggestedRuns) { suggestion in
+                                suggestedRunCard(suggestion)
                             }
                         }
                     }
@@ -111,12 +136,14 @@ struct RunsOverviewView: View {
 
                     if runsForCurrentSection.isEmpty {
                         if selectedTab == .today {
-                            UICard {
-                                Text("No upcoming runs today.")
-                                    .font(.system(size: 15, weight: .semibold))
-                                    .foregroundStyle(UIRunDesignSystem.textSecondary)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .padding(.vertical, 8)
+                            if !hasNoRunData {
+                                UICard {
+                                    Text("No upcoming runs today.")
+                                        .font(.system(size: 15, weight: .semibold))
+                                        .foregroundStyle(UIRunDesignSystem.textSecondary)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .padding(.vertical, 8)
+                                }
                             }
                         } else if selectedTab == .upcoming {
                             upcomingEmptyState
@@ -190,22 +217,141 @@ struct RunsOverviewView: View {
         }
     }
 
-    private var activeRunRoleSelector: some View {
-        HStack(spacing: 6) {
-            ForEach(ActiveRunRole.allCases) { role in
-                Button {
-                    selectedActiveRole = role
-                } label: {
-                    Text(role.rawValue)
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(selectedActiveRole == role ? .white : UIRunDesignSystem.textSecondary)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
-                        .padding(.horizontal, 2)
-                        .background(selectedActiveRole == role ? UIRunDesignSystem.primary : Color.white)
-                        .clipShape(Capsule())
+    private var todayAtAGlanceCard: some View {
+        UICard {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Today at a glance")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(UIRunDesignSystem.textPrimary)
+                HStack(alignment: .firstTextBaseline) {
+                    Text(nextScheduledRun?.scheduledTime ?? "No runs yet")
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundStyle(UIRunDesignSystem.textPrimary)
+                    Spacer()
+                    AppBadge(
+                        text: activeRun != nil ? "LIVE" : (nextScheduledRun != nil ? "UPCOMING" : "NONE"),
+                        style: activeRun != nil ? .live : (nextScheduledRun != nil ? .info : .neutral)
+                    )
                 }
-                .buttonStyle(.plain)
+                Text(activeRun != nil ? "A run is in progress." : "Next scheduled departure")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(UIRunDesignSystem.textSecondary)
+            }
+        }
+    }
+
+    private var quickActionsCard: some View {
+        UICard {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Quick Actions")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(UIRunDesignSystem.textPrimary)
+                quickActionRow(
+                    icon: "steeringwheel",
+                    title: "Driver Mode",
+                    subtitle: quickActionRun == nil ? "No active or upcoming run yet" : "Open driver controls for your next run",
+                    action: { run in onOpenRunDetails(run) }
+                )
+                quickActionRow(
+                    icon: "location.viewfinder",
+                    title: "Observer Tracking",
+                    subtitle: quickActionRun == nil ? "No run to track right now" : "Track live progress as an observer",
+                    action: { run in onOpenObserver(run) }
+                )
+            }
+        }
+    }
+
+    private var emptyRunsCard: some View {
+        UICard {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("No runs yet")
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundStyle(UIRunDesignSystem.textPrimary)
+                Text("Create a run to get started, or build recurring schedules from Calendar.")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(UIRunDesignSystem.textSecondary)
+                HStack(spacing: 8) {
+                    subtleCreateRunButton
+                    if let onViewCalendar {
+                        Button {
+                            onViewCalendar()
+                        } label: {
+                            Text("View Calendar")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(UIRunDesignSystem.textPrimary)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 8)
+                                .background(Color.black.opacity(0.06))
+                                .clipShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, 2)
+        }
+    }
+
+    private func quickActionRow(
+        icon: String,
+        title: String,
+        subtitle: String,
+        action: @escaping (UIRun) -> Void
+    ) -> some View {
+        let run = quickActionRun
+        return Button {
+            guard let run else { return }
+            action(run)
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: icon)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(UIRunDesignSystem.primary)
+                    .frame(width: 34, height: 34)
+                    .background(UIRunDesignSystem.primary.opacity(0.10))
+                    .clipShape(Circle())
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(UIRunDesignSystem.textPrimary)
+                    Text(subtitle)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(UIRunDesignSystem.textSecondary)
+                        .lineLimit(2)
+                }
+                Spacer()
+                if let run {
+                    quickActionAvatarCluster(run: run)
+                }
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(12)
+            .background(Color.white)
+            .overlay {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(Color.black.opacity(0.07), lineWidth: 1)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .disabled(run == nil)
+        .opacity(run == nil ? 0.72 : 1)
+    }
+
+    private func quickActionAvatarCluster(run: UIRun) -> some View {
+        let names = [run.driverName] + run.passengers.map(\.name)
+        let visible = Array(names.prefix(3))
+        return HStack(spacing: -8) {
+            ForEach(Array(visible.enumerated()), id: \.offset) { index, name in
+                AvatarView(
+                    name: name,
+                    identity: "\(run.id.uuidString)-quick-\(index)",
+                    size: 24
+                )
             }
         }
     }
@@ -323,6 +469,77 @@ struct RunsOverviewView: View {
         .buttonStyle(.plain)
     }
 
+    private func suggestedRunCard(_ suggestion: RunSuggestion) -> some View {
+        UICard {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Text(suggestion.title)
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(UIRunDesignSystem.textPrimary)
+                    Spacer()
+                    Text(timeText(suggestion.proposedStart))
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(UIRunDesignSystem.primary)
+                }
+
+                Text("\(suggestion.originName) → \(suggestion.destinationName)")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(UIRunDesignSystem.textSecondary)
+
+                HStack(spacing: 6) {
+                    ForEach(Array(suggestion.childNames.enumerated()), id: \.offset) { index, childName in
+                        AvatarView(
+                            name: childName,
+                            identity: "\(suggestion.id.uuidString)-\(index)",
+                            imageName: index < suggestion.childAvatarImageNames.count ? suggestion.childAvatarImageNames[index] : nil,
+                            size: 24
+                        )
+                    }
+                    Spacer()
+                    Text(driverLabel(for: suggestion))
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(UIRunDesignSystem.textSecondary)
+                }
+
+                HStack(spacing: 8) {
+                    miniAction("Start", tint: UIRunDesignSystem.primary) {
+                        onStartSuggestion(suggestion)
+                    }
+                    miniAction("Snooze 10m", tint: UIRunDesignSystem.secondary) {
+                        onSnoozeSuggestion(suggestion)
+                    }
+                    miniAction("Dismiss", tint: .red.opacity(0.8)) {
+                        onDismissSuggestion(suggestion)
+                    }
+                }
+            }
+        }
+    }
+
+    private func miniAction(_ title: String, tint: Color, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(tint)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
+                .background(tint.opacity(0.10))
+                .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func timeText(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "h:mm a"
+        return formatter.string(from: date)
+    }
+
+    private func driverLabel(for suggestion: RunSuggestion) -> String {
+        guard let driverName = suggestion.driverName, !driverName.isEmpty else { return "No driver set" }
+        return "Driver: \(driverName)"
+    }
+
 }
 
 #Preview {
@@ -333,8 +550,12 @@ struct RunsOverviewView: View {
             upcomingRuns: [UIRunMockData.scheduledRun],
             historyRuns: UIRunMockData.historyRuns,
             activeRun: UIRunMockData.activeRun,
+            suggestedRuns: [],
             onOpenRunDetails: { _ in },
-            onOpenObserver: { _ in }
+            onOpenObserver: { _ in },
+            onStartSuggestion: { _ in },
+            onSnoozeSuggestion: { _ in },
+            onDismissSuggestion: { _ in }
         )
     }
 }

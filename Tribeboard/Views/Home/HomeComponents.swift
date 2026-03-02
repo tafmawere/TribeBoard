@@ -6,6 +6,12 @@ enum HomeTheme {
     static let primary = Color(red: 0.388, green: 0.400, blue: 0.945) // #6366F1
     static let textPrimary = Color(red: 0.098, green: 0.110, blue: 0.145)
     static let textSecondary = Color(red: 0.420, green: 0.471, blue: 0.580)
+    static let success = Color(red: 0.063, green: 0.725, blue: 0.506)
+}
+
+enum HomeCardStyle {
+    static let regularShadow = Color.black.opacity(0.04)
+    static let activeShadow = HomeTheme.primary.opacity(0.22)
 }
 
 struct HomeCard<Content: View>: View {
@@ -20,7 +26,7 @@ struct HomeCard<Content: View>: View {
             .padding(16)
             .background(HomeTheme.card)
             .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-            .shadow(color: Color.black.opacity(0.05), radius: 12, x: 0, y: 8)
+            .shadow(color: HomeCardStyle.regularShadow, radius: 10, x: 0, y: 6)
     }
 }
 
@@ -275,28 +281,53 @@ struct TodayRunCard: View {
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(run.title)
-                        .font(.system(size: 18, weight: .bold))
+                        .font(.system(size: 17, weight: .semibold))
                         .foregroundStyle(HomeTheme.textPrimary)
                     Text(run.subtitle)
-                        .font(.system(size: 13, weight: .medium))
+                        .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(HomeTheme.textSecondary)
                 }
                 Spacer()
-                if run.status == .pending {
-                    Text(run.status.rawValue)
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(HomeTheme.primary)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(HomeTheme.primary.opacity(0.12))
-                        .clipShape(Capsule())
-                } else {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(Color.green.opacity(0.72))
-                        .font(.system(size: 20, weight: .semibold))
-                }
+                trailingStatus
+                    .frame(width: 90, alignment: .trailing)
             }
         }
+        .overlay {
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .stroke(Color.black.opacity(0.04), lineWidth: 1)
+        }
+    }
+
+    @ViewBuilder
+    private var trailingStatus: some View {
+        switch run.status {
+        case .pending:
+            Text(run.status.rawValue)
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(HomeTheme.primary)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(HomeTheme.primary.opacity(0.10))
+                .clipShape(Capsule())
+        case .completed:
+            HStack(spacing: 6) {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(HomeTheme.success.opacity(0.85))
+                    .font(.system(size: 16, weight: .semibold))
+                Text("DONE")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(HomeTheme.success.opacity(0.88))
+            }
+        }
+    }
+}
+
+struct HomePressableCardButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.986 : 1.0)
+            .opacity(configuration.isPressed ? 0.94 : 1.0)
+            .animation(.easeOut(duration: 0.16), value: configuration.isPressed)
     }
 }
 

@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Tribeboard.ipa</key>
+	<array>
+		<dict>
+			<key>architectures</key>
+			<array>
+				<string>arm64</string>
+			</array>
+			<key>buildNumber</key>
+			<string>1</string>
+			<key>certificate</key>
+			<dict>
+				<key>SHA1</key>
+				<string>C661BC27BF18A60D7E2235BAE6DBECA8734A59F3</string>
+				<key>dateExpires</key>
+				<string>2027/02/23</string>
+				<key>type</key>
+				<string>Cloud Managed Apple Distribution</string>
+			</dict>
+			<key>entitlements</key>
+			<dict>
+				<key>application-identifier</key>
+				<string>NDM2BK8S8H.net.dataenvy.tribeboard.ios</string>
+				<key>aps-environment</key>
+				<string>production</string>
+				<key>beta-reports-active</key>
+				<true/>
+				<key>com.apple.developer.icloud-container-identifiers</key>
+				<array/>
+				<key>com.apple.developer.team-identifier</key>
+				<string>NDM2BK8S8H</string>
+				<key>get-task-allow</key>
+				<false/>
+			</dict>
+			<key>name</key>
+			<string>Tribeboard.app</string>
+			<key>profile</key>
+			<dict>
+				<key>UUID</key>
+				<string>f6fabe8e-b89d-45ef-adc2-40f58a41d580</string>
+				<key>dateExpires</key>
+				<string>2027/02/23</string>
+				<key>name</key>
+				<string>iOS Team Store Provisioning Profile: net.dataenvy.tribeboard.ios</string>
+			</dict>
+			<key>symbols</key>
+			<true/>
+			<key>team</key>
+			<dict>
+				<key>id</key>
+				<string>NDM2BK8S8H</string>
+				<key>name</key>
+				<string>Tafadzwa Mawere</string>
+			</dict>
+			<key>versionNumber</key>
+			<string>1.0</string>
+		</dict>
+	</array>
+</dict>
+</plist>

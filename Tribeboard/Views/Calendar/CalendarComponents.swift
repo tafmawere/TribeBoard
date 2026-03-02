@@ -31,13 +31,11 @@ struct CalendarBadge: View {
     let color: Color
 
     var body: some View {
-        Text(text.uppercased())
-            .font(.system(size: 11, weight: .bold))
-            .foregroundStyle(color)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .background(color.opacity(0.14))
-            .clipShape(Capsule())
+        AppBadge(text: text, style: badgeStyle)
+    }
+
+    private var badgeStyle: BadgeStyle {
+        text.lowercased().contains("created") ? .success : .info
     }
 }
 

@@ -2,9 +2,19 @@ import SwiftUI
 import UIKit
 
 struct FamilyRootView: View {
-    @StateObject private var store = TribeStore()
+    @StateObject private var store: TribeStore
     @State private var selectedMemberID: UUID?
     @State private var isPresentingAddMember = false
+    @State private var destination: FamilyDestination?
+
+    init(store: TribeStore) {
+        _store = StateObject(wrappedValue: store)
+    }
+
+    @MainActor
+    init() {
+        _store = StateObject(wrappedValue: TribeStore())
+    }
 
     var body: some View {
         Group {
@@ -22,8 +32,18 @@ struct FamilyRootView: View {
         .toolbar {
             if store.tribe != nil {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Add") {
-                        isPresentingAddMember = true
+                    Menu {
+                        Button("Add Member") {
+                            isPresentingAddMember = true
+                        }
+                        Button("Add Child") {
+                            destination = .addChild
+                        }
+                        Button("Locations") {
+                            destination = .locations
+                        }
+                    } label: {
+                        Image(systemName: "plus")
                     }
                 }
             }
@@ -33,6 +53,14 @@ struct FamilyRootView: View {
         }
         .navigationDestination(item: selectedMemberBinding) { memberID in
             FamilyMemberDetailView(store: store, memberID: memberID)
+        }
+        .navigationDestination(item: $destination) { route in
+            switch route {
+            case .addChild:
+                ChildSetupFlowView(store: store)
+            case .locations:
+                LocationsManagementView(store: store)
+            }
         }
         .task {
             seedDemoDataIfNeeded()
@@ -53,6 +81,18 @@ struct FamilyRootView: View {
         store.createTribe(name: "Mawere Tribe", tribeCode: "TRIBE-MWR1")
         for member in FamilySeed.members where !store.members.contains(where: { $0.id == member.id }) {
             store.addMember(member)
+        }
+    }
+}
+
+private enum FamilyDestination: Identifiable {
+    case addChild
+    case locations
+
+    var id: String {
+        switch self {
+        case .addChild: return "addChild"
+        case .locations: return "locations"
         }
     }
 }
@@ -83,7 +123,7 @@ private enum FamilySeed {
             id: UUID(uuidString: "C3333333-3333-3333-3333-333333333333") ?? UUID(),
             fullName: "TJ",
             memberType: .child,
-            age: 10,
+            dateOfBirth: Calendar.current.date(byAdding: .year, value: -10, to: Date()),
             roles: [.child, .passenger],
             isLocationSharingEnabled: true,
             isOnline: false
@@ -92,7 +132,7 @@ private enum FamilySeed {
             id: UUID(uuidString: "D4444444-4444-4444-4444-444444444444") ?? UUID(),
             fullName: "Tawana",
             memberType: .child,
-            age: 8,
+            dateOfBirth: Calendar.current.date(byAdding: .year, value: -8, to: Date()),
             roles: [.child, .passenger],
             isLocationSharingEnabled: true,
             isOnline: false
@@ -149,6 +189,43 @@ private struct FamilyMembersListView: View {
             .sorted { $0.fullName < $1.fullName }
     }
 
+    private var driverCount: Int {
+        store.members.filter { $0.roles.contains(.driver) || $0.permissions.contains(.driver) }.count
+    }
+
+    private var childrenCount: Int {
+        store.members.filter { $0.memberType == .child }.count
+    }
+
+    private var hasHomeSet: Bool {
+        if let homeLocationId = store.tribe?.homeLocationId {
+            return store.locations.contains(where: { $0.id == homeLocationId })
+        }
+        return store.locations.contains(where: { $0.type == .home })
+    }
+
+    private var childrenMissingSchedulesCount: Int {
+        children.filter { store.ruleCount(for: $0.id) == 0 }.count
+    }
+
+    private var configurationWarnings: [String] {
+        var warnings: [String] = []
+        if driverCount == 0 {
+            warnings.append("No driver configured")
+        }
+        if childrenMissingSchedulesCount > 0 {
+            warnings.append("\(childrenMissingSchedulesCount) child without schedules")
+        }
+        if !hasHomeSet {
+            warnings.append("Home location not set")
+        }
+        return warnings
+    }
+
+    private var roleSummaryText: String {
+        "\(store.members.count) Members • \(driverCount) Driver\(driverCount == 1 ? "" : "s") • \(childrenCount) Child\(childrenCount == 1 ? "" : "ren")"
+    }
+
     var body: some View {
         List {
             if let tribe = store.tribe {
@@ -157,95 +234,161 @@ private struct FamilyMembersListView: View {
                 }
             }
 
-            Section("Admins") {
-                ForEach(admins) { member in
-                    Button {
-                        onSelectMember(member)
-                    } label: {
-                        memberRow(member)
+            Section {
+                configurationHealthCard
+            }
+
+            if !admins.isEmpty {
+                Section("Admins") {
+                    ForEach(admins) { member in
+                        Button {
+                            onSelectMember(member)
+                        } label: {
+                            adultMemberRow(member)
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                 }
             }
 
-            Section("Parents") {
-                ForEach(parents) { member in
-                    Button {
-                        onSelectMember(member)
-                    } label: {
-                        memberRow(member)
+            if !parents.isEmpty {
+                Section("Parents") {
+                    ForEach(parents) { member in
+                        Button {
+                            onSelectMember(member)
+                        } label: {
+                            adultMemberRow(member)
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                 }
             }
 
-            Section("Children") {
-                ForEach(children) { member in
-                    Button {
-                        onSelectMember(member)
-                    } label: {
-                        memberRow(member)
+            if !children.isEmpty {
+                Section("Children") {
+                    ForEach(children) { member in
+                        Button {
+                            onSelectMember(member)
+                        } label: {
+                            childMemberRow(member)
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                 }
             }
         }
     }
 
     private func tribeHeaderCard(tribe: Tribe) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(tribe.name)
-                .font(.system(size: 20, weight: .bold))
-                .foregroundStyle(.primary)
+        ZStack {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [Color.indigo.opacity(0.12), Color.white],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
 
-            HStack(spacing: 7) {
-                MemberAvatarStackView(members: allMembersSorted, maxVisible: 3, avatarSize: 28, overlap: 10)
-                Text("\(store.members.count) Members")
-                    .font(.system(size: 13, weight: .regular))
+            VStack(alignment: .leading, spacing: 10) {
+                Text(tribe.name)
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundStyle(.primary)
+
+                Text(roleSummaryText)
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(.secondary)
-            }
 
-            HStack(spacing: 8) {
-                Image(systemName: "qrcode")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(.secondary.opacity(0.8))
-                    .frame(width: 28, height: 28)
-                    .background(Color.gray.opacity(0.12))
-                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                Text(tribe.tribeCode)
+                    .font(.system(size: 13, weight: .bold, design: .monospaced))
+                    .foregroundStyle(Color.indigo)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 7)
+                    .background(Color.indigo.opacity(0.10))
+                    .clipShape(Capsule())
 
-                Button {
-                    copyInviteCode(tribe.tribeCode)
-                } label: {
-                    Text(tribe.tribeCode)
-                        .font(.system(size: 14, weight: .medium, design: .monospaced))
+                HStack(spacing: 8) {
+                    ShareLink(item: tribe.tribeCode) {
+                        Label("Share Tribe", systemImage: "square.and.arrow.up")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 9)
+                            .background(Color.indigo)
+                            .clipShape(Capsule())
+                    }
+
+                    Button("Copy Code") {
+                        copyInviteCode(tribe.tribeCode)
+                    }
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Color.indigo)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 9)
+                    .background(Color.indigo.opacity(0.10))
+                    .clipShape(Capsule())
+                    .buttonStyle(.plain)
+
+                    Spacer()
+                }
+
+                HStack(spacing: 7) {
+                    MemberAvatarStackView(members: allMembersSorted, maxVisible: 3, avatarSize: 26, overlap: 10)
+                    Text("\(store.members.count) Members")
+                        .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(.secondary)
                 }
-                .buttonStyle(.plain)
 
-                Spacer()
-
-                Button("Copy") {
-                    copyInviteCode(tribe.tribeCode)
-                }
-                .font(.system(size: 13, weight: .semibold))
-                .buttonStyle(.plain)
-
-                ShareLink(item: tribe.tribeCode) {
-                    Text("Share")
-                        .font(.system(size: 13, weight: .semibold))
+                if didCopyInviteCode {
+                    Text("Invite code copied")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(Color.green.opacity(0.85))
                 }
             }
-
-            if didCopyInviteCode {
-                Text("Invite code copied")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(Color.green.opacity(0.85))
-            }
+            .padding(12)
         }
-        .padding(.vertical, 6)
+        .overlay {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(Color.indigo.opacity(0.14), lineWidth: 1)
+        }
     }
 
-    private func memberRow(_ member: TribeMember) -> some View {
+    private var configurationHealthCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Configuration Health")
+                .font(.system(size: 16, weight: .bold))
+                .foregroundStyle(.primary)
+
+            if configurationWarnings.isEmpty {
+                HStack(spacing: 8) {
+                    Image(systemName: "checkmark.seal.fill")
+                        .foregroundStyle(Color.green.opacity(0.88))
+                    Text("Tribe fully configured")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Color.green.opacity(0.88))
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 7)
+                .background(Color.green.opacity(0.10))
+                .clipShape(Capsule())
+            } else {
+                ForEach(configurationWarnings, id: \.self) { warning in
+                    HStack(alignment: .top, spacing: 8) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(Color.orange.opacity(0.92))
+                            .padding(.top, 2)
+                        Text(warning)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
+        .padding(.vertical, 4)
+    }
+
+    private func adultMemberRow(_ member: TribeMember) -> some View {
         HStack(spacing: 10) {
             MemberAvatarView(member: member, size: 44)
                 .onTapGesture {
@@ -256,20 +399,17 @@ private struct FamilyMembersListView: View {
                 Text(member.fullName)
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(.primary)
-                if member.memberType == .child {
-                    Text(member.subtitle)
-                        .font(.system(size: 13))
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(member.isDriver ? Color.indigo : Color.gray.opacity(0.45))
+                        .frame(width: 8, height: 8)
+                    Text(member.isDriver ? "Driver enabled" : "No driver role")
+                        .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(.secondary)
                 }
                 HStack(spacing: 6) {
-                    ForEach(member.roles.sorted(by: { $0.sortOrder < $1.sortOrder }).map(\.rawValue), id: \.self) { role in
-                        Text(role)
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(Color.indigo)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(Color.indigo.opacity(0.12))
-                            .clipShape(Capsule())
+                    ForEach(member.roles.sorted(by: { $0.sortOrder < $1.sortOrder }), id: \.self) { role in
+                        rolePill(role: role)
                     }
                 }
             }
@@ -279,7 +419,48 @@ private struct FamilyMembersListView: View {
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(.tertiary)
         }
-        .frame(minHeight: 48)
+        .frame(minHeight: 56)
+    }
+
+    private func childMemberRow(_ member: TribeMember) -> some View {
+        let scheduleCount = store.ruleCount(for: member.id)
+        return HStack(spacing: 10) {
+            MemberAvatarView(member: member, size: 44)
+                .onTapGesture {
+                    onSelectMember(member)
+                }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(member.fullName)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(.primary)
+                Text(scheduleCount > 0 ? "\(scheduleCount) schedule rule\(scheduleCount == 1 ? "" : "s")" : "Setup incomplete")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(scheduleCount > 0 ? Color.indigo : Color.orange.opacity(0.92))
+                HStack(spacing: 6) {
+                    ForEach(member.roles.sorted(by: { $0.sortOrder < $1.sortOrder }), id: \.self) { role in
+                        rolePill(role: role)
+                    }
+                }
+            }
+
+            Spacer()
+            Image(systemName: "chevron.right")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.tertiary)
+        }
+        .frame(minHeight: 56)
+    }
+
+    private func rolePill(role: Role) -> some View {
+        let isSoftRole = (role == .child || role == .passenger)
+        return Text(role.rawValue)
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(Color.indigo.opacity(isSoftRole ? 0.72 : 1))
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(Color.indigo.opacity(isSoftRole ? 0.07 : 0.12))
+            .clipShape(Capsule())
     }
 
     private func copyInviteCode(_ code: String) {
