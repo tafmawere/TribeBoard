@@ -30,12 +30,14 @@ struct CreateTribeView: View {
                             Text("Family Name")
                                 .font(.system(size: 14, weight: .semibold))
                             TextField("e.g. Mawere Family", text: $tribeName)
+                                .foregroundStyle(.primary)
+                                .tint(TribeTheme.primary)
                                 .padding(.horizontal, 14)
                                 .padding(.vertical, 12)
-                                .background(Color.white)
+                                .background(Color(uiColor: .tertiarySystemBackground))
                                 .overlay {
                                     RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                        .stroke(Color.black.opacity(0.08), lineWidth: 1)
+                                        .stroke(Color(uiColor: .separator).opacity(0.35), lineWidth: 1)
                                 }
                                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                         }
@@ -87,10 +89,10 @@ struct CreateTribeView: View {
                             }
                             .padding(.horizontal, 14)
                             .padding(.vertical, 12)
-                            .background(Color.white)
+                            .background(Color(uiColor: .tertiarySystemBackground))
                             .overlay {
                                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                    .stroke(Color.black.opacity(0.08), lineWidth: 1)
+                                    .stroke(Color(uiColor: .separator).opacity(0.35), lineWidth: 1)
                             }
                             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
 

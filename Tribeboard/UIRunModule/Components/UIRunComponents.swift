@@ -83,13 +83,7 @@ struct UIRunCard: View {
             UICard {
                 VStack(alignment: .leading, spacing: 10) {
                     HStack {
-                        Text(run.status.rawValue.uppercased())
-                            .font(.system(size: 11, weight: .bold))
-                            .foregroundStyle(run.status == .active ? UIRunDesignSystem.primary : UIRunDesignSystem.secondary)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 6)
-                            .background((run.status == .active ? UIRunDesignSystem.primary : Color.gray).opacity(0.12))
-                            .clipShape(Capsule())
+                        AppBadge(text: run.status.rawValue, style: statusBadgeStyle(run.status))
                         Spacer()
                         Text(run.scheduledTime)
                             .font(.system(size: 13, weight: .semibold))
@@ -119,6 +113,17 @@ struct UIRunCard: View {
             }
         }
         .buttonStyle(.plain)
+    }
+
+    private func statusBadgeStyle(_ status: UIRunStatus) -> BadgeStyle {
+        switch status {
+        case .scheduled:
+            return .scheduled
+        case .active:
+            return .enRoute
+        case .completed:
+            return .completed
+        }
     }
 }
 

@@ -11,17 +11,17 @@ private enum UIRunRoute: Hashable {
 struct UIRunModuleRootView: View {
     @State private var path: [UIRunRoute] = []
     @State private var selectedTab: RunsOverviewTab = .today
-
-    private let scheduledRun = UIRunMockData.scheduledRun
-    private let activeRun = UIRunMockData.activeRun
-    private let historyRuns = UIRunMockData.historyRuns
+    @State private var boardMode: RunsBoardMode = .runs
+    @StateObject private var runDataSource = RunDataSource()
+    @StateObject private var driverDataSource = DriverDataSource()
 
     var body: some View {
         NavigationStack(path: $path) {
             RunsOverviewView(
                 selectedTab: $selectedTab,
-                todayRuns: [scheduledRun],
-                upcomingRuns: [scheduledRun],
+                boardMode: $boardMode,
+                todayRuns: todayRuns,
+                upcomingRuns: upcomingRuns,
                 historyRuns: historyRuns,
                 activeRun: activeRun,
                 suggestedRuns: [],
@@ -35,6 +35,8 @@ struct UIRunModuleRootView: View {
                 onSnoozeSuggestion: { _ in },
                 onDismissSuggestion: { _ in }
             )
+            .environmentObject(runDataSource)
+            .environmentObject(driverDataSource)
             .navigationDestination(for: UIRunRoute.self) { route in
                 switch route {
                 case let .runDetails(runId):
@@ -62,11 +64,49 @@ struct UIRunModuleRootView: View {
                 }
             }
         }
+        .task {
+            await runDataSource.bootstrapIfNeeded()
+            await driverDataSource.bootstrapIfNeeded()
+        }
+    }
+
+    private var allSystemRuns: [SystemDomain.RunInstance] {
+        runDataSource.runs.sorted { $0.date < $1.date }
+    }
+
+    private var allUIRuns: [UIRun] {
+        allSystemRuns.map(RunUIAdapter.mapToUIRun)
+    }
+
+    private var activeRun: UIRun? {
+        allUIRuns.first(where: { $0.status == .active })
+    }
+
+    private var todayRuns: [UIRun] {
+        let calendar = Calendar.current
+        let today = Date()
+        return allSystemRuns.filter { run in
+            let isTerminal = run.status == .completed || run.status == .cancelled
+            return calendar.isDate(run.date, inSameDayAs: today) && !isTerminal
+        }.map(RunUIAdapter.mapToUIRun)
+    }
+
+    private var upcomingRuns: [UIRun] {
+        let calendar = Calendar.current
+        let today = Date()
+        return allSystemRuns.filter { run in
+            run.status == .scheduled && !calendar.isDate(run.date, inSameDayAs: today) && run.date > today
+        }.map(RunUIAdapter.mapToUIRun)
+    }
+
+    private var historyRuns: [UIRun] {
+        allSystemRuns.filter { run in
+            run.status == .completed || run.status == .cancelled
+        }.map(RunUIAdapter.mapToUIRun)
     }
 
     private func runForRunId(_ runId: String) -> UIRun? {
-        let all = [scheduledRun, activeRun] + historyRuns
-        return all.first { $0.backingRunId == runId }
+        allUIRuns.first { $0.backingRunId == runId }
     }
 
     private func runDetailsDestination(runId: String) -> some View {

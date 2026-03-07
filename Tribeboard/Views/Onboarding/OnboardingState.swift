@@ -538,7 +538,7 @@ final class OnboardingState: ObservableObject {
                     case .roundTrip:
                         guard let drop = rule.dropOffTime, let pick = rule.pickupTime else { continue }
                         store.scheduleTemplates.append(
-                            ScheduleTemplate(
+                            LegacyScheduleTemplate(
                                 title: "\(child.name) \(venue.label) Drop-off",
                                 type: .dropoff,
                                 venueId: location.id,
@@ -553,7 +553,7 @@ final class OnboardingState: ObservableObject {
                             )
                         )
                         store.scheduleTemplates.append(
-                            ScheduleTemplate(
+                            LegacyScheduleTemplate(
                                 title: "\(child.name) \(venue.label) Pickup",
                                 type: .pickup,
                                 venueId: location.id,
@@ -578,7 +578,7 @@ final class OnboardingState: ObservableObject {
                     case .dropOffOnly:
                         guard let drop = rule.dropOffTime else { continue }
                         store.scheduleTemplates.append(
-                            ScheduleTemplate(
+                            LegacyScheduleTemplate(
                                 title: "\(child.name) \(venue.label) Drop-off",
                                 type: .dropoff,
                                 venueId: location.id,
@@ -595,7 +595,7 @@ final class OnboardingState: ObservableObject {
                     case .pickupOnly:
                         guard let pick = rule.pickupTime else { continue }
                         store.scheduleTemplates.append(
-                            ScheduleTemplate(
+                            LegacyScheduleTemplate(
                                 title: "\(child.name) \(venue.label) Pickup",
                                 type: .pickup,
                                 venueId: location.id,

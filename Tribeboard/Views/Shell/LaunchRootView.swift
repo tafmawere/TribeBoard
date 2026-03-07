@@ -7,6 +7,7 @@ struct LaunchRootView: View {
                 DemoShellView()
             } else {
                 HomeView()
+                    .environmentObject(RunDataSource())
             }
         }
     }

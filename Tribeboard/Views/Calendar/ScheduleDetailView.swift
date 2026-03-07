@@ -41,9 +41,11 @@ struct ScheduleDetailView: View {
             dismiss()
         }
         .sheet(isPresented: $isShowingEditor) {
-            ScheduleEditorView(mode: .edit(schedule.asCalendarSchedule)) { saved in
-                schedule = UIScheduleTemplate(savedSchedule: saved)
-                upcomingOccurrences = Self.mockOccurrences(for: schedule)
+            NavigationStack {
+                ScheduleEditorView(mode: .edit(schedule.asCalendarSchedule)) { saved in
+                    schedule = UIScheduleTemplate(savedSchedule: saved)
+                    upcomingOccurrences = Self.mockOccurrences(for: schedule)
+                }
             }
         }
         .sheet(isPresented: $isShowingEditorPlaceholder) {

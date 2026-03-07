@@ -1,5 +1,6 @@
 import SwiftUI
 
+// Legacy UI schedule models kept for compatibility with existing detail screens.
 struct UIScheduleTemplate: Identifiable, Hashable {
     let id: UUID
     var title: String
@@ -42,12 +43,7 @@ struct UIOccurrence: Identifiable, Hashable {
     var timeString: String
     var status: UIOccurrenceStatus
 
-    init(
-        id: UUID = UUID(),
-        date: Date,
-        timeString: String,
-        status: UIOccurrenceStatus
-    ) {
+    init(id: UUID = UUID(), date: Date, timeString: String, status: UIOccurrenceStatus) {
         self.id = id
         self.date = date
         self.timeString = timeString
@@ -56,94 +52,143 @@ struct UIOccurrence: Identifiable, Hashable {
 }
 
 struct SchedulesListView: View {
-    @State private var schedules: [UIScheduleTemplate] = Self.seedSchedules
-    @State private var isShowingEditor = false
-    @State private var isShowingEditorPlaceholder = false
+    @EnvironmentObject private var scheduleDataSource: ScheduleDataSource
+    @EnvironmentObject private var runDataSource: RunDataSource
 
-    // Keep this UI-only gate so there is a fallback path.
-    private let supportsScheduleEditor = true
+    @State private var isShowingEditor = false
+    @State private var editingTemplate: SystemDomain.ScheduleTemplate?
+    @State private var generationMessage: String?
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                CalendarUITheme.offWhite.ignoresSafeArea()
+        ZStack {
+            CalendarUITheme.offWhite.ignoresSafeArea()
 
-                if schedules.isEmpty {
-                    emptyState
-                        .padding(16)
-                } else {
-                    ScrollView {
-                        VStack(spacing: 12) {
-                            ForEach($schedules) { $schedule in
-                                scheduleCard(schedule: $schedule)
-                            }
+            if scheduleDataSource.templates.isEmpty && !scheduleDataSource.isLoading {
+                emptyState
+                    .padding(16)
+            } else {
+                ScrollView {
+                    VStack(spacing: 12) {
+                        if let generationMessage {
+                            generationBanner(text: generationMessage)
                         }
-                        .padding(16)
-                    }
-                }
-            }
-            .navigationTitle("Schedules")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("+ New") {
-                        if supportsScheduleEditor {
-                            isShowingEditor = true
-                        } else {
-                            isShowingEditorPlaceholder = true
+                        ForEach(scheduleDataSource.templates) { template in
+                            scheduleCard(template)
                         }
                     }
+                    .padding(16)
+                }
+                .refreshable {
+                    await scheduleDataSource.refresh()
                 }
             }
-            .sheet(isPresented: $isShowingEditor) {
-                ScheduleEditorView(mode: .create) { saved in
-                    schedules.append(UIScheduleTemplate(savedSchedule: saved))
+        }
+        .navigationTitle("Schedules")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItemGroup(placement: .topBarTrailing) {
+#if DEBUG
+                Button("Clear Runs") {
+                    Task {
+                        try? await SystemBootstrap.clearAllRuns()
+                        await runDataSource.refresh()
+                        generationMessage = "Cleared all runs"
+                    }
+                }
+#endif
+                Button("Generate Runs") {
+                    Task {
+                        let newRuns = await scheduleDataSource.generateRuns(daysAhead: 14)
+                        await runDataSource.refresh()
+                        generationMessage = newRuns == 0
+                            ? "No new runs (already up to date)"
+                            : "Generated \(newRuns) new runs"
+                    }
+                }
+                .disabled(scheduleDataSource.isWorking)
+
+                Button("New Schedule") {
+                    editingTemplate = nil
+                    isShowingEditor = true
                 }
             }
-            .sheet(isPresented: $isShowingEditorPlaceholder) {
-                SchedulePlaceholderSheet(
-                    title: "Schedule Editor",
-                    message: "ScheduleEditorView is not available in this target yet."
-                )
+        }
+        .task {
+            await scheduleDataSource.refresh()
+#if DEBUG
+            await scheduleDataSource.seedDemoIfNeeded()
+#endif
+        }
+        .sheet(isPresented: $isShowingEditor, onDismiss: {
+            Task { await scheduleDataSource.refresh() }
+        }) {
+            NavigationStack {
+                ScheduleEditorView(mode: editorMode) { _ in
+                    // Real persistence happens in ScheduleDataSource.
+                }
             }
         }
     }
 
-    private func scheduleCard(schedule: Binding<UIScheduleTemplate>) -> some View {
+    private var editorMode: ScheduleEditorView.Mode {
+        guard let editingTemplate else { return .create }
+        return .edit(editingTemplate.asCalendarSchedule)
+    }
+
+    private func scheduleCard(_ template: SystemDomain.ScheduleTemplate) -> some View {
         CalendarCard {
             VStack(alignment: .leading, spacing: 12) {
-                NavigationLink {
-                    ScheduleDetailView(schedule: schedule) {
-                        schedules.removeAll { $0.id == schedule.wrappedValue.id }
-                    }
+                Button {
+                    editingTemplate = template
+                    isShowingEditor = true
                 } label: {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text(schedule.wrappedValue.title)
+                        Text(template.name)
                             .font(.system(size: 18, weight: .bold))
                             .foregroundStyle(CalendarUITheme.textPrimary)
 
-                        Text("\(schedule.wrappedValue.timeString) • \(schedule.wrappedValue.recurrenceLabel)")
+                        Text("\(timeText(template)) • \(weekdaysLabel(template.weekdays))")
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(CalendarUITheme.textSecondary)
 
-                        Text("Driver: \(schedule.wrappedValue.driverName)")
-                            .font(.system(size: 14, weight: .medium))
+                        Text("\(template.stops.count) stops")
+                            .font(.system(size: 13, weight: .medium))
                             .foregroundStyle(CalendarUITheme.textSecondary)
 
-                        Text("Passengers: \(schedule.wrappedValue.passengers.joined(separator: ", "))")
-                            .font(.system(size: 13, weight: .regular))
-                            .foregroundStyle(CalendarUITheme.textSecondary)
-                            .lineLimit(2)
+                        AppBadge(
+                            text: template.isActive ? "ENABLED" : "DISABLED",
+                            style: template.isActive ? .success : .neutral
+                        )
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .buttonStyle(.plain)
 
-                Toggle("Enabled", isOn: schedule.isEnabled)
-                    .font(.system(size: 15, weight: .semibold))
-                    .tint(CalendarUITheme.indigo)
+                Toggle("Enabled", isOn: Binding(
+                    get: { template.isActive },
+                    set: { newValue in
+                        Task { await scheduleDataSource.toggleEnabled(id: template.id, enabled: newValue) }
+                    }
+                ))
+                .font(.system(size: 15, weight: .semibold))
+                .tint(CalendarUITheme.indigo)
             }
         }
+    }
+
+    private func generationBanner(text: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundStyle(CalendarUITheme.indigo)
+            Text(text)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(CalendarUITheme.textPrimary)
+            Spacer()
+        }
+        .padding(12)
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .shadow(color: Color.black.opacity(0.05), radius: 6, x: 0, y: 4)
     }
 
     private var emptyState: some View {
@@ -156,17 +201,14 @@ struct SchedulesListView: View {
                 .font(.system(size: 20, weight: .bold))
                 .foregroundStyle(CalendarUITheme.textPrimary)
 
-            Text("Create your first schedule to start generating upcoming runs.")
+            Text("Create a schedule to generate recurring runs.")
                 .font(.system(size: 14, weight: .medium))
                 .foregroundStyle(CalendarUITheme.textSecondary)
                 .multilineTextAlignment(.center)
 
             Button("Create Schedule") {
-                if supportsScheduleEditor {
-                    isShowingEditor = true
-                } else {
-                    isShowingEditorPlaceholder = true
-                }
+                editingTemplate = nil
+                isShowingEditor = true
             }
             .font(.system(size: 16, weight: .semibold))
             .foregroundStyle(.white)
@@ -174,30 +216,43 @@ struct SchedulesListView: View {
             .frame(height: 44)
             .background(CalendarUITheme.indigo)
             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+
+#if DEBUG
+            if AppConfig.isDemoFlowEnabled {
+                Button("Seed Demo Schedules") {
+                    Task { await scheduleDataSource.seedDemoIfNeeded() }
+                }
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(CalendarUITheme.textPrimary)
+                .frame(maxWidth: .infinity)
+                .frame(height: 44)
+                .background(Color.white)
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            }
+#endif
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    private static let seedSchedules: [UIScheduleTemplate] = [
-        UIScheduleTemplate(
-            title: "School Dropoff",
-            timeString: "06:45 AM",
-            recurrenceLabel: "Weekdays",
-            driverName: "Tafadzwa",
-            passengers: ["TJ", "Tawana"],
-            stopsSummary: "Home -> School",
-            isEnabled: true
-        ),
-        UIScheduleTemplate(
-            title: "School Pickup",
-            timeString: "02:30 PM",
-            recurrenceLabel: "Weekdays",
-            driverName: "Tafadzwa",
-            passengers: ["TJ", "Tawana"],
-            stopsSummary: "School -> Home",
-            isEnabled: true
-        )
-    ]
+    private func weekdaysLabel(_ weekdays: Set<Int>) -> String {
+        let ordered = [2, 3, 4, 5, 6, 7, 1]
+        let labels: [Int: String] = [1: "Sun", 2: "Mon", 3: "Tue", 4: "Wed", 5: "Thu", 6: "Fri", 7: "Sat"]
+        let names = ordered.compactMap { day in
+            weekdays.contains(day) ? labels[day] : nil
+        }
+        if names == ["Mon", "Tue", "Wed", "Thu", "Fri"] { return "Weekdays" }
+        return names.joined(separator: ", ")
+    }
+
+    private func timeText(_ template: SystemDomain.ScheduleTemplate) -> String {
+        var components = DateComponents()
+        components.hour = template.hour
+        components.minute = template.minute
+        let date = Calendar.current.date(from: components) ?? Date()
+        let formatter = DateFormatter()
+        formatter.dateFormat = "h:mm a"
+        return formatter.string(from: date)
+    }
 }
 
 extension UIScheduleTemplate {
@@ -236,16 +291,15 @@ extension UIScheduleTemplate {
             driverName: driverName,
             passengerNames: passengers,
             isEnabled: isEnabled,
-            stops: normalizedStops.isEmpty
-                ? [
-                    .init(type: "Pickup", label: "Home", address: ""),
-                    .init(type: "Dropoff", label: "School", address: "")
-                ]
-                : normalizedStops
+            stops: normalizedStops
         )
     }
 }
 
 #Preview {
-    SchedulesListView()
+    NavigationStack {
+        SchedulesListView()
+            .environmentObject(ScheduleDataSource())
+            .environmentObject(RunDataSource())
+    }
 }

@@ -37,6 +37,12 @@ struct MainMenuView: View {
 
             Section {
                 sectionHeader("Preferences")
+                menuRow(title: "Driver Mode", icon: "steeringwheel") {
+                    path.append(Destination.driverModeSelector)
+                }
+                menuRow(title: "Schedules", icon: "calendar") {
+                    path.append(Destination.schedulesList)
+                }
                 menuRow(title: "Notifications", icon: "bell.fill") {
                     path.append(Destination.notificationsInbox)
                 }
@@ -60,6 +66,15 @@ struct MainMenuView: View {
                     path.append(Destination.about)
                 }
             }
+
+#if DEBUG
+            Section {
+                sectionHeader("System")
+                menuRow(title: "System Tools", icon: "wrench.and.screwdriver.fill") {
+                    path.append(Destination.systemTools)
+                }
+            }
+#endif
 
             Section {
                 Button("Sign out", role: .destructive) {

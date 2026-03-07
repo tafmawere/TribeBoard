@@ -4,7 +4,7 @@ import Combine
 
 @MainActor
 final class RunDetailsViewModel: ObservableObject {
-    @Published var run: Run?
+    @Published var run: SystemDomain.RunInstance?
     @Published var isLoading = false
     @Published var errorMessage: String?
     @Published var showAlert = false
@@ -17,18 +17,18 @@ final class RunDetailsViewModel: ObservableObject {
     var onOpenObserverLive: (() -> Void)?
     var onOpenCompletionSummary: (() -> Void)?
 
-    private let runsProvider: () -> [Run]
+    private weak var runDataSource: RunDataSource?
     private let startRunHandler: ((String) async throws -> Void)?
 
     init(
         runId: String,
         currentUserId: String,
-        runsProvider: (() -> [Run])? = nil,
+        runDataSource: RunDataSource? = nil,
         startRunHandler: ((String) async throws -> Void)? = nil
     ) {
         self.runId = runId
         self.currentUserId = currentUserId
-        self.runsProvider = runsProvider ?? { MockHomeData.mockRuns }
+        self.runDataSource = runDataSource
         self.startRunHandler = startRunHandler
     }
 
@@ -36,7 +36,13 @@ final class RunDetailsViewModel: ObservableObject {
         isLoading = true
         defer { isLoading = false }
 
-        let found = runsProvider().first { $0.id == runId }
+        guard let runDataSource else {
+            run = nil
+            errorMessage = "Run data is unavailable."
+            return
+        }
+        await runDataSource.refresh()
+        let found = runDataSource.run(withId: runId)
         run = found
         if found == nil {
             errorMessage = "Run not found."
@@ -47,7 +53,7 @@ final class RunDetailsViewModel: ObservableObject {
 
     func startRun() async {
         guard let run else { return }
-        guard run.driverId == currentUserId else {
+        guard run.driverId?.uuidString == currentUserId else {
             alertMessage = "Only the assigned driver can start this run."
             showAlert = true
             return
@@ -55,7 +61,7 @@ final class RunDetailsViewModel: ObservableObject {
 
         if let startRunHandler {
             do {
-                try await startRunHandler(run.id)
+                try await startRunHandler(run.id.uuidString)
                 onOpenDriverLive?()
             } catch {
                 alertMessage = "Unable to start run right now."
@@ -72,11 +78,11 @@ final class RunDetailsViewModel: ObservableObject {
     func openInMaps() {
         guard
             let run,
-            let firstStop = run.stops.first
+            let firstStop = run.stopSnapshots.first
         else { return }
 
-        let lat = firstStop.location.latitude
-        let lng = firstStop.location.longitude
+        let lat = firstStop.latitude
+        let lng = firstStop.longitude
         if let url = URL(string: "http://maps.apple.com/?daddr=\(lat),\(lng)") {
             UIApplication.shared.open(url)
         }
@@ -88,8 +94,8 @@ final class RunDetailsViewModel: ObservableObject {
         case .scheduled:
             // Scheduled uses explicit Start Run button.
             break
-        case .activeEnroute, .arrivedAtStop, .paused:
-            if run.driverId == currentUserId {
+        case .inProgress:
+            if run.driverId?.uuidString == currentUserId {
                 onOpenDriverLive?()
             } else {
                 onOpenObserverLive?()

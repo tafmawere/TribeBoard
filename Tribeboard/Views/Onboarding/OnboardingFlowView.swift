@@ -48,10 +48,14 @@ struct OnboardingFlowView: View {
     @State private var venueSetupRoute: VenueSetupRoute = .addVenue
     @State private var previewWeekdaySelection: OnboardingWeekday = .monday
     @State private var showingSetupSuccessMoment = false
+    private let adaptiveCardBackground = Color(uiColor: .secondarySystemBackground)
+    private let adaptiveFieldBackground = Color(uiColor: .tertiarySystemBackground)
+    private let adaptiveChipBackground = Color(uiColor: .tertiarySystemBackground)
+    private let adaptiveBorder = Color(uiColor: .separator).opacity(0.35)
 
     var body: some View {
         ZStack {
-            Color(red: 0.976, green: 0.980, blue: 0.984).ignoresSafeArea()
+            Color(uiColor: .systemBackground).ignoresSafeArea()
 
             VStack(spacing: 16) {
                 header
@@ -99,7 +103,7 @@ struct OnboardingFlowView: View {
                     Image(systemName: "chevron.left")
                         .font(.system(size: 16, weight: .semibold))
                         .frame(width: 36, height: 36)
-                        .background(Color.white)
+                        .background(adaptiveCardBackground)
                         .clipShape(Circle())
                 }
                 .buttonStyle(.plain)
@@ -206,7 +210,7 @@ struct OnboardingFlowView: View {
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 10)
-                .background(Color(red: 0.98, green: 0.96, blue: 0.90))
+                .background(Color(uiColor: .secondarySystemBackground))
                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 .padding(.bottom, 8)
             }
@@ -509,7 +513,7 @@ struct OnboardingFlowView: View {
                             .foregroundStyle(venueTypeSelection == type ? .white : .secondary)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 6)
-                            .background(venueTypeSelection == type ? Color(red: 0.388, green: 0.400, blue: 0.945) : Color.black.opacity(0.06))
+                            .background(venueTypeSelection == type ? Color(red: 0.388, green: 0.400, blue: 0.945) : adaptiveChipBackground)
                             .clipShape(Capsule())
                             .buttonStyle(.plain)
                         }
@@ -548,11 +552,11 @@ struct OnboardingFlowView: View {
                             }
                         }
                         .frame(maxHeight: 160)
-                        .background(Color.white)
+                        .background(adaptiveFieldBackground)
                         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                         .overlay {
                             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .stroke(Color.black.opacity(0.08), lineWidth: 1)
+                                .stroke(adaptiveBorder, lineWidth: 1)
                         }
                     }
                 }
@@ -684,7 +688,7 @@ struct OnboardingFlowView: View {
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 12)
-                .background(Color.white)
+                .background(adaptiveCardBackground)
                 .clipShape(Capsule())
 
                 primaryButton("Done") {
@@ -722,7 +726,7 @@ struct OnboardingFlowView: View {
                                 .foregroundStyle(tripModeSelection == mode ? .white : .secondary)
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 6)
-                                .background(tripModeSelection == mode ? Color(red: 0.388, green: 0.400, blue: 0.945) : Color.black.opacity(0.06))
+                                .background(tripModeSelection == mode ? Color(red: 0.388, green: 0.400, blue: 0.945) : adaptiveChipBackground)
                                 .clipShape(Capsule())
                                 .buttonStyle(.plain)
                         }
@@ -756,7 +760,7 @@ struct OnboardingFlowView: View {
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 12)
-                .background(Color.white)
+                .background(adaptiveCardBackground)
                 .clipShape(Capsule())
 
                 primaryButton("Save Rule") {
@@ -850,7 +854,7 @@ struct OnboardingFlowView: View {
         content()
             .padding(20)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.white)
+            .background(adaptiveCardBackground)
             .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
             .shadow(color: .black.opacity(0.06), radius: 10, x: 0, y: 3)
     }
@@ -911,7 +915,7 @@ struct OnboardingFlowView: View {
             .foregroundStyle(isSelected ? .white : .secondary)
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
-            .background(isSelected ? Color(red: 0.388, green: 0.400, blue: 0.945) : Color.black.opacity(0.06))
+            .background(isSelected ? Color(red: 0.388, green: 0.400, blue: 0.945) : adaptiveChipBackground)
             .clipShape(Capsule())
         }
         .disabled(isDisabled)
@@ -1023,7 +1027,7 @@ struct OnboardingFlowView: View {
                 .foregroundStyle(selected ? .white : .secondary)
                 .padding(.horizontal, 9)
                 .padding(.vertical, 7)
-                .background(selected ? Color(red: 0.388, green: 0.400, blue: 0.945) : Color.black.opacity(0.06))
+                .background(selected ? Color(red: 0.388, green: 0.400, blue: 0.945) : adaptiveChipBackground)
                 .clipShape(Capsule())
                 .buttonStyle(.plain)
             }
@@ -1044,7 +1048,7 @@ struct OnboardingFlowView: View {
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(selected ? .white : .secondary)
                 .frame(width: 32, height: 32)
-                .background(selected ? Color(red: 0.388, green: 0.400, blue: 0.945) : Color.black.opacity(0.06))
+                .background(selected ? Color(red: 0.388, green: 0.400, blue: 0.945) : adaptiveChipBackground)
                 .clipShape(Circle())
                 .buttonStyle(.plain)
             }
@@ -1262,7 +1266,7 @@ struct OnboardingFlowView: View {
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 22)
-            .background(Color.white)
+            .background(adaptiveCardBackground)
             .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
             .shadow(color: .black.opacity(0.15), radius: 18, x: 0, y: 10)
             .padding(.horizontal, 26)

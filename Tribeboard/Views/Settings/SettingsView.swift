@@ -5,6 +5,10 @@ struct SettingsView: View {
     @AppStorage("profile.displayName") private var displayName = "Tafadzwa Mawere"
     @AppStorage("profile.activeRole") private var activeRoleRawValue = "driver"
     @AppStorage("profile.isAdmin") private var isAdmin = true
+    @AppStorage(AppSettings.notificationLeadMinutesKey) private var notificationLeadMinutes = 15
+    @AppStorage(AppSettings.arrivalRadiusMetersKey) private var arrivalRadiusMeters = 100.0
+    @AppStorage(AppSettings.allowGoogleMapsKey) private var allowGoogleMaps = true
+    @AppStorage(AppSettings.allowWazeKey) private var allowWaze = true
     @State private var locationSharingEnabled = true
 
     private var currentRole: SettingsRole {
@@ -30,6 +34,7 @@ struct SettingsView: View {
             VStack(spacing: 16) {
                 profileHeaderCard
                 familySectionCard
+                householdSectionCard
                 runsCalendarSectionCard
                 safetyPrivacySectionCard
                 appSectionCard
@@ -92,14 +97,23 @@ struct SettingsView: View {
                 } label: {
                     SettingsRow(icon: "person.3.fill", title: "Family Members & Roles", showsChevron: true)
                 }
+            }
+        }
+    }
 
-                SettingsRow(
-                    icon: "arrow.triangle.2.circlepath",
-                    title: "Switch Tribe",
-                    subtitle: "Demo only",
-                    showsChevron: true
-                ) {
-                    print("Switch Tribe tapped")
+    private var householdSectionCard: some View {
+        SettingsSectionCard {
+            sectionHeader("Household")
+            VStack(spacing: 8) {
+                NavigationLink {
+                    HouseholdSwitcherView()
+                } label: {
+                    SettingsRow(
+                        icon: "arrow.triangle.2.circlepath",
+                        title: "Switch Household",
+                        subtitle: "Choose active family",
+                        showsChevron: true
+                    )
                 }
             }
         }
@@ -161,6 +175,39 @@ struct SettingsView: View {
                     title: "About",
                     trailingValue: appVersionText
                 )
+
+                HStack {
+                    Label("Notification Lead (min)", systemImage: "bell.badge.fill")
+                        .font(.system(size: 14, weight: .semibold))
+                    Spacer()
+                    Stepper("\(notificationLeadMinutes)", value: $notificationLeadMinutes, in: 1...60)
+                        .labelsHidden()
+                }
+
+                HStack {
+                    Label("Arrival Radius (m)", systemImage: "location.circle.fill")
+                        .font(.system(size: 14, weight: .semibold))
+                    Spacer()
+                    Stepper(
+                        "\(Int(arrivalRadiusMeters))",
+                        value: $arrivalRadiusMeters,
+                        in: 25...500,
+                        step: 25
+                    )
+                    .labelsHidden()
+                }
+
+                Toggle(isOn: $allowGoogleMaps) {
+                    Label("Allow Google Maps", systemImage: "map")
+                        .font(.system(size: 14, weight: .semibold))
+                }
+                .tint(Color.indigo)
+
+                Toggle(isOn: $allowWaze) {
+                    Label("Allow Waze", systemImage: "car")
+                        .font(.system(size: 14, weight: .semibold))
+                }
+                .tint(Color.indigo)
             }
         }
     }
@@ -303,7 +350,7 @@ private struct SettingsPlaceholderView: View {
                 .foregroundStyle(Color(red: 0.388, green: 0.400, blue: 0.945))
             Text(title)
                 .font(.system(size: 20, weight: .bold))
-            Text("Placeholder screen")
+            Text("This section is available in upcoming internal builds.")
                 .font(.system(size: 14, weight: .regular))
                 .foregroundStyle(.secondary)
         }

@@ -22,13 +22,15 @@ struct JoinTribeView: View {
 
                         TextField("Invite code", text: $inviteCode)
                             .textInputAutocapitalization(.characters)
+                            .foregroundStyle(.primary)
+                            .tint(TribeTheme.primary)
                             .padding(.horizontal, 14)
                             .padding(.vertical, 12)
-                            .background(Color.white)
+                            .background(Color(uiColor: .tertiarySystemBackground))
                             .overlay {
                                 RoundedRectangle(cornerRadius: 12, style: .continuous)
                                     .stroke(
-                                        inlineError == nil ? Color.black.opacity(0.08) : Color.red.opacity(0.45),
+                                        inlineError == nil ? Color(uiColor: .separator).opacity(0.35) : Color.red.opacity(0.6),
                                         lineWidth: 1
                                     )
                             }

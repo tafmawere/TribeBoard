@@ -359,7 +359,7 @@ struct Routine: Identifiable, Hashable {
     }
 }
 
-struct ScheduleTemplate: Identifiable, Hashable {
+struct LegacyScheduleTemplate: Identifiable, Hashable {
     let id: UUID
     var title: String
     var type: ScheduleType
@@ -421,7 +421,7 @@ struct MobilityRunEvent: Identifiable, Hashable {
     }
 }
 
-struct RunInstance: Identifiable, Hashable {
+struct LegacyRunInstance: Identifiable, Hashable {
     let id: UUID
     var scheduleTemplateId: UUID?
     var title: String

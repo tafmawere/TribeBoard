@@ -8,8 +8,18 @@ enum RunsOverviewTab: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
+enum RunsBoardMode: String, CaseIterable, Identifiable {
+    case runs = "Runs"
+    case dispatch = "Dispatch"
+
+    var id: String { rawValue }
+}
+
 struct RunsOverviewView: View {
+    @EnvironmentObject private var runDataSource: RunDataSource
+    @EnvironmentObject private var driverDataSource: DriverDataSource
     @Binding var selectedTab: RunsOverviewTab
+    @Binding var boardMode: RunsBoardMode
     let todayRuns: [UIRun]
     let upcomingRuns: [UIRun]
     let historyRuns: [UIRun]
@@ -24,6 +34,7 @@ struct RunsOverviewView: View {
 
     init(
         selectedTab: Binding<RunsOverviewTab>,
+        boardMode: Binding<RunsBoardMode> = .constant(.runs),
         todayRuns: [UIRun],
         upcomingRuns: [UIRun],
         historyRuns: [UIRun],
@@ -37,6 +48,7 @@ struct RunsOverviewView: View {
         onViewCalendar: (() -> Void)? = nil
     ) {
         self._selectedTab = selectedTab
+        self._boardMode = boardMode
         self.todayRuns = todayRuns
         self.upcomingRuns = upcomingRuns
         self.historyRuns = historyRuns
@@ -88,100 +100,135 @@ struct RunsOverviewView: View {
         activeRun == nil && todayRuns.isEmpty && upcomingRuns.isEmpty && suggestedRuns.isEmpty
     }
 
+    private var shouldShowGlobalEmptyState: Bool {
+        runDataSource.runs.isEmpty && !runDataSource.isLoading
+    }
+
+    private var isRefreshInProgress: Bool {
+        runDataSource.isRefreshing || runDataSource.isLoading
+    }
+
     var body: some View {
         ZStack {
             UIRunDesignSystem.background.ignoresSafeArea()
 
-            ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
-                    header
-                    Text(situationalSummaryText)
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(UIRunDesignSystem.textSecondary)
-                    tabs
+            VStack(spacing: 0) {
+                boardModeToggle
+                    .padding(.horizontal, 16)
+                    .padding(.top, 12)
+                    .padding(.bottom, 8)
 
-                    if selectedTab == .today {
-                        todayAtAGlanceCard
-                        quickActionsCard
-
-                        if hasNoRunData {
-                            emptyRunsCard
-                        }
-
-                        if let activeRun {
-                            Text("Active Run")
-                                .font(.system(size: 18, weight: .bold))
-                                .foregroundStyle(UIRunDesignSystem.textPrimary)
-                            activeRunCard(activeRun)
-                        }
-
-                        if !suggestedRuns.isEmpty {
-                            Text("Suggested Runs")
-                                .font(.system(size: 18, weight: .bold))
-                                .foregroundStyle(UIRunDesignSystem.textPrimary)
-
-                            ForEach(suggestedRuns) { suggestion in
-                                suggestedRunCard(suggestion)
+                if boardMode == .dispatch {
+                    DailyDispatchView(onOpenRunDetails: onOpenRunDetails)
+                        .environmentObject(runDataSource)
+                        .environmentObject(driverDataSource)
+                } else {
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 14) {
+                            header
+                            Text(situationalSummaryText)
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundStyle(UIRunDesignSystem.textSecondary)
+                            tabs
+                            if shouldShowGlobalEmptyState {
+                                runsDataEmptyStateCard
                             }
-                        }
-                    }
 
-                    Text(
-                        selectedTab == .history
-                        ? "Past Runs"
-                        : (selectedTab == .today ? "Up Next" : "Runs")
-                    )
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundStyle(UIRunDesignSystem.textPrimary)
+                            if selectedTab == .today {
+                                todayAtAGlanceCard
+                                quickActionsCard
 
-                    if runsForCurrentSection.isEmpty {
-                        if selectedTab == .today {
-                            if !hasNoRunData {
-                                UICard {
-                                    Text("No upcoming runs today.")
-                                        .font(.system(size: 15, weight: .semibold))
-                                        .foregroundStyle(UIRunDesignSystem.textSecondary)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                        .padding(.vertical, 8)
+                                if hasNoRunData && !shouldShowGlobalEmptyState {
+                                    emptyRunsCard
                                 }
-                            }
-                        } else if selectedTab == .upcoming {
-                            upcomingEmptyState
-                        } else {
-                            UICard {
-                                VStack(spacing: 10) {
-                                    Image(systemName: "car.fill")
-                                        .font(.system(size: 28, weight: .semibold))
-                                        .foregroundStyle(UIRunDesignSystem.primary)
-                                    Text("No runs in \(selectedTab.rawValue.lowercased())")
-                                        .font(.system(size: 17, weight: .semibold))
+
+                                if let activeRun {
+                                    Text("Active Run")
+                                        .font(.system(size: 18, weight: .bold))
                                         .foregroundStyle(UIRunDesignSystem.textPrimary)
-                                    Text("Create a run to coordinate pickups and dropoffs.")
-                                        .font(.system(size: 14, weight: .regular))
-                                        .foregroundStyle(UIRunDesignSystem.textSecondary)
-                                        .multilineTextAlignment(.center)
+                                    activeRunCard(activeRun)
                                 }
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 8)
+
+                                if !suggestedRuns.isEmpty {
+                                    Text("Suggested Runs")
+                                        .font(.system(size: 18, weight: .bold))
+                                        .foregroundStyle(UIRunDesignSystem.textPrimary)
+
+                                    LazyVStack(spacing: 10) {
+                                        ForEach(suggestedRuns) { suggestion in
+                                            suggestedRunCard(suggestion)
+                                        }
+                                    }
+                                }
                             }
-                        }
-                    } else {
-                        ForEach(runsForCurrentSection) { run in
-                            UIRunCard(run: run) {
-                                onOpenRunDetails(run)
-                            }
-                            .saturation(selectedTab == .history ? 0.72 : 1.0)
-                            .opacity(selectedTab == .history ? 0.84 : 1.0)
-                            .shadow(
-                                color: selectedTab == .history ? Color.black.opacity(0.025) : Color.clear,
-                                radius: selectedTab == .history ? 6 : 0,
-                                x: 0,
-                                y: selectedTab == .history ? 3 : 0
+
+                            Text(
+                                selectedTab == .history
+                                ? "Past Runs"
+                                : (selectedTab == .today ? "Up Next" : "Runs")
                             )
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundStyle(UIRunDesignSystem.textPrimary)
+
+                            if runsForCurrentSection.isEmpty {
+                                if shouldShowGlobalEmptyState {
+                                    EmptyView()
+                                } else
+                                if selectedTab == .today {
+                                    if !hasNoRunData {
+                                        UICard {
+                                            Text("No upcoming runs today.")
+                                                .font(.system(size: 15, weight: .semibold))
+                                                .foregroundStyle(UIRunDesignSystem.textSecondary)
+                                                .frame(maxWidth: .infinity, alignment: .leading)
+                                                .padding(.vertical, 8)
+                                        }
+                                    }
+                                } else if selectedTab == .upcoming {
+                                    upcomingEmptyState
+                                } else {
+                                    UICard {
+                                        VStack(spacing: 10) {
+                                            Image(systemName: "car.fill")
+                                                .font(.system(size: 28, weight: .semibold))
+                                                .foregroundStyle(UIRunDesignSystem.primary)
+                                            Text("No runs in \(selectedTab.rawValue.lowercased())")
+                                                .font(.system(size: 17, weight: .semibold))
+                                                .foregroundStyle(UIRunDesignSystem.textPrimary)
+                                            Text("Create a run to coordinate pickups and dropoffs.")
+                                                .font(.system(size: 14, weight: .regular))
+                                                .foregroundStyle(UIRunDesignSystem.textSecondary)
+                                                .multilineTextAlignment(.center)
+                                        }
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 8)
+                                    }
+                                }
+                            } else {
+                                LazyVStack(spacing: 10) {
+                                    ForEach(runsForCurrentSection) { run in
+                                        UIRunCard(run: run) {
+                                            onOpenRunDetails(run)
+                                        }
+                                        .saturation(selectedTab == .history ? 0.72 : 1.0)
+                                        .opacity(selectedTab == .history ? 0.84 : 1.0)
+                                        .shadow(
+                                            color: selectedTab == .history ? Color.black.opacity(0.025) : Color.clear,
+                                            radius: selectedTab == .history ? 6 : 0,
+                                            x: 0,
+                                            y: selectedTab == .history ? 3 : 0
+                                        )
+                                    }
+                                }
+                            }
                         }
+                        .padding(16)
+                    }
+                    .refreshable {
+                        await runDataSource.refresh()
+                        await driverDataSource.refresh()
                     }
                 }
-                .padding(16)
             }
         }
         .navigationTitle("Runs")
@@ -210,6 +257,26 @@ struct RunsOverviewView: View {
                         .padding(.vertical, 10)
                         .padding(.horizontal, 2)
                         .background(selectedTab == tab ? UIRunDesignSystem.primary : Color.white)
+                        .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private var boardModeToggle: some View {
+        HStack(spacing: 6) {
+            ForEach(RunsBoardMode.allCases) { mode in
+                Button {
+                    boardMode = mode
+                } label: {
+                    Text(mode.rawValue)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(boardMode == mode ? .white : UIRunDesignSystem.textSecondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .padding(.horizontal, 2)
+                        .background(boardMode == mode ? UIRunDesignSystem.primary : Color.white)
                         .clipShape(Capsule())
                 }
                 .buttonStyle(.plain)
@@ -291,6 +358,68 @@ struct RunsOverviewView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.vertical, 2)
+        }
+    }
+
+    private var runsDataEmptyStateCard: some View {
+        UICard {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("No runs yet")
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundStyle(UIRunDesignSystem.textPrimary)
+                Text("Runs come from schedules. Add schedules next, or refresh demo runs.")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(UIRunDesignSystem.textSecondary)
+                HStack(spacing: 10) {
+                    if let onViewCalendar {
+                        Button {
+                            onViewCalendar()
+                        } label: {
+                            Text("Open Calendar")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(UIRunDesignSystem.textPrimary)
+                                .frame(maxWidth: .infinity)
+                                .frame(minHeight: 44)
+                                .background(Color.black.opacity(0.06))
+                                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        }
+                        .buttonStyle(.plain)
+                    } else {
+                        Text("Calendar coming next")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(UIRunDesignSystem.textSecondary)
+                            .frame(maxWidth: .infinity)
+                            .frame(minHeight: 44)
+                            .background(Color.black.opacity(0.04))
+                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    }
+
+                    Button {
+                        Task { await runDataSource.refresh() }
+                    } label: {
+                        Group {
+                            if isRefreshInProgress {
+                                HStack(spacing: 8) {
+                                    ProgressView()
+                                        .tint(.white)
+                                    Text("Refreshing...")
+                                }
+                            } else {
+                                Text("Refresh")
+                            }
+                        }
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .frame(minHeight: 44)
+                        .background(UIRunDesignSystem.primary.opacity(isRefreshInProgress ? 0.7 : 1.0))
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isRefreshInProgress)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
@@ -546,6 +675,7 @@ struct RunsOverviewView: View {
     NavigationStack {
         RunsOverviewView(
             selectedTab: .constant(.today),
+            boardMode: .constant(.runs),
             todayRuns: [UIRunMockData.scheduledRun],
             upcomingRuns: [UIRunMockData.scheduledRun],
             historyRuns: UIRunMockData.historyRuns,
@@ -557,5 +687,7 @@ struct RunsOverviewView: View {
             onSnoozeSuggestion: { _ in },
             onDismissSuggestion: { _ in }
         )
+        .environmentObject(RunDataSource())
+        .environmentObject(DriverDataSource())
     }
 }

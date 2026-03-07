@@ -1,12 +1,13 @@
 import SwiftUI
 
 enum AuthTheme {
-    static let background = Color(red: 0.976, green: 0.980, blue: 0.984) // #F9FAFB
+    static let background = Color(uiColor: .systemBackground)
     static let primary = Color(red: 0.388, green: 0.400, blue: 0.945) // #6366F1
-    static let textPrimary = Color(red: 0.098, green: 0.110, blue: 0.145)
-    static let textSecondary = Color(red: 0.384, green: 0.459, blue: 0.612)
-    static let cardBorder = Color.black.opacity(0.08)
-    static let cardFill = Color.white.opacity(0.9)
+    static let textPrimary = Color.primary
+    static let textSecondary = Color.secondary
+    static let cardBorder = Color(uiColor: .separator).opacity(0.35)
+    static let cardFill = Color(uiColor: .secondarySystemBackground)
+    static let fieldFill = Color(uiColor: .tertiarySystemBackground)
 }
 
 struct AuthScreenContainer<Content: View>: View {
@@ -38,17 +39,27 @@ struct AuthCardField: View {
 
             Group {
                 if isSecure {
-                    SecureField(placeholder, text: $text)
+                    SecureField(
+                        "",
+                        text: $text,
+                        prompt: Text(placeholder).foregroundStyle(.secondary)
+                    )
                 } else {
-                    TextField(placeholder, text: $text)
+                    TextField(
+                        "",
+                        text: $text,
+                        prompt: Text(placeholder).foregroundStyle(.secondary)
+                    )
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                 }
             }
             .font(.system(size: 16, weight: .regular))
+            .foregroundStyle(.primary)
+            .tint(AuthTheme.primary)
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
-            .background(AuthTheme.cardFill)
+            .background(AuthTheme.fieldFill)
             .overlay {
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .stroke(AuthTheme.cardBorder, lineWidth: 1)
@@ -101,7 +112,7 @@ struct AuthSecondaryOutlineButton: View {
                 .padding(.vertical, 18)
                 .background(
                     Capsule(style: .continuous)
-                        .fill(AuthTheme.background)
+                        .fill(Color(uiColor: .secondarySystemBackground))
                 )
                 .overlay {
                     Capsule(style: .continuous)
@@ -144,7 +155,7 @@ struct AuthCheckboxRow: View {
 
                 Text(label)
                     .font(.system(size: 14, weight: .regular))
-                    .foregroundStyle(AuthTheme.textSecondary)
+                    .foregroundStyle(AuthTheme.textPrimary)
 
                 Spacer(minLength: 0)
             }
@@ -159,13 +170,13 @@ struct AuthDividerText: View {
     var body: some View {
         HStack(spacing: 12) {
             Rectangle()
-                .fill(Color.black.opacity(0.10))
+                .fill(Color(uiColor: .separator))
                 .frame(height: 1)
             Text(text)
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(AuthTheme.textSecondary)
             Rectangle()
-                .fill(Color.black.opacity(0.10))
+                .fill(Color(uiColor: .separator))
                 .frame(height: 1)
         }
     }

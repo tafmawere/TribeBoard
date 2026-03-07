@@ -30,11 +30,11 @@ private struct SocialAuthButton: View {
             }
             .padding(.horizontal, 16)
             .frame(height: 52)
-            .background(isAppleStyle ? Color.black : Color.white)
-            .foregroundColor(isAppleStyle ? .white : .black)
+            .background(isAppleStyle ? Color.primary : Color(uiColor: .secondarySystemBackground))
+            .foregroundStyle(isAppleStyle ? Color(uiColor: .systemBackground) : Color.primary)
             .overlay {
                 RoundedRectangle(cornerRadius: 14)
-                    .stroke(isAppleStyle ? Color.clear : Color.black.opacity(0.12), lineWidth: 1)
+                    .stroke(isAppleStyle ? Color.clear : Color(uiColor: .separator).opacity(0.35), lineWidth: 1)
             }
             .cornerRadius(14)
             .shadow(color: Color.black.opacity(isAppleStyle ? 0.18 : 0.06), radius: 10, x: 0, y: 4)

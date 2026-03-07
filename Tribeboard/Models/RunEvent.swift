@@ -13,8 +13,8 @@ struct RunEvent: Codable, Identifiable {
     let type: RunEventType
     let timestamp: Date
     let actorId: String
-    let stateBefore: RunStatus?
-    let stateAfter: RunStatus
+    let stateBefore: LegacyRunStatus?
+    let stateAfter: LegacyRunStatus
     let currentStopIndex: Int
     let location: GeoPoint?
     let note: String?
@@ -24,8 +24,8 @@ struct RunEvent: Codable, Identifiable {
          type: RunEventType,
          timestamp: Date = Date(),
          actorId: String,
-         stateBefore: RunStatus?,
-         stateAfter: RunStatus,
+         stateBefore: LegacyRunStatus?,
+         stateAfter: LegacyRunStatus,
          currentStopIndex: Int,
          location: GeoPoint? = nil,
          note: String? = nil) {

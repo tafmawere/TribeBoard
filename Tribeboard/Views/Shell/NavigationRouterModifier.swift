@@ -64,6 +64,12 @@ struct DestinationNavigationRouter: ViewModifier {
                 case .about:
                     AboutView()
 
+                case .systemTools:
+                    SystemToolsView()
+
+                case .driverModeSelector:
+                    DriverModeSelectorView()
+
                 case let .error(message):
                     ShellMessageErrorView(message: message)
                 }
@@ -80,20 +86,8 @@ extension View {
 private struct RunDetailsRouteView: View {
     let runId: String
 
-    private var resolvedRun: UIRun {
-        let allRuns = [UIRunMockData.activeRun, UIRunMockData.scheduledRun] + UIRunMockData.historyRuns
-        return allRuns.first(where: { $0.backingRunId == runId }) ?? UIRunMockData.activeRun
-    }
-
     var body: some View {
-        RunDetailView(run: resolvedRun)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Text(runId)
-                        .font(.caption2)
-                        .foregroundStyle(GeneralUXTheme.textSecondary)
-                }
-            }
+        RunExecutionDetailView(runId: runId)
     }
 }
 
@@ -103,13 +97,6 @@ private struct RunEditRouteView: View {
     var body: some View {
         RunEditRescheduleView(run: RunDetailsData.scheduledRun) { _ in }
             .navigationTitle("Edit Run")
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Text(runId)
-                        .font(.caption2)
-                        .foregroundStyle(GeneralUXTheme.textSecondary)
-                }
-            }
     }
 }
 
@@ -118,13 +105,6 @@ private struct RunHistoryDetailRouteView: View {
 
     var body: some View {
         RunHistoryDetailView(run: RunDetailsData.completedRun)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Text(runId)
-                        .font(.caption2)
-                        .foregroundStyle(GeneralUXTheme.textSecondary)
-                }
-            }
     }
 }
 
@@ -134,24 +114,22 @@ private struct CancelRunRouteView: View {
     var body: some View {
         CancelRunDemoHostView()
             .navigationTitle("Cancel Run")
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Text(runId)
-                        .font(.caption2)
-                        .foregroundStyle(GeneralUXTheme.textSecondary)
-                }
-            }
     }
 }
 
 private struct ScheduleEditorRouteView: View {
     let scheduleId: String?
+    @EnvironmentObject private var scheduleDataSource: ScheduleDataSource
 
     var body: some View {
-        if scheduleId == nil {
-            ScheduleEditorView(mode: .create) { _ in }
+        if
+            let scheduleId,
+            let uuid = UUID(uuidString: scheduleId),
+            let template = scheduleDataSource.templates.first(where: { $0.id == uuid })
+        {
+            ScheduleEditorView(mode: .edit(template.asCalendarSchedule)) { _ in }
         } else {
-            ScheduleEditorDestinationPlaceholder(scheduleId: scheduleId)
+            ScheduleEditorView(mode: .create) { _ in }
         }
     }
 }

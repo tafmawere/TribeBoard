@@ -2,11 +2,11 @@ import SwiftUI
 import UIKit
 
 enum TribeTheme {
-    static let background = Color(red: 0.976, green: 0.980, blue: 0.984) // #F9FAFB
-    static let card = Color.white
+    static let background = Color(uiColor: .systemBackground)
+    static let card = Color(uiColor: .secondarySystemBackground)
     static let primary = Color(red: 0.388, green: 0.400, blue: 0.945) // #6366F1
-    static let textPrimary = Color(red: 0.098, green: 0.110, blue: 0.145)
-    static let textSecondary = Color(red: 0.376, green: 0.451, blue: 0.600)
+    static let textPrimary = Color.primary
+    static let textSecondary = Color.secondary
 }
 
 struct TribeCard<Content: View>: View {
@@ -81,10 +81,10 @@ struct TribeSearchBar: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
-        .background(Color.white)
+        .background(Color(uiColor: .tertiarySystemBackground))
         .overlay {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(Color.black.opacity(0.08), lineWidth: 1)
+                .stroke(Color(uiColor: .separator).opacity(0.35), lineWidth: 1)
         }
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .shadow(color: Color.black.opacity(0.04), radius: 8, x: 0, y: 5)
@@ -135,7 +135,7 @@ struct MemberRow: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
-        .background(Color.white)
+        .background(Color(uiColor: .tertiarySystemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .shadow(color: Color.black.opacity(0.04), radius: 8, x: 0, y: 4)
         .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))

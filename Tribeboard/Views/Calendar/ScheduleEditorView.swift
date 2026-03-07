@@ -6,7 +6,15 @@ struct ScheduleEditorView: View {
         case edit(CalendarMockModel.UISchedule)
     }
 
+    private struct EditableStop: Identifiable {
+        let id: UUID
+        var label: String
+        var latitude: String
+        var longitude: String
+    }
+
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var scheduleDataSource: ScheduleDataSource
 
     let mode: Mode
     let isOnboardingContext: Bool
@@ -14,17 +22,13 @@ struct ScheduleEditorView: View {
 
     @State private var title: String
     @State private var time: Date
-    @State private var recurrence: RecurrenceKind
-    @State private var weeklyDays: Set<Int>
-    @State private var oneOffDate: Date
-    @State private var driverName: String
-    @State private var selectedPassengers: Set<String>
-    @State private var stops: [CalendarMockModel.UIStop]
+    @State private var weekdays: Set<Int>
+    @State private var stops: [EditableStop]
     @State private var isEnabled: Bool
+    @State private var showDeleteAlert = false
 
     private let weekdayItems: [(Int, String)] = [(2, "Mon"), (3, "Tue"), (4, "Wed"), (5, "Thu"), (6, "Fri"), (7, "Sat"), (1, "Sun")]
-    private let drivers = ["Tafadzwa", "Rue"]
-    private let passengerPool = ["TJ", "Tawana", "Rue"]
+    private let templateId: UUID
 
     init(
         mode: Mode,
@@ -35,239 +39,331 @@ struct ScheduleEditorView: View {
         self.isOnboardingContext = isOnboardingContext
         self.onSave = onSave
 
-        let now = Date()
+        let defaultTime = Calendar.current.date(from: DateComponents(hour: 6, minute: 45)) ?? Date()
 
         switch mode {
         case .create:
+            self.templateId = UUID()
             _title = State(initialValue: "")
-            _time = State(initialValue: Calendar.current.date(from: DateComponents(hour: 6, minute: 45)) ?? now)
-            _recurrence = State(initialValue: .schoolWeek)
-            _weeklyDays = State(initialValue: Set([2, 3, 4, 5, 6]))
-            _oneOffDate = State(initialValue: now)
-            _driverName = State(initialValue: "Tafadzwa")
-            _selectedPassengers = State(initialValue: Set(["TJ", "Tawana"]))
+            _time = State(initialValue: defaultTime)
+            _weekdays = State(initialValue: [2, 3, 4, 5, 6])
             _stops = State(initialValue: [
-                CalendarMockModel.UIStop(type: "Pickup", label: "Home", address: "123 Maple St"),
-                CalendarMockModel.UIStop(type: "Dropoff", label: "School", address: "456 School Ave")
+                EditableStop(id: UUID(), label: "Home", latitude: "-17.8249", longitude: "31.0530"),
+                EditableStop(id: UUID(), label: "Friend", latitude: "-17.8150", longitude: "31.0602"),
+                EditableStop(id: UUID(), label: "School", latitude: "-17.8015", longitude: "31.0476")
             ])
             _isEnabled = State(initialValue: true)
         case let .edit(schedule):
+            self.templateId = schedule.id
             _title = State(initialValue: schedule.title)
-            _time = State(initialValue: Self.timeFromString(schedule.timeString) ?? now)
-            _recurrence = State(initialValue: schedule.recurrenceLabel.lowercased().contains("one") ? .oneTime : .schoolWeek)
-            _weeklyDays = State(initialValue: Set([2, 3, 4, 5, 6]))
-            _oneOffDate = State(initialValue: now)
-            _driverName = State(initialValue: schedule.driverName)
-            _selectedPassengers = State(initialValue: Set(schedule.passengerNames))
-            _stops = State(initialValue: schedule.stops)
+            _time = State(initialValue: Self.timeFromString(schedule.timeString) ?? defaultTime)
+            _weekdays = State(initialValue: Self.weekdaysFromRecurrence(schedule.recurrenceLabel))
+            _stops = State(initialValue: schedule.stops.enumerated().map { _, stop in
+                let split = stop.address.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
+                return EditableStop(
+                    id: UUID(),
+                    label: stop.label,
+                    latitude: split.first ?? "",
+                    longitude: split.count > 1 ? split[1] : ""
+                )
+            })
             _isEnabled = State(initialValue: schedule.isEnabled)
         }
     }
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 16) {
-                    basicInfoCard
-                    recurrenceCard
-                    participantsCard
-                    stopsCard
-                    enabledCard
-                    summaryPreviewCard
-                }
-                .padding(.horizontal, 16)
-                .padding(.top, 16)
-                .padding(.bottom, 24)
-            }
-            .background(CalendarUITheme.offWhite.ignoresSafeArea())
-            .navigationTitle(navTitle)
-            .navigationBarTitleDisplayMode(.inline)
-            .onChange(of: recurrence) { _, newValue in
-                if newValue == .schoolWeek {
-                    weeklyDays = Set([2, 3, 4, 5, 6])
+        ScrollView {
+            VStack(spacing: 16) {
+                detailsCard
+                weekdaysCard
+                stopsCard
+                enabledCard
+                if case .edit = mode {
+                    deleteCard
                 }
             }
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("Cancel") {
-                        dismiss()
+            .padding(.horizontal, 16)
+            .padding(.top, 16)
+            .padding(.bottom, 24)
+        }
+        .background(CalendarUITheme.offWhite.ignoresSafeArea())
+        .safeAreaInset(edge: .bottom) {
+            bottomActionBar
+        }
+        .navigationTitle(navTitle)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button("Cancel") { dismiss() }
+            }
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("Save") {
+                    performSave()
+                }
+                .disabled(scheduleDataSource.isWorking || !canSave)
+            }
+        }
+        .alert("Delete Schedule?", isPresented: $showDeleteAlert) {
+            Button("Delete", role: .destructive) {
+                Task {
+                    await scheduleDataSource.delete(id: templateId)
+                    dismiss()
+                }
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("This will remove the schedule template.")
+        }
+        .alert(
+            "Could Not Save Schedule",
+            isPresented: Binding(
+                get: { scheduleDataSource.lastError != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        scheduleDataSource.lastError = nil
                     }
                 }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Save Run") {
-                        saveSchedule()
-                    }
-                    .disabled(!canSave)
-                    .foregroundStyle(canSave ? CalendarUITheme.indigo : CalendarUITheme.textSecondary.opacity(0.8))
-                }
+            )
+        ) {
+            Button("OK", role: .cancel) {
+                scheduleDataSource.lastError = nil
             }
+        } message: {
+            Text(scheduleDataSource.lastError ?? "Unknown validation error.")
         }
     }
 
-    private var basicInfoCard: some View {
+    private var bottomActionBar: some View {
+        HStack(spacing: 10) {
+            Button("Cancel") {
+                dismiss()
+            }
+            .font(.system(size: 15, weight: .semibold))
+            .foregroundStyle(CalendarUITheme.textPrimary)
+            .frame(maxWidth: .infinity)
+            .frame(height: 44)
+            .background(Color.black.opacity(0.06))
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+
+            Button {
+                performSave()
+            } label: {
+                HStack(spacing: 8) {
+                    if scheduleDataSource.isWorking {
+                        ProgressView()
+                            .tint(.white)
+                    }
+                    Text(scheduleDataSource.isWorking ? "Saving..." : "Save")
+                }
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .frame(height: 44)
+                .background(CalendarUITheme.indigo)
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .disabled(scheduleDataSource.isWorking || !canSave)
+            .opacity(scheduleDataSource.isWorking || !canSave ? 0.7 : 1.0)
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 10)
+        .padding(.bottom, 12)
+        .background(.ultraThinMaterial)
+    }
+
+    private var detailsCard: some View {
         CalendarCard {
             VStack(alignment: .leading, spacing: 12) {
-                sectionTitle("Basic Info")
+                sectionTitle("Schedule Details")
                 textField("Title", text: $title)
-
                 DatePicker("Time", selection: $time, displayedComponents: .hourAndMinute)
                     .datePickerStyle(.compact)
                     .tint(CalendarUITheme.indigo)
-            }
-        }
-    }
-
-    private var recurrenceCard: some View {
-        CalendarCard {
-            VStack(alignment: .leading, spacing: 12) {
-                sectionTitle("Run type")
-                HStack(spacing: 8) {
-                    recurrenceChip(kind: .oneTime)
-                    recurrenceChip(kind: .schoolWeek)
-                    recurrenceChip(kind: .custom)
-                }
-
-                if recurrence == .custom {
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 42), spacing: 8)], spacing: 8) {
-                        ForEach(weekdayItems, id: \.0) { item in
-                            dayChip(dayCode: item.0, label: item.1)
-                        }
-                    }
-                } else if recurrence == .oneTime {
-                    DatePicker("Date", selection: $oneOffDate, displayedComponents: .date)
-                        .datePickerStyle(.compact)
+                if title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    validationText("Title is required.")
                 }
             }
         }
     }
 
-    private var participantsCard: some View {
+    private var weekdaysCard: some View {
         CalendarCard {
             VStack(alignment: .leading, spacing: 12) {
-                sectionTitle("Participants")
-                Picker("Driver", selection: $driverName) {
-                    ForEach(drivers, id: \.self) { driver in
-                        Text(driver).tag(driver)
+                sectionTitle("Weekdays")
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 44), spacing: 8)], spacing: 8) {
+                    ForEach(weekdayItems, id: \.0) { day, label in
+                        weekdayChip(day: day, label: label)
                     }
                 }
-                .pickerStyle(.menu)
-
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Passengers")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(CalendarUITheme.textSecondary)
-                    HStack {
-                        ForEach(passengerPool, id: \.self) { passenger in
-                            CalendarChip(
-                                text: passenger,
-                                selected: selectedPassengers.contains(passenger),
-                                action: {
-                                    if selectedPassengers.contains(passenger) {
-                                        selectedPassengers.remove(passenger)
-                                    } else {
-                                        selectedPassengers.insert(passenger)
-                                    }
-                                }
-                            )
-                        }
-                    }
+                if weekdays.isEmpty {
+                    validationText("Select at least one weekday.")
                 }
             }
         }
     }
 
     private var stopsCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            CalendarCard {
+        CalendarCard {
+            VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     sectionTitle("Stops")
                     Spacer()
-                    Button("Add Pickup") {
-                        stops.append(CalendarMockModel.UIStop(type: "Pickup", label: "", address: ""))
+                    Button("Add Stop") {
+                        guard stops.count < 3 else { return }
+                        stops.append(EditableStop(id: UUID(), label: "", latitude: "", longitude: ""))
                     }
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(CalendarUITheme.indigo)
-                    Button("Add Dropoff") {
-                        stops.append(CalendarMockModel.UIStop(type: "Dropoff", label: "", address: ""))
-                    }
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(CalendarUITheme.warning)
+                    .disabled(stops.count >= 3)
                 }
-            }
 
-            ForEach(stops.indices, id: \.self) { index in
-                stopCard(index: index)
-            }
+                ForEach(stops.indices, id: \.self) { index in
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text("Stop \(index + 1)")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(CalendarUITheme.textPrimary)
+                            Spacer()
+                            if stops.count > 2 {
+                                Button {
+                                    stops.remove(at: index)
+                                } label: {
+                                    Image(systemName: "trash")
+                                        .foregroundStyle(.red)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        textField("Label", text: $stops[index].label)
+                        HStack(spacing: 8) {
+                            textField("Latitude", text: $stops[index].latitude)
+                            textField("Longitude", text: $stops[index].longitude)
+                        }
+                    }
+                    .padding(12)
+                    .background(Color(uiColor: .secondarySystemBackground))
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                }
 
-            if showDropoffValidationHint {
-                Text("Add at least one dropoff to continue.")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 4)
+                if let stopsValidationMessage {
+                    validationText(stopsValidationMessage)
+                }
             }
         }
     }
 
     private var enabledCard: some View {
         CalendarCard {
-            VStack(alignment: .leading, spacing: 8) {
-                Toggle("Activate this run", isOn: $isEnabled)
-                    .font(.system(size: 15, weight: .semibold))
-                    .tint(CalendarUITheme.indigo)
-                Text("Turn off to pause without deleting.")
-                    .font(.system(size: 13, weight: .regular))
-                    .foregroundStyle(CalendarUITheme.textSecondary)
-            }
+            Toggle("Enabled", isOn: $isEnabled)
+                .font(.system(size: 15, weight: .semibold))
+                .tint(CalendarUITheme.indigo)
         }
     }
 
-    private var summaryPreviewCard: some View {
+    private var deleteCard: some View {
         CalendarCard {
-            VStack(alignment: .leading, spacing: 8) {
-                sectionTitle("Run Summary")
-                Text("\(pickupLabel) \u{2192} \(dropoffLabel)")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(CalendarUITheme.textPrimary)
-                Text("\(recurrenceSummary) \u{2022} \(Self.formatTime(time))")
-                    .font(.system(size: 14, weight: .regular))
-                    .foregroundStyle(CalendarUITheme.textSecondary)
-                Text("Driver: \(driverName) \u{2022} \(passengerCountText)")
-                    .font(.system(size: 13, weight: .regular))
-                    .foregroundStyle(CalendarUITheme.textSecondary)
+            Button(role: .destructive) {
+                showDeleteAlert = true
+            } label: {
+                Text("Delete Schedule")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(.red)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 44)
+                    .background(Color.red.opacity(0.12))
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             }
-        }
-    }
-
-    private var editingSchedule: CalendarMockModel.UISchedule? {
-        if case let .edit(schedule) = mode {
-            return schedule
-        }
-        return nil
-    }
-
-    private var recurrenceLabel: String {
-        switch recurrence {
-        case .oneTime: return "One-time"
-        case .schoolWeek: return "Weekdays"
-        case .custom: return "Custom"
+            .buttonStyle(.plain)
         }
     }
 
     private var navTitle: String {
         switch mode {
         case .create:
-            return isOnboardingContext ? "Create your first run" : "New Run"
+            return "New Schedule"
         case .edit:
-            return "Edit Run"
+            return "Edit Schedule"
         }
     }
 
     private var canSave: Bool {
         !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        pickupStops.contains(where: isStopDefined) &&
-        dropoffStops.contains(where: isStopDefined) &&
-        (recurrence == .oneTime || !weeklyDays.isEmpty)
+        !weekdays.isEmpty &&
+        hasValidStops
+    }
+
+    private var hasValidStops: Bool {
+        stopsValidationMessage == nil
+    }
+
+    private var stopsValidationMessage: String? {
+        guard stops.count >= 2 else {
+            return "Add at least 2 stops."
+        }
+        for stop in stops {
+            if stop.label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                return "Each stop must have a label."
+            }
+            guard let lat = Double(stop.latitude), let lon = Double(stop.longitude) else {
+                return "Each stop must have valid latitude and longitude values."
+            }
+            if !(-90.0...90.0).contains(lat) || !(-180.0...180.0).contains(lon) {
+                return "Latitude must be -90...90 and longitude must be -180...180."
+            }
+        }
+        return nil
+    }
+
+    private func saveTemplate() async -> Bool {
+        let existing = scheduleDataSource.templates.first(where: { $0.id == templateId })
+        let validStops = stops.enumerated().compactMap { index, stop -> SystemDomain.Stop? in
+            guard
+                !stop.label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                let lat = Double(stop.latitude),
+                let lon = Double(stop.longitude)
+            else { return nil }
+            let existingStops = existing?.stops.sorted { $0.order < $1.order } ?? []
+            let existingStopId = index < existingStops.count ? existingStops[index].id : nil
+            return SystemDomain.Stop(
+                id: existingStopId ?? UUID(),
+                name: stop.label.trimmingCharacters(in: .whitespacesAndNewlines),
+                latitude: lat,
+                longitude: lon,
+                order: index
+            )
+        }
+
+        var components = Calendar.current.dateComponents([.hour, .minute], from: time)
+        let template = SystemDomain.ScheduleTemplate(
+            id: templateId,
+            name: title.trimmingCharacters(in: .whitespacesAndNewlines),
+            childId: existing?.childId ?? UUID(),
+            driverId: existing?.driverId,
+            weekdays: weekdays,
+            hour: components.hour ?? 6,
+            minute: components.minute ?? 45,
+            stops: validStops,
+            isActive: isEnabled,
+            createdAt: existing?.createdAt ?? Date()
+        )
+
+        await scheduleDataSource.upsert(template)
+        guard scheduleDataSource.lastError == nil else {
+            return false
+        }
+        onSave(template.asCalendarSchedule)
+        return true
+    }
+
+    private func performSave() {
+        guard canSave else { return }
+        Task {
+            let saved = await saveTemplate()
+            if saved {
+                dismiss()
+            }
+        }
     }
 
     private func sectionTitle(_ text: String) -> some View {
@@ -282,184 +378,87 @@ struct ScheduleEditorView: View {
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(CalendarUITheme.textSecondary)
             TextField(title, text: text)
+                .foregroundStyle(.primary)
+                .tint(CalendarUITheme.indigo)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 10)
-                .background(Color(red: 0.952, green: 0.957, blue: 0.965))
+                .background(Color(uiColor: .tertiarySystemBackground))
                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
     }
 
-    private func saveSchedule() {
-        let saved = CalendarMockModel.UISchedule(
-            id: editingSchedule?.id ?? UUID(),
-            title: title.trimmingCharacters(in: .whitespacesAndNewlines),
-            timeString: Self.formatTime(time),
-            recurrenceLabel: recurrenceLabel,
-            driverName: driverName,
-            passengerNames: selectedPassengers.sorted(),
-            isEnabled: isEnabled,
-            stops: stops
-        )
-        onSave(saved)
-        dismiss()
-    }
-
-    private var pickupStops: [CalendarMockModel.UIStop] {
-        stops.filter { $0.type == "Pickup" }
-    }
-
-    private var dropoffStops: [CalendarMockModel.UIStop] {
-        stops.filter { $0.type == "Dropoff" }
-    }
-
-    private var pickupLabel: String {
-        pickupStops.first(where: isStopDefined)?.label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
-            ? pickupStops.first(where: isStopDefined)!.label
-            : "Home"
-    }
-
-    private var dropoffLabel: String {
-        dropoffStops.first(where: isStopDefined)?.label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
-            ? dropoffStops.first(where: isStopDefined)!.label
-            : "School"
-    }
-
-    private var recurrenceSummary: String {
-        switch recurrence {
-        case .oneTime:
-            let formatter = DateFormatter()
-            formatter.dateStyle = .medium
-            return formatter.string(from: oneOffDate)
-        case .schoolWeek:
-            return "Mon\u{2013}Fri"
-        case .custom:
-            let selected = weekdayItems.filter { weeklyDays.contains($0.0) }.map(\.1)
-            return selected.isEmpty ? "No days" : selected.joined(separator: ", ")
-        }
-    }
-
-    private var passengerCountText: String {
-        let count = selectedPassengers.count
-        return count == 1 ? "1 passenger" : "\(count) passengers"
-    }
-
-    private var showDropoffValidationHint: Bool {
-        pickupStops.contains(where: isStopDefined) && !dropoffStops.contains(where: isStopDefined)
-    }
-
-    private func isStopDefined(_ stop: CalendarMockModel.UIStop) -> Bool {
-        !stop.label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        !stop.address.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
-
-    private func recurrenceChip(kind: RecurrenceKind) -> some View {
-        Button {
-            recurrence = kind
-        } label: {
-            Text(kind.rawValue)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(recurrence == kind ? .white : CalendarUITheme.textPrimary)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(recurrence == kind ? CalendarUITheme.indigo : Color.black.opacity(0.06))
-                .clipShape(Capsule(style: .continuous))
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func dayChip(dayCode: Int, label: String) -> some View {
-        let isSelected = weeklyDays.contains(dayCode)
+    private func weekdayChip(day: Int, label: String) -> some View {
+        let isSelected = weekdays.contains(day)
         return Button {
             if isSelected {
-                weeklyDays.remove(dayCode)
+                weekdays.remove(day)
             } else {
-                weeklyDays.insert(dayCode)
+                weekdays.insert(day)
             }
         } label: {
             Text(label)
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(isSelected ? .white : CalendarUITheme.textPrimary)
-                .frame(minWidth: 42)
-                .padding(.vertical, 8)
-                .background(isSelected ? CalendarUITheme.indigo : Color.black.opacity(0.06))
-                .clipShape(Capsule(style: .continuous))
+                .frame(minWidth: 44)
+                .frame(height: 36)
+                .background(isSelected ? CalendarUITheme.indigo : Color(uiColor: .tertiarySystemBackground))
+                .clipShape(Capsule())
         }
         .buttonStyle(.plain)
     }
 
-    private func stopCard(index: Int) -> some View {
-        let isPickup = stops[index].type == "Pickup"
-        let accent = isPickup ? CalendarUITheme.indigo : CalendarUITheme.warning
-
-        return VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                HStack(spacing: 8) {
-                    Image(systemName: isPickup ? "location.fill" : "mappin.and.ellipse")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(accent)
-                    Text(isPickup ? "Pickup" : "Dropoff")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(CalendarUITheme.textPrimary)
-                }
-                Spacer()
-                Button {
-                    stops.remove(at: index)
-                } label: {
-                    Image(systemName: "trash")
-                        .foregroundStyle(.red)
-                }
-                .buttonStyle(.plain)
-            }
-
-            textField("Label", text: $stops[index].label)
-
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Address")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(CalendarUITheme.textSecondary)
-                HStack(spacing: 8) {
-                    Image(systemName: "mappin")
-                        .foregroundStyle(CalendarUITheme.textSecondary)
-                    TextField("Search address", text: $stops[index].address)
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(CalendarUITheme.textSecondary.opacity(0.8))
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
-                .background(Color(red: 0.952, green: 0.957, blue: 0.965).opacity(0.75))
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-            }
-        }
-        .padding(14)
-        .background(accent.opacity(0.08))
-        .overlay {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(accent.opacity(0.25), lineWidth: 1)
-        }
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-    }
-
-    private static func formatTime(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "hh:mm a"
-        return formatter.string(from: date)
+    private func validationText(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 12, weight: .medium))
+            .foregroundStyle(.red.opacity(0.9))
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private static func timeFromString(_ value: String) -> Date? {
         let formatter = DateFormatter()
-        formatter.dateFormat = "hh:mm a"
+        formatter.dateFormat = "h:mm a"
         return formatter.date(from: value)
+    }
+
+    private static func weekdaysFromRecurrence(_ recurrenceLabel: String) -> Set<Int> {
+        let lowered = recurrenceLabel.lowercased()
+        if lowered.contains("weekday") || lowered.contains("school") {
+            return [2, 3, 4, 5, 6]
+        }
+        return [2, 3, 4, 5, 6]
     }
 }
 
-private enum RecurrenceKind: String, CaseIterable, Identifiable {
-    case oneTime = "One-time"
-    case schoolWeek = "School week"
-    case custom = "Custom"
-    var id: String { rawValue }
+extension SystemDomain.ScheduleTemplate {
+    var asCalendarSchedule: CalendarMockModel.UISchedule {
+        var components = DateComponents()
+        components.hour = hour
+        components.minute = minute
+        let date = Calendar.current.date(from: components) ?? Date()
+        let formatter = DateFormatter()
+        formatter.dateFormat = "h:mm a"
+        return CalendarMockModel.UISchedule(
+            id: id,
+            title: name,
+            timeString: formatter.string(from: date),
+            recurrenceLabel: "Custom",
+            driverName: driverId != nil ? "Assigned Driver" : "Unassigned",
+            passengerNames: ["Passenger"],
+            isEnabled: isActive,
+            stops: stops.sorted { $0.order < $1.order }.map {
+                CalendarMockModel.UIStop(
+                    type: $0.order == 0 ? "Pickup" : "Dropoff",
+                    label: $0.name,
+                    address: "\($0.latitude), \($0.longitude)"
+                )
+            }
+        )
+    }
 }
 
 #Preview {
-    ScheduleEditorView(mode: .create) { _ in }
+    NavigationStack {
+        ScheduleEditorView(mode: .create) { _ in }
+            .environmentObject(ScheduleDataSource())
+    }
 }

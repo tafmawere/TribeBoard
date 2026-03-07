@@ -43,7 +43,7 @@ final class TribeStore: ObservableObject {
         willSet { objectWillChange.send() }
     }
 
-    var scheduleTemplates: [ScheduleTemplate] = [] {
+    var scheduleTemplates: [LegacyScheduleTemplate] = [] {
         willSet { objectWillChange.send() }
     }
 
@@ -51,7 +51,7 @@ final class TribeStore: ObservableObject {
         willSet { objectWillChange.send() }
     }
 
-    var runInstances: [RunInstance] = [] {
+    var runInstances: [LegacyRunInstance] = [] {
         willSet { objectWillChange.send() }
     }
 
@@ -131,7 +131,7 @@ final class TribeStore: ObservableObject {
         let homeId = resolveHomeLocationId()
         let preferredDriver = allowedDriverIds.first
 
-        let dropoff = ScheduleTemplate(
+        let dropoff = LegacyScheduleTemplate(
             title: "\(childName) School Drop-off",
             type: .dropoff,
             originLocationId: homeId,
@@ -143,7 +143,7 @@ final class TribeStore: ObservableObject {
             timeMinute: dropoffTime.minute ?? 30
         )
 
-        let pickup = ScheduleTemplate(
+        let pickup = LegacyScheduleTemplate(
             title: "\(childName) School Pickup",
             type: .pickup,
             originLocationId: school.id,
@@ -232,8 +232,8 @@ final class TribeStore: ObservableObject {
     }
 
     @discardableResult
-    func createRunInstanceFromSuggestion(_ suggestion: RunSuggestion, now: Date) -> RunInstance {
-        let run = RunInstance(
+    func createRunInstanceFromSuggestion(_ suggestion: RunSuggestion, now: Date) -> LegacyRunInstance {
+        let run = LegacyRunInstance(
             scheduleTemplateId: suggestion.scheduleTemplateId,
             title: suggestion.title,
             plannedStart: suggestion.proposedStart,
@@ -442,7 +442,7 @@ final class TribeStore: ObservableObject {
         return fallback.id
     }
 
-    private func suggestedStartDate(for template: ScheduleTemplate, on reference: Date) -> Date {
+    private func suggestedStartDate(for template: LegacyScheduleTemplate, on reference: Date) -> Date {
         var components = Calendar.current.dateComponents([.year, .month, .day], from: reference)
         components.hour = template.timeHour
         components.minute = template.timeMinute
@@ -487,7 +487,7 @@ final class TribeStore: ObservableObject {
         ]
 
         scheduleTemplates = [
-            ScheduleTemplate(
+            LegacyScheduleTemplate(
                 title: "\(child.fullName) School Drop-off",
                 type: .dropoff,
                 originLocationId: home.id,
@@ -498,7 +498,7 @@ final class TribeStore: ObservableObject {
                 timeHour: 7,
                 timeMinute: 45
             ),
-            ScheduleTemplate(
+            LegacyScheduleTemplate(
                 title: "\(child.fullName) School Pickup",
                 type: .pickup,
                 originLocationId: school.id,
@@ -518,11 +518,11 @@ final class TribeStore: ObservableObject {
         tribe?.memberIds = members.map(\.id)
     }
 
-    private func childTemplates(for childId: UUID) -> [ScheduleTemplate] {
+    private func childTemplates(for childId: UUID) -> [LegacyScheduleTemplate] {
         scheduleTemplates.filter { $0.childIds.contains(childId) }
     }
 
-    private func inferredVenueLocationId(for template: ScheduleTemplate) -> UUID? {
+    private func inferredVenueLocationId(for template: LegacyScheduleTemplate) -> UUID? {
         if let venueId = template.venueId {
             return venueId
         }
@@ -531,7 +531,7 @@ final class TribeStore: ObservableObject {
     }
 
     private func nextOccurrenceDate(
-        for template: ScheduleTemplate,
+        for template: LegacyScheduleTemplate,
         after reference: Date,
         calendar: Calendar,
         lookaheadDays: Int

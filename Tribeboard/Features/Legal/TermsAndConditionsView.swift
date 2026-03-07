@@ -43,6 +43,9 @@ struct TermsAndConditionsView: View {
                     .padding(.vertical, 4)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding(12)
+                .background(Color(uiColor: .secondarySystemBackground))
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                 .accessibilityLabel("Terms and conditions content")
 
                 Button {
@@ -51,7 +54,7 @@ struct TermsAndConditionsView: View {
                     HStack(spacing: 10) {
                         Image(systemName: hasAgreed ? "checkmark.square.fill" : "square")
                             .font(.system(size: 18, weight: .semibold))
-                            .foregroundStyle(hasAgreed ? Color(red: 0.388, green: 0.400, blue: 0.945) : Color.secondary)
+                            .foregroundStyle(hasAgreed ? Color.accentColor : Color.secondary)
                         Text("I have read and agree")
                             .font(.system(size: 15, weight: .medium))
                             .foregroundStyle(.primary)
@@ -69,7 +72,7 @@ struct TermsAndConditionsView: View {
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 14)
-                        .background(Color(red: 0.388, green: 0.400, blue: 0.945))
+                        .background(Color.accentColor)
                         .clipShape(Capsule())
                 }
                 .disabled(!hasAgreed)
@@ -89,7 +92,7 @@ struct TermsAndConditionsView: View {
             .padding(.horizontal, 20)
             .padding(.top, 16)
             .padding(.bottom, 20)
-            .background(Color(red: 0.976, green: 0.980, blue: 0.984).ignoresSafeArea())
+            .background(Color(uiColor: .systemBackground).ignoresSafeArea())
             .navigationBarBackButtonHidden(true)
             .toolbar(.hidden, for: .navigationBar)
         }
@@ -103,7 +106,7 @@ struct TermsAndConditionsView: View {
                 .foregroundStyle(Color.primary)
             Text(body)
                 .font(.system(size: 14, weight: .regular))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.primary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }

@@ -68,9 +68,13 @@ struct SetHomeView: View {
 
             TextField("Label", text: $homeLabel)
                 .textFieldStyle(.roundedBorder)
+                .foregroundStyle(.primary)
+                .tint(Color(red: 0.388, green: 0.400, blue: 0.945))
 
             TextField("Home address", text: $vm.addressQuery)
                 .textFieldStyle(.roundedBorder)
+                .foregroundStyle(.primary)
+                .tint(Color(red: 0.388, green: 0.400, blue: 0.945))
                 .onChange(of: vm.addressQuery) { _, newValue in
                     homeAddress = newValue
                     vm.updateQuery(newValue)
@@ -97,7 +101,7 @@ struct SetHomeView: View {
         }
         .padding(20)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.white)
+        .background(Color(uiColor: .secondarySystemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .shadow(color: .black.opacity(0.06), radius: 10, x: 0, y: 3)
     }
@@ -131,11 +135,11 @@ struct SetHomeView: View {
                 }
             }
             .frame(maxHeight: 180)
-            .background(Color.white)
+            .background(Color(uiColor: .tertiarySystemBackground))
             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .stroke(Color.black.opacity(0.08), lineWidth: 1)
+                    .stroke(Color(uiColor: .separator).opacity(0.35), lineWidth: 1)
             }
         }
     }

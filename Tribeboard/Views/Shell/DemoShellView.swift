@@ -18,24 +18,134 @@ enum DemoSheet: Identifiable, Equatable {
 }
 
 struct DemoShellView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @StateObject private var tribeStore: TribeStore
+    @StateObject private var runDataSource: RunDataSource
+    @StateObject private var scheduleDataSource: ScheduleDataSource
+    @StateObject private var driverDataSource: DriverDataSource
+    @StateObject private var householdContext: ActiveHouseholdContext
+    @StateObject private var householdDataSource: HouseholdDataSource
+    @StateObject private var locationService: LocationReadinessService
+    @StateObject private var notificationService: NotificationService
+    @StateObject private var syncCoordinator: SyncCoordinator
     @State private var selectedTab: AppTab
     @State private var runsOverviewTab: RunsOverviewTab = .today
+    @State private var runsBoardMode: RunsBoardMode = .runs
     @State private var homePath = NavigationPath()
     @State private var runsPath = NavigationPath()
     @State private var calendarPath = NavigationPath()
     @State private var familyPath = NavigationPath()
     @State private var morePath = NavigationPath()
     @State private var presentedSheet: DemoSheet?
+    @State private var lastRemotePullAt: Date?
+    private let minimumRemotePullInterval: TimeInterval = 60
 
     init(store: TribeStore, initialTab: AppTab = .home) {
+        let runRepository = LocalRunRepository()
+        let scheduleRepository = LocalScheduleRepository()
+        let driverRepository = LocalDriverRepository()
+        let householdContext = ActiveHouseholdContext()
+        let householdRepository = LocalHouseholdRepository()
+        let syncCoordinator = SyncCoordinator(
+            queueRepository: LocalSyncQueueRepository(),
+            auditRepository: LocalSyncAuditRepository(),
+            processedChangeRepository: LocalProcessedChangeRepository(),
+            remoteDriver: MockRemoteSyncDriver(),
+            runRepository: runRepository,
+            scheduleRepository: scheduleRepository,
+            driverRepository: driverRepository,
+            householdRepository: householdRepository
+        )
         _tribeStore = StateObject(wrappedValue: store)
+        _runDataSource = StateObject(
+            wrappedValue: RunDataSource(
+                repository: runRepository,
+                scheduleRepository: scheduleRepository,
+                driverRepository: driverRepository,
+                householdContext: householdContext,
+                syncCoordinator: syncCoordinator
+            )
+        )
+        _scheduleDataSource = StateObject(
+            wrappedValue: ScheduleDataSource(
+                repository: scheduleRepository,
+                householdContext: householdContext,
+                syncCoordinator: syncCoordinator
+            )
+        )
+        _driverDataSource = StateObject(
+            wrappedValue: DriverDataSource(
+                repository: driverRepository,
+                householdContext: householdContext,
+                syncCoordinator: syncCoordinator
+            )
+        )
+        _householdContext = StateObject(wrappedValue: householdContext)
+        _householdDataSource = StateObject(
+            wrappedValue: HouseholdDataSource(
+                repository: householdRepository,
+                activeContext: householdContext,
+                syncCoordinator: syncCoordinator
+            )
+        )
+        _locationService = StateObject(wrappedValue: LocationReadinessService())
+        _notificationService = StateObject(wrappedValue: NotificationService())
+        _syncCoordinator = StateObject(wrappedValue: syncCoordinator)
         _selectedTab = State(initialValue: initialTab)
     }
 
     @MainActor
     init() {
+        let runRepository = LocalRunRepository()
+        let scheduleRepository = LocalScheduleRepository()
+        let driverRepository = LocalDriverRepository()
+        let householdContext = ActiveHouseholdContext()
+        let householdRepository = LocalHouseholdRepository()
+        let syncCoordinator = SyncCoordinator(
+            queueRepository: LocalSyncQueueRepository(),
+            auditRepository: LocalSyncAuditRepository(),
+            processedChangeRepository: LocalProcessedChangeRepository(),
+            remoteDriver: MockRemoteSyncDriver(),
+            runRepository: runRepository,
+            scheduleRepository: scheduleRepository,
+            driverRepository: driverRepository,
+            householdRepository: householdRepository
+        )
         _tribeStore = StateObject(wrappedValue: TribeStore(demoFlow: true))
+        _runDataSource = StateObject(
+            wrappedValue: RunDataSource(
+                repository: runRepository,
+                scheduleRepository: scheduleRepository,
+                driverRepository: driverRepository,
+                householdContext: householdContext,
+                syncCoordinator: syncCoordinator
+            )
+        )
+        _scheduleDataSource = StateObject(
+            wrappedValue: ScheduleDataSource(
+                repository: scheduleRepository,
+                householdContext: householdContext,
+                syncCoordinator: syncCoordinator
+            )
+        )
+        _driverDataSource = StateObject(
+            wrappedValue: DriverDataSource(
+                repository: driverRepository,
+                householdContext: householdContext,
+                syncCoordinator: syncCoordinator
+            )
+        )
+        _householdContext = StateObject(wrappedValue: householdContext)
+        _householdDataSource = StateObject(
+            wrappedValue: HouseholdDataSource(
+                repository: householdRepository,
+                activeContext: householdContext,
+                syncCoordinator: syncCoordinator
+            )
+        )
+        _locationService = StateObject(wrappedValue: LocationReadinessService())
+        _notificationService = StateObject(wrappedValue: NotificationService())
+        _syncCoordinator = StateObject(wrappedValue: syncCoordinator)
         _selectedTab = State(initialValue: .home)
     }
 
@@ -43,10 +153,26 @@ struct DemoShellView: View {
         TabView(selection: $selectedTab) {
             NavigationStack(path: pathBinding(for: .home)) {
                 HomeView(
-                    onOpenRuns: { selectedTab = .runs },
+                    onOpenRuns: {
+                        runsBoardMode = .runs
+                        selectedTab = .runs
+                    },
+                    onOpenDispatch: {
+                        runsBoardMode = .dispatch
+                        selectedTab = .runs
+                    },
                     onOpenCalendar: { selectedTab = .calendar },
                     onOpenFamily: { selectedTab = .family },
-                    onCreateRun: { selectedTab = .runs },
+                    onCreateRun: {
+                        runsBoardMode = .runs
+                        selectedTab = .runs
+                    },
+                    onOpenDriverMode: {
+                        homePath.append(Destination.driverModeSelector)
+                    },
+                    onOpenRunDetails: { runId in
+                        homePath.append(Destination.runDetails(runId: runId))
+                    },
                     onOpenSettings: {
                         homePath.append(Destination.settings)
                     }
@@ -61,10 +187,11 @@ struct DemoShellView: View {
             NavigationStack(path: pathBinding(for: .runs)) {
                 RunsOverviewView(
                     selectedTab: $runsOverviewTab,
-                    todayRuns: [UIRunMockData.scheduledRun],
-                    upcomingRuns: [],
-                    historyRuns: UIRunMockData.historyRuns,
-                    activeRun: UIRunMockData.activeRun,
+                    boardMode: $runsBoardMode,
+                    todayRuns: todayRuns,
+                    upcomingRuns: upcomingRuns,
+                    historyRuns: historyRuns,
+                    activeRun: activeRun,
                     suggestedRuns: tribeStore.generateSuggestedRuns(now: Date()),
                     onOpenRunDetails: { run in
                         runsPath.append(Destination.runDetails(runId: run.backingRunId))
@@ -141,13 +268,117 @@ struct DemoShellView: View {
             }
             .tag(AppTab.more)
         }
+        .environmentObject(runDataSource)
+        .environmentObject(scheduleDataSource)
+        .environmentObject(driverDataSource)
+        .environmentObject(householdContext)
+        .environmentObject(householdDataSource)
+        .environmentObject(locationService)
+        .environmentObject(notificationService)
+        .environmentObject(syncCoordinator)
+        .task {
+            householdDataSource.setOnHouseholdSwitched {
+                async let runReload = runDataSource.reloadForHouseholdChange()
+                async let scheduleReload = scheduleDataSource.reloadForHouseholdChange()
+                async let driverReload = driverDataSource.reloadForHouseholdChange()
+                _ = await (runReload, scheduleReload, driverReload)
+                await syncCoordinator.pull(householdId: householdContext.householdId)
+                await refreshDataSourcesAfterRemotePull()
+                runDataSource.reconcileTrackingState(locationService: locationService)
+                await notificationService.refreshAuthorizationState()
+                if notificationService.authorizationState == .authorized
+                    || notificationService.authorizationState == .provisional
+                    || notificationService.authorizationState == .ephemeral {
+                    await runDataSource.reconcileNotifications(notificationService: notificationService)
+                }
+            }
+
+            await householdDataSource.refresh()
+            await syncCoordinator.refreshStatus()
+            await runDataSource.bootstrapIfNeeded()
+            await scheduleDataSource.refresh()
+            await driverDataSource.bootstrapIfNeeded()
+            await syncCoordinator.pull(householdId: householdContext.householdId)
+            await refreshDataSourcesAfterRemotePull()
+            lastRemotePullAt = Date()
+            runDataSource.reconcileTrackingState(locationService: locationService)
+            await notificationService.refreshAuthorizationState()
+            if notificationService.authorizationState == .authorized
+                || notificationService.authorizationState == .provisional
+                || notificationService.authorizationState == .ephemeral {
+                await runDataSource.reconcileNotifications(notificationService: notificationService)
+            }
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            guard newPhase == .active else { return }
+            Task {
+                await householdDataSource.refresh()
+                await syncCoordinator.refreshStatus()
+                await runDataSource.refresh()
+                await scheduleDataSource.refresh()
+                await driverDataSource.refresh()
+                if shouldPullRemoteNow {
+                    await syncCoordinator.pull(householdId: householdContext.householdId)
+                    await refreshDataSourcesAfterRemotePull()
+                    lastRemotePullAt = Date()
+                }
+                runDataSource.reconcileTrackingState(locationService: locationService)
+                await notificationService.refreshAuthorizationState()
+                if notificationService.authorizationState == .authorized
+                    || notificationService.authorizationState == .provisional
+                    || notificationService.authorizationState == .ephemeral {
+                    await runDataSource.reconcileNotifications(notificationService: notificationService)
+                }
+            }
+        }
         .sheet(item: $presentedSheet, onDismiss: dismissSheet) { sheet in
             sheetView(sheet)
         }
     }
 
+    private var allSystemRuns: [SystemDomain.RunInstance] {
+        runDataSource.runs.sorted { $0.date < $1.date }
+    }
+
+    private var runBuckets: RunDataSource.RunBuckets {
+        runDataSource.bucketedRuns(referenceDate: Date(), calendar: Calendar.current)
+    }
+
+    private var uiRuns: [UIRun] {
+        allSystemRuns.map(RunUIAdapter.mapToUIRun)
+    }
+
+    private var activeRun: UIRun? {
+        runBuckets.activeRuns.first.map(RunUIAdapter.mapToUIRun)
+    }
+
+    private var todayRuns: [UIRun] {
+        runBuckets.todayRuns.map(RunUIAdapter.mapToUIRun)
+    }
+
+    private var upcomingRuns: [UIRun] {
+        runBuckets.upcomingRuns.map(RunUIAdapter.mapToUIRun)
+    }
+
+    private var historyRuns: [UIRun] {
+        runBuckets.historyRuns.map(RunUIAdapter.mapToUIRun)
+    }
+
     private func selectedDateProxy() -> Date {
         Date()
+    }
+
+    private var shouldPullRemoteNow: Bool {
+        guard let lastRemotePullAt else { return true }
+        return Date().timeIntervalSince(lastRemotePullAt) >= minimumRemotePullInterval
+    }
+
+    private func refreshDataSourcesAfterRemotePull() async {
+        await householdDataSource.refresh()
+        async let runReload = runDataSource.reloadForHouseholdChange()
+        async let scheduleReload = scheduleDataSource.reloadForHouseholdChange()
+        async let driverReload = driverDataSource.reloadForHouseholdChange()
+        _ = await (runReload, scheduleReload, driverReload)
     }
 
     private func pathBinding(for tab: AppTab) -> Binding<NavigationPath> {
@@ -184,8 +415,10 @@ struct DemoShellView: View {
                 }
             }
         case .scheduleEditor:
-            ScheduleEditorView(mode: .create) { _ in
-                dismissSheet()
+            NavigationStack {
+                ScheduleEditorView(mode: .create) { _ in
+                    dismissSheet()
+                }
             }
         case .runScheduledConfirmation:
             RunScheduledConfirmationView()

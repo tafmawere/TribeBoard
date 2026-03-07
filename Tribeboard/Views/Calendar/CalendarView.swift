@@ -76,6 +76,8 @@ enum CalendarMockModel {
 }
 
 struct CalendarView: View {
+    @EnvironmentObject private var scheduleDataSource: ScheduleDataSource
+    @EnvironmentObject private var runDataSource: RunDataSource
     var suggestedRunsProvider: (() -> [RunSuggestion])? = nil
     @State private var monthDate = Date()
     @State private var selectedDate = Date()
@@ -87,6 +89,7 @@ struct CalendarView: View {
 
     @State private var editorMode: ScheduleEditorView.Mode = .create
     @State private var isShowingEditor = false
+    @State private var dayActionMessage: String?
 
     private let calendar = Calendar.current
     private let weekdays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
@@ -114,12 +117,22 @@ struct CalendarView: View {
             )
         }
         .sheet(isPresented: $isShowingEditor) {
-            ScheduleEditorView(mode: editorMode) { savedSchedule in
-                if let index = schedules.firstIndex(where: { $0.id == savedSchedule.id }) {
-                    schedules[index] = savedSchedule
-                } else {
-                    schedules.append(savedSchedule)
+            NavigationStack {
+                ScheduleEditorView(mode: editorMode) { savedSchedule in
+                    if let index = schedules.firstIndex(where: { $0.id == savedSchedule.id }) {
+                        schedules[index] = savedSchedule
+                    } else {
+                        schedules.append(savedSchedule)
+                    }
                 }
+            }
+        }
+        .onAppear {
+            Task { await scheduleDataSource.refresh() }
+        }
+        .onChange(of: isShowingEditor) { _, isPresented in
+            if !isPresented {
+                Task { await scheduleDataSource.refresh() }
             }
         }
     }
@@ -188,10 +201,10 @@ struct CalendarView: View {
     }
 
     private var selectedDaySchedulesSection: some View {
-        let dayOccurrences = occurrencesForDay(selectedDate).sorted { $0.date < $1.date }
+        let dayRuns = runDataSource.runsForDay(selectedDate, calendar: calendar)
         let daySuggestions = suggestedRunsForSelectedDate()
-        let completedCount = dayOccurrences.filter { $0.status == .alreadyCreated }.count
-        let scheduledCount = dayOccurrences.count
+        let completedCount = dayRuns.filter { $0.status == .completed || $0.status == .cancelled }.count
+        let scheduledCount = dayRuns.count
         return VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text("Runs for \(formattedDayHeader(selectedDate))")
@@ -204,48 +217,61 @@ struct CalendarView: View {
                 .font(.system(size: 13, weight: .regular))
                 .foregroundStyle(CalendarUITheme.textSecondary)
 
+            if let dayActionMessage {
+                CalendarCard {
+                    Text(dayActionMessage)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(CalendarUITheme.textPrimary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+
+            schedulesForSelectedDaySection
+
             if !daySuggestions.isEmpty {
                 Text("Suggested")
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(CalendarUITheme.textPrimary)
                     .padding(.top, 2)
 
-                ForEach(daySuggestions) { suggestion in
-                    CalendarCard {
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack {
-                                Text(suggestion.title)
-                                    .font(.system(size: 16, weight: .semibold))
-                                    .foregroundStyle(CalendarUITheme.textPrimary)
-                                Spacer()
-                                Text("Suggested")
-                                    .font(.system(size: 11, weight: .bold))
-                                    .foregroundStyle(CalendarUITheme.indigo)
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 4)
-                                    .background(CalendarUITheme.indigo.opacity(0.12))
-                                    .clipShape(Capsule())
-                            }
+                LazyVStack(spacing: 10) {
+                    ForEach(daySuggestions) { suggestion in
+                        CalendarCard {
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack {
+                                    Text(suggestion.title)
+                                        .font(.system(size: 16, weight: .semibold))
+                                        .foregroundStyle(CalendarUITheme.textPrimary)
+                                    Spacer()
+                                    Text("Suggested")
+                                        .font(.system(size: 11, weight: .bold))
+                                        .foregroundStyle(CalendarUITheme.indigo)
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 4)
+                                        .background(CalendarUITheme.indigo.opacity(0.12))
+                                        .clipShape(Capsule())
+                                }
 
-                            Text("\(suggestion.originName) → \(suggestion.destinationName)")
-                                .font(.system(size: 13, weight: .medium))
-                                .foregroundStyle(CalendarUITheme.textSecondary)
-
-                            HStack {
-                                Text(timeString(suggestion.proposedStart))
-                                    .font(.system(size: 13, weight: .semibold))
-                                    .foregroundStyle(CalendarUITheme.indigo)
-                                Spacer()
-                                Text(suggestion.driverName ?? "No driver set")
-                                    .font(.system(size: 12, weight: .medium))
+                                Text("\(suggestion.originName) → \(suggestion.destinationName)")
+                                    .font(.system(size: 13, weight: .medium))
                                     .foregroundStyle(CalendarUITheme.textSecondary)
+
+                                HStack {
+                                    Text(timeString(suggestion.proposedStart))
+                                        .font(.system(size: 13, weight: .semibold))
+                                        .foregroundStyle(CalendarUITheme.indigo)
+                                    Spacer()
+                                    Text(suggestion.driverName ?? "No driver set")
+                                        .font(.system(size: 12, weight: .medium))
+                                        .foregroundStyle(CalendarUITheme.textSecondary)
+                                }
                             }
                         }
                     }
                 }
             }
 
-            if dayOccurrences.isEmpty {
+            if dayRuns.isEmpty {
                 CalendarCard {
                     VStack(spacing: 10) {
                         Image(systemName: "calendar.badge.clock")
@@ -271,27 +297,40 @@ struct CalendarView: View {
                     .frame(maxWidth: .infinity)
                 }
             } else {
-                ForEach(dayOccurrences) { occurrence in
-                    CalendarOccurrenceCard(
-                        title: occurrence.schedule.title,
-                        time: occurrence.schedule.timeString,
-                        driver: occurrence.schedule.driverName,
-                        passengers: occurrence.schedule.passengerNames,
-                        isCreated: occurrence.status == .alreadyCreated,
-                        subtitle: occurrence.subtitle,
-                        onTap: {
-                            editorMode = .edit(occurrence.schedule)
-                            isShowingEditor = true
-                        },
-                        onCreateRunNow: {
-                            createdOccurrenceIDs.insert(occurrence.id)
-                        },
-                        showsCreateAction: false,
-                        isCompact: true
-                    )
+                LazyVStack(spacing: 10) {
+                    ForEach(dayRuns) { run in
+                        let uiRun = RunUIAdapter.mapToUIRun(run)
+                        CalendarCard {
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack {
+                                    Text(uiRun.title)
+                                        .font(.system(size: 16, weight: .semibold))
+                                        .foregroundStyle(CalendarUITheme.textPrimary)
+                                    Spacer()
+                                    AppBadge(
+                                        text: uiRun.status.rawValue.uppercased(),
+                                        style: uiRun.status == .active ? .live : (uiRun.status == .completed ? .success : .info)
+                                    )
+                                }
+                                Text(uiRun.scheduledTime)
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundStyle(CalendarUITheme.textSecondary)
+                                Text("\(uiRun.stops.count) stops")
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundStyle(CalendarUITheme.textSecondary)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
                 }
                 Button {
-                    dayOccurrences.forEach { createdOccurrenceIDs.insert($0.id) }
+                    Task {
+                        let newRuns = await scheduleDataSource.generateRuns(daysAhead: 14)
+                        await runDataSource.refresh()
+                        dayActionMessage = newRuns == 0
+                            ? "No new runs (already up to date)"
+                            : "Generated \(newRuns) new runs"
+                    }
                 } label: {
                     Text("Create Runs for This Day")
                         .font(.system(size: 16, weight: .semibold))
@@ -309,6 +348,93 @@ struct CalendarView: View {
                 .padding(.top, 6)
             }
         }
+    }
+
+    private var schedulesForSelectedDaySection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Schedules for this day")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(CalendarUITheme.textPrimary)
+
+            if schedulesForSelectedDay.isEmpty {
+                Text("No active schedules match this date.")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(CalendarUITheme.textSecondary)
+            } else {
+                LazyVStack(spacing: 10) {
+                    ForEach(schedulesForSelectedDay) { template in
+                        CalendarCard {
+                            VStack(alignment: .leading, spacing: 10) {
+                                Text(template.name)
+                                    .font(.system(size: 17, weight: .bold))
+                                    .foregroundStyle(CalendarUITheme.textPrimary)
+                                Text("\(templateTimeText(template)) • \(weekdaysLabel(template.weekdays))")
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundStyle(CalendarUITheme.textSecondary)
+                                Text("\(template.stops.count) stops")
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundStyle(CalendarUITheme.textSecondary)
+                                Button {
+                                    Task {
+                                        let created = await runDataSource.createRun(template: template, date: selectedDate)
+                                        dayActionMessage = created
+                                            ? "Created run for \(template.name)"
+                                            : "Run already exists for \(template.name)"
+                                    }
+                                } label: {
+                                    Text("Create Run Now")
+                                        .font(.system(size: 14, weight: .semibold))
+                                        .foregroundStyle(.white)
+                                        .frame(maxWidth: .infinity)
+                                        .frame(height: 44)
+                                        .background(CalendarUITheme.indigo)
+                                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                }
+                                .buttonStyle(.plain)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private var selectedWeekdayInt: Int {
+        calendar.component(.weekday, from: selectedDate)
+    }
+
+    private var schedulesForSelectedDay: [SystemDomain.ScheduleTemplate] {
+        scheduleDataSource.templates
+            .filter { $0.isActive && $0.weekdays.contains(selectedWeekdayInt) }
+            .sorted { lhs, rhs in
+                if lhs.hour == rhs.hour { return lhs.minute < rhs.minute }
+                return lhs.hour < rhs.hour
+            }
+    }
+
+    private func weekdaysLabel(_ weekdays: Set<Int>) -> String {
+        let ordered = [2, 3, 4, 5, 6, 7, 1]
+        let labels: [Int: String] = [1: "Sun", 2: "Mon", 3: "Tue", 4: "Wed", 5: "Thu", 6: "Fri", 7: "Sat"]
+        let names = ordered.compactMap { day in weekdays.contains(day) ? labels[day] : nil }
+        if names == ["Mon", "Tue", "Wed", "Thu", "Fri"] { return "Weekdays" }
+        return names.joined(separator: ", ")
+    }
+
+    private func templateTimeText(_ template: SystemDomain.ScheduleTemplate) -> String {
+        var components = DateComponents()
+        components.hour = template.hour
+        components.minute = template.minute
+        let date = calendar.date(from: components) ?? Date()
+        let formatter = DateFormatter()
+        formatter.dateFormat = "h:mm a"
+        return formatter.string(from: date)
+    }
+
+    private func templateTimeText(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "h:mm a"
+        return formatter.string(from: date)
     }
 
     private func suggestedRunsForSelectedDate() -> [RunSuggestion] {

@@ -54,12 +54,14 @@ struct SignupView: View {
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
                             .font(.system(size: 16, weight: .regular))
+                            .foregroundStyle(.primary)
+                            .tint(AuthTheme.primary)
                             .padding(.horizontal, 16)
                             .padding(.vertical, 12)
-                            .background(Color.white.opacity(0.85))
+                            .background(Color(uiColor: .tertiarySystemBackground))
                             .overlay {
                                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                    .stroke(Color.black.opacity(0.12), lineWidth: 1)
+                                    .stroke(Color(uiColor: .separator).opacity(0.35), lineWidth: 1)
                             }
                             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                     }

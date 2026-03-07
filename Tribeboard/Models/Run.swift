@@ -23,7 +23,7 @@ struct Run: Codable, Identifiable {
     let title: String
     let scheduledTime: Date
     var driverId: String
-    var status: RunStatus
+    var status: LegacyRunStatus
     var stops: [RunStop]
     var passengers: [MemberSummary]
     let createdBy: String
@@ -39,7 +39,7 @@ struct Run: Codable, Identifiable {
          title: String,
          scheduledTime: Date,
          driverId: String,
-         status: RunStatus = .scheduled,
+         status: LegacyRunStatus = .scheduled,
          stops: [RunStop],
          passengers: [MemberSummary],
          createdBy: String,
@@ -68,7 +68,7 @@ struct Run: Codable, Identifiable {
     }
 }
 
-enum RunStatus: String, Codable, CaseIterable {
+enum LegacyRunStatus: String, Codable, CaseIterable {
     case scheduled = "scheduled"
     case activeEnroute = "activeEnroute"
     case arrivedAtStop = "arrivedAtStop"

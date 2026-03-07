@@ -56,5 +56,7 @@ enum Destination: Hashable {
     case settings
     case helpSupport
     case about
+    case systemTools
+    case driverModeSelector
     case error(message: String)
 }
