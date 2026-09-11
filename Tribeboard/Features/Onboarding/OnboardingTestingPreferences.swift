@@ -32,6 +32,9 @@ enum OnboardingTestingPreferences {
         userDefaults.removeObject(forKey: onboardingDraftKey)
         userDefaults.removeObject(forKey: fastFamilyDraftKey)
         OnboardingInviteDismissalStore.clear(userDefaults: userDefaults)
+#else
+        _ = flow
+        _ = userDefaults
 #endif
     }
 
