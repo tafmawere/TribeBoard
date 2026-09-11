@@ -5,6 +5,9 @@
 ## User settings
 xcuserdata/
 
+## Local API keys (never commit Secrets.xcconfig)
+Secrets.xcconfig
+
 ## compatibility with Xcode 8 and earlier (ignoring not required starting Xcode 9)
 *.xcscmblueprint
 *.xccheckout
@@ -12,6 +15,7 @@ xcuserdata/
 ## compatibility with Xcode 3 and earlier (ignoring not required starting Xcode 4)
 build/
 DerivedData/
+.derivedData/
 *.moved-aside
 *.pbxuser
 !default.pbxuser
@@ -88,3 +92,13 @@ fastlane/test_output
 # https://github.com/johnno1962/injectionforxcode
 
 iOSInjectionProject/
+docs/.claude/
+.claude/
+*.xcresult
+test.log
+test_output.log
+test_results.log
+build_phase5.log
+build_phase5_full.log
+Tribeboard 2026-02-23 14-00-14/
+build.log
