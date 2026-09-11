@@ -54,7 +54,7 @@ Change detection:
 
 There is no app-lifecycle pause on this 2s household poll: it continues while the view exists, including when the scene is inactive, until `onDisappear` or unsubscribe.
 
-A **separate** observer, `RunLocationObserverStore`, polls `run_driver_positions` every ~7s with `select=*`. That loop is gated to in-progress runs and paused when `scenePhase != .active`. It is not a Realtime protocol change.
+A **separate** observer, `RunLocationObserverStore`, polls `run_driver_positions` every ~7s with `select=*`. Gate: `RunLocationObserverPolicy` (in-progress run **and** `scenePhase == .active`). Paused in background; stopped on sign-out. Positions are filtered to those in-progress run IDs. This is not a Realtime protocol change.
 
 ## Battery and network cost
 
@@ -91,3 +91,14 @@ Do **not** flip this on without:
 - Marker-only updates cannot distinguish *which* row changed when IDs are unchanged.
 - Deletes of one row and inserts of another in the same 2s window can be misclassified (count-based).
 - The 2s household poll still has no `scenePhase` pause (battery follow-up; not a protocol rewrite).
+- `run_driver_positions` may 404 in some environments; that table is isolated and must not fail the tick.
+
+## This sprint (client, no channels)
+
+Shipped against existing REST contract:
+
+- Per-table error isolation + cached JWT (`RealtimePollingConfiguration`)
+- `household_memberships` marker `updated_at`
+- 7s location observer gated to in-progress + active scene
+
+Mac verified 119/119 `TribeboardTests` @ `d4d9780`. Do not merge until any later helper-test commits are re-run on Mac.

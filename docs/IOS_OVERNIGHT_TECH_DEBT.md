@@ -14,7 +14,7 @@ Notes from the 2026-09-12 iOS sprint. Items here were **not** deleted or rewritt
 | `RemoteSyncDebuggable` + `SyncCoordinator` seed helpers | No-op in Release because `remoteDriver` is `nil` and `MockRemoteSyncDriver` is DEBUG-only. System Tools already hides the buttons. |
 | `FamilyRootView.FamilySeed` | Private demo members, unused by the authenticated path. |
 | Invite accept / membership INSERT / Gate A | Security freeze. Client still calls existing `acceptPendingInvitesForSignedInUser` / RPC paths unchanged. `InviteAcceptCredentialResolver` is parsing/routing only (id → token → code). |
-| Realtime → websocket | See `REALTIME_POLLING_INVESTIGATION.md`. Doc only this sprint. |
+| Realtime → websocket | See `REALTIME_POLLING_INVESTIGATION.md`. REST polling only this sprint (JWT cache + per-table isolation shipped; no channels). |
 | `AuthService.checkEmailExists` dependency on `auth-check` | Hardened to fail open to a **choice** UI (sign in *or* create account). Deploying the function is a backend task. |
 
 ## Follow-ups (client, non-security)
@@ -27,6 +27,12 @@ Notes from the 2026-09-12 iOS sprint. Items here were **not** deleted or rewritt
 6. `HouseholdSwitcherView` still lists a separate local-cache section; confirm whether local household rows should be hidden when backend households exist.
 7. `RootFlowView.applyDebugSkipOnboardingIfNeeded` remains DEBUG-only (`DebugFlags.skipOnboarding`). Do not lift that flag.
 
+## Optional helpers extracted (test-only surface)
+
+- `HouseholdBootstrapSequencer` — membership-refresh → create-flow / load-failed / continue. No membership INSERT.
+- `HouseholdCreateName` / `HouseholdCreateRowPayload` — name trim + `households` row JSON. Membership create body unchanged.
+- `InviteDeepLinkIngest` — parse + persist; signed-out path keeps the pending snapshot and returns `.savedForSignIn`.
+
 ## Verification gap
 
-This environment cannot run `xcodebuild`. Phase 1 Mac baseline was 48/48 @ `3c6ffcc`. This sprint adds mapper, flags, next-run, run-state, onboarding, driver-eligibility, auth-callback, realtime-poll, notification-bootstrap, run-route, and location-observer policy tests. **Mac/Xcode verification is required** before merge.
+Mac verified **119/119** `TribeboardTests` PASS @ `d4d9780`. This Linux VM cannot run `xcodebuild`. Optional sequencer / create-payload / signed-out ingest tests landed after that SHA. **Mac re-run required** for the post-`d4d9780` commits before merge.
