@@ -222,13 +222,6 @@ struct SupabaseHouseholdBackendService: HouseholdBackendService {
         let updated_at: String
     }
 
-    private struct CreateHouseholdRequest: Encodable {
-        let id: UUID
-        let name: String
-        let created_by: UUID
-        let invite_code: String
-    }
-
     private struct UpdateHouseholdInviteCodeRequest: Encodable {
         let invite_code: String
     }
@@ -361,15 +354,16 @@ struct SupabaseHouseholdBackendService: HouseholdBackendService {
         guard let userId = UUID(uuidString: session.userId) else {
             throw ServiceError.invalidUserId
         }
-        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         let householdId = UUID()
         let inviteCode = try await nextAvailableHouseholdInviteCode(session: session)
-        let payload = [CreateHouseholdRequest(
+        let row = HouseholdCreateRowPayload.make(
             id: householdId,
-            name: trimmed,
-            created_by: userId,
-            invite_code: inviteCode
-        )]
+            name: name,
+            createdBy: userId,
+            inviteCode: inviteCode
+        )
+        let trimmed = row.name
+        let payload = [row]
         let url = try SupabaseClientProvider.restURL(path: "households")
         var request = URLRequest(url: url)
         request.httpMethod = "POST"

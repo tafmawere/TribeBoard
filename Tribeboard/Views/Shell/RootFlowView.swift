@@ -228,18 +228,24 @@ struct RootFlowView: View {
 
     @MainActor
     private func handleInviteDeepLink(_ url: URL) {
-        guard PendingInvitePersistence.ingestInviteURL(url) else { return }
-        InviteFlowLogger.inviteDeepLinkIngested(
-            authPresent: authSession.isAuthenticated,
-            host: url.host
-        )
-        if authSession.isAuthenticated {
+        switch InviteDeepLinkIngest.handle(url: url, isAuthenticated: authSession.isAuthenticated) {
+        case .ignored:
+            return
+        case .savedForSignIn:
+            InviteFlowLogger.inviteDeepLinkIngested(
+                authPresent: false,
+                host: url.host
+            )
+            unauthenticatedInviteBanner = InviteDeepLinkIngest.savedForSignInBanner
+        case .evaluatePostAuth:
+            InviteFlowLogger.inviteDeepLinkIngested(
+                authPresent: true,
+                host: url.host
+            )
             globalInviteNotice = nil
             Task {
                 await evaluatePostAuthScreen()
             }
-        } else {
-            unauthenticatedInviteBanner = "We saved your invite. Sign in or create an account to finish joining."
         }
     }
 

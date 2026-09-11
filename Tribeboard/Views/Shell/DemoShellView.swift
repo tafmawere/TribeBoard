@@ -1,12 +1,5 @@
 import SwiftUI
 
-private enum HouseholdBootstrapPhase: Equatable {
-    case idle
-    case loading
-    case resolved(hasHousehold: Bool)
-    case loadFailed(message: String)
-}
-
 enum DemoSheet: Identifiable, Equatable {
     case runCreation
     case scheduleEditor(scheduleId: String?)
@@ -511,8 +504,8 @@ struct DemoShellView: View {
                 .environmentObject(activeRunDriverSessionStore)
         }
         .task {
-            if activeHouseholdStore.restoredActiveHouseholdId != nil {
-                householdBootstrapPhase = .resolved(hasHousehold: true)
+            if let restoredId = activeHouseholdStore.restoredActiveHouseholdId {
+                householdBootstrapPhase = HouseholdBootstrapSequencer.phaseAfterSelection(resolvedHouseholdId: restoredId)
             }
             locationService.prepareMapsAndLocation()
             networkMonitor.onReconnect = {
@@ -678,43 +671,40 @@ struct DemoShellView: View {
     }
 
     private var isHouseholdContentLoading: Bool {
-        guard authSession.isAuthenticated, authSession.didRestoreSession else { return false }
-        if shouldShowNoHouseholdOnboarding { return false }
-        switch householdBootstrapPhase {
-        case .idle:
-            return true
-        case .loading:
-            return activeHouseholdStore.restoredActiveHouseholdId == nil
-        case .loadFailed:
-            return false
-        case .resolved(let hasHousehold):
-            guard hasHousehold else { return false }
-            guard let activeHouseholdId = activeHouseholdStore.activeHouseholdId else { return true }
-            return isDependentHouseholdDataLoading || dependentDataLoadedHouseholdId != activeHouseholdId
-        }
+        HouseholdBootstrapSequencer.isContentLoading(
+            isAuthenticated: authSession.isAuthenticated,
+            didRestoreSession: authSession.didRestoreSession,
+            phase: householdBootstrapPhase,
+            showsCreateFlow: shouldShowNoHouseholdOnboarding,
+            restoredActiveHouseholdId: activeHouseholdStore.restoredActiveHouseholdId,
+            activeHouseholdId: activeHouseholdStore.activeHouseholdId,
+            isDependentDataLoading: isDependentHouseholdDataLoading,
+            dependentDataLoadedHouseholdId: dependentDataLoadedHouseholdId
+        )
     }
 
     private var shouldShowHouseholdLoadFailure: Bool {
-        guard authSession.isAuthenticated, authSession.didRestoreSession else { return false }
-        if case .loadFailed = householdBootstrapPhase {
-            return true
-        }
-        return false
+        HouseholdBootstrapSequencer.showsLoadFailure(
+            isAuthenticated: authSession.isAuthenticated,
+            didRestoreSession: authSession.didRestoreSession,
+            phase: householdBootstrapPhase
+        )
     }
 
     private var householdLoadFailureMessage: String {
-        if case .loadFailed(let message) = householdBootstrapPhase {
-            return message
-        }
-        return BackendUserFacingErrorMapper.genericLoadFailure
+        HouseholdBootstrapSequencer.loadFailureMessage(
+            phase: householdBootstrapPhase,
+            fallback: BackendUserFacingErrorMapper.genericLoadFailure
+        )
     }
 
     private var shouldShowNoHouseholdOnboarding: Bool {
-        guard authSession.isAuthenticated, authSession.didRestoreSession else { return false }
-        if case .resolved(let hasHousehold) = householdBootstrapPhase {
-            return !hasHousehold || !backendHouseholdContext.hasActiveMembership
-        }
-        return false
+        HouseholdBootstrapSequencer.showsCreateFlow(
+            isAuthenticated: authSession.isAuthenticated,
+            didRestoreSession: authSession.didRestoreSession,
+            phase: householdBootstrapPhase,
+            hasActiveMembership: backendHouseholdContext.hasActiveMembership
+        )
     }
 
     private var currentUserMembershipStatusForActiveHousehold: HouseholdMembershipStatus? {
@@ -901,29 +891,29 @@ struct DemoShellView: View {
         )
         print("[Bootstrap] MEMBERSHIPS COUNT=\(backendHouseholdContext.memberships.count)")
 #endif
-        if backendHouseholdContext.memberships.isEmpty,
-           let loadError = backendHouseholdContext.lastError,
-           !loadError.isEmpty,
-           !isCancellationMessage(loadError) {
-            householdBootstrapPhase = .loadFailed(message: loadError)
+        if let earlyPhase = HouseholdBootstrapSequencer.phaseAfterMembershipRefresh(
+            membershipCount: backendHouseholdContext.memberships.count,
+            lastError: backendHouseholdContext.lastError,
+            treatsErrorAsCancellation: isCancellationMessage(backendHouseholdContext.lastError)
+        ) {
+            if case .resolved(hasHousehold: false) = earlyPhase {
+                activeHouseholdStore.clear()
+                childrenLoadedHouseholdId = nil
+                dependentDataLoadedHouseholdId = nil
+                await realtimeService.unsubscribe()
+                runDataSource.clearHouseholdScopedData()
+                scheduleDataSource.clearHouseholdScopedData()
+            }
+            householdBootstrapPhase = earlyPhase
 #if DEBUG
-            print("[Bootstrap] household refresh failed error=\(loadError)")
-#endif
-            return
-        }
-        if backendHouseholdContext.memberships.isEmpty {
-            activeHouseholdStore.clear()
-            childrenLoadedHouseholdId = nil
-            dependentDataLoadedHouseholdId = nil
-            await realtimeService.unsubscribe()
-            runDataSource.clearHouseholdScopedData()
-            scheduleDataSource.clearHouseholdScopedData()
-            householdBootstrapPhase = .resolved(hasHousehold: false)
-#if DEBUG
-            print(
-                "[Bootstrap] auth.uid=\(authSession.currentUserId ?? "nil"), selected_active_household_id=nil, " +
-                "activeHouseholdId.after=nil, no-household-ui=true"
-            )
+            if case .loadFailed(let loadError) = earlyPhase {
+                print("[Bootstrap] household refresh failed error=\(loadError)")
+            } else {
+                print(
+                    "[Bootstrap] auth.uid=\(authSession.currentUserId ?? "nil"), selected_active_household_id=nil, " +
+                    "activeHouseholdId.after=nil, no-household-ui=true"
+                )
+            }
 #endif
             return
         }
@@ -936,7 +926,7 @@ struct DemoShellView: View {
             await realtimeService.unsubscribe()
             runDataSource.clearHouseholdScopedData()
             scheduleDataSource.clearHouseholdScopedData()
-            householdBootstrapPhase = .resolved(hasHousehold: false)
+            householdBootstrapPhase = HouseholdBootstrapSequencer.phaseAfterSelection(resolvedHouseholdId: nil)
 #if DEBUG
             print(
                 "[Bootstrap] auth.uid=\(authSession.currentUserId ?? "nil"), selected_active_household_id=nil, " +
@@ -987,7 +977,7 @@ struct DemoShellView: View {
             await refreshDataSourcesAfterRemotePull()
             lastRemotePullAt = Date()
         }
-        householdBootstrapPhase = .resolved(hasHousehold: true)
+        householdBootstrapPhase = HouseholdBootstrapSequencer.phaseAfterSelection(resolvedHouseholdId: activeHouseholdId)
         requestSync(reason: "initialization_pipeline")
 
         reconcileLiveRunSystems()

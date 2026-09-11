@@ -216,6 +216,29 @@ struct ParsedInviteLink: Equatable {
     let inviteCode: String?
 }
 
+/// Parse + persist only. Accept/membership INSERT stays on the existing signed-in RPC path.
+enum InviteDeepLinkIngest {
+    enum NextStep: Equatable {
+        case ignored
+        case savedForSignIn
+        case evaluatePostAuth
+    }
+
+    static let savedForSignInBanner =
+        "We saved your invite. Sign in or create an account to finish joining."
+
+    static func handle(
+        url: URL,
+        isAuthenticated: Bool,
+        userDefaults: UserDefaults = .standard
+    ) -> NextStep {
+        guard PendingInvitePersistence.ingestInviteURL(url, userDefaults: userDefaults) else {
+            return .ignored
+        }
+        return isAuthenticated ? .evaluatePostAuth : .savedForSignIn
+    }
+}
+
 struct PendingInviteSnapshot: Equatable {
     let inviteCode: String?
     let inviteToken: String?
