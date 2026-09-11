@@ -5,7 +5,6 @@ import SwiftUI
 enum MapDebugLaunchGate {
     static let launchStraightIntoMapDebug = false
 }
-#endif
 
 /// Minimal host for `TribeGoogleMapView` (default camera from the representable; no bindings).
 struct GoogleMapView: View {
@@ -31,3 +30,4 @@ struct MapDebugView: View {
             .ignoresSafeArea()
     }
 }
+#endif

@@ -174,11 +174,13 @@ final class TribeStore: ObservableObject {
     private var dismissedSuggestionIDs: Set<UUID> = []
 
     init(demoFlow: Bool = false) {
-        if demoFlow {
+#if DEBUG
+        if demoFlow && AppConfig.isDemoFlowEnabled {
             tribe = Tribe(name: "Mawere Tribe", tribeCode: Self.generateTribeCode())
             members = Self.seedMembers()
             seedMobilityDemoData()
         }
+#endif
     }
 
     func createTribe(name: String, tribeCode: String? = nil) {
@@ -621,6 +623,7 @@ final class TribeStore: ObservableObject {
         return "TRIBE-\(suffix)"
     }
 
+#if DEBUG
     private static func seedMembers() -> [TribeMember] {
         [
             TribeMember(
@@ -661,6 +664,7 @@ final class TribeStore: ObservableObject {
             )
         ]
     }
+#endif
 
     private func resolveHomeLocationId() -> UUID {
         if let homeId = tribe?.homeLocationId {
@@ -692,6 +696,7 @@ final class TribeStore: ObservableObject {
         }
     }
 
+#if DEBUG
     private func seedMobilityDemoData() {
         let home = TribeLocation(name: "Home", address: "123 Maple St", type: .home)
         let school = TribeLocation(name: "Lincoln Elementary", address: "456 School Ave", type: .school)
@@ -747,6 +752,7 @@ final class TribeStore: ObservableObject {
 
         syncTribeMemberIds()
     }
+#endif
 
     private func syncTribeMemberIds() {
         tribe?.memberIds = members.map(\.id)

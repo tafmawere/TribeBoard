@@ -98,6 +98,7 @@ final class DriverDataSource: ObservableObject {
     }
 
     func seedDemoDrivers() async {
+        guard AppConfig.isDemoFlowEnabled else { return }
         guard !isWorking else { return }
         isWorking = true
         defer { isWorking = false }

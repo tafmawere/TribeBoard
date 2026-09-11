@@ -1,5 +1,6 @@
 import Foundation
 
+#if DEBUG
 final class MockRemoteSyncDriver: RemoteSyncDriver, RemoteSyncDebuggable {
     private let store: RemoteMirrorStore
 
@@ -348,4 +349,5 @@ final class MockRemoteSyncDriver: RemoteSyncDriver, RemoteSyncDebuggable {
         return run
     }
 }
+#endif
 

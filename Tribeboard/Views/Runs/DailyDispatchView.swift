@@ -593,6 +593,7 @@ struct DailyDispatchView: View {
     }
 }
 
+#if DEBUG
 #Preview {
     let householdContext = ActiveHouseholdContext()
     let activeStore = ActiveHouseholdStore()
@@ -626,3 +627,4 @@ struct DailyDispatchView: View {
             .environmentObject(NotificationService())
     }
 }
+#endif
