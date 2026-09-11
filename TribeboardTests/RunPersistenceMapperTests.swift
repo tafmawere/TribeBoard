@@ -348,4 +348,29 @@ final class RunPersistenceMapperTests: XCTestCase {
         XCTAssertNil(mapped.stops[0].arrivedAt)
         XCTAssertNil(mapped.stops[0].departedAt)
     }
+
+    func testRoundTripPreservesCancelledLifecycle() {
+        let cancelledAt = Date(timeIntervalSince1970: 1_700_000_800)
+        let run = SystemDomain.RunInstance(
+            id: UUID(),
+            householdId: UUID(),
+            templateId: UUID(),
+            title: "Cancelled run",
+            date: Date(),
+            departureTime: "07:00:00",
+            status: .cancelled,
+            stops: [],
+            stopSnapshots: [],
+            cancelledAt: cancelledAt,
+            driverId: nil,
+            childId: UUID(),
+            createdAt: Date()
+        )
+        let package = RunPersistenceMapper.package(from: run)
+        XCTAssertEqual(package.run.status, BackendRunStatusCodec.encode(.cancelled))
+        XCTAssertEqual(package.run.cancelledAt, cancelledAt)
+        let mapped = RunPersistenceMapper.runInstance(from: package, template: nil, driverName: nil)
+        XCTAssertEqual(mapped.status, .cancelled)
+        XCTAssertEqual(mapped.cancelledAt, cancelledAt)
+    }
 }
