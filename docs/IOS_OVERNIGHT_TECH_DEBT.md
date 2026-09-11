@@ -21,7 +21,7 @@ Notes from the 2026-09-12 iOS sprint. Items here were **not** deleted or rewritt
 
 1. Rename `DemoShellView` → `AppShellView` once there is a dedicated UI rename PR.
 2. Delete `LaunchRootView` after a reference sweep (Xcode project + previews).
-3. Pause realtime polling in `scenePhase != .active` (battery); requires product sign-off on stale-data window.
+3. Pause the **2s household** realtime poll in `scenePhase != .active` (battery); requires product sign-off on stale-data window. The separate 7s `RunLocationObserverStore` is already gated to in-progress runs and paused off-screen.
 4. Surface `BackendRunsContext.lastSyncFailed` on Runs empty states the same way household/locations now distinguish error vs empty.
 5. `BackendSchedulesContext` still assigns `error.localizedDescription` in a few paths; migrate remaining call sites to `BackendUserFacingErrorMapper`.
 6. `HouseholdSwitcherView` still lists a separate local-cache section; confirm whether local household rows should be hidden when backend households exist.
@@ -29,4 +29,4 @@ Notes from the 2026-09-12 iOS sprint. Items here were **not** deleted or rewritt
 
 ## Verification gap
 
-This environment cannot run `xcodebuild`. `TribeboardTests` historically ~48/48. This sprint adds mapper, flags, next-run, run-state, onboarding, driver-eligibility, and auth-callback tests. **Mac/Xcode verification is required** before merge.
+This environment cannot run `xcodebuild`. Phase 1 Mac baseline was 48/48 @ `3c6ffcc`. This sprint adds mapper, flags, next-run, run-state, onboarding, driver-eligibility, auth-callback, realtime-poll, notification-bootstrap, run-route, and location-observer policy tests. **Mac/Xcode verification is required** before merge.
