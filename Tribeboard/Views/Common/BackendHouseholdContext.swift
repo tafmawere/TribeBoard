@@ -201,13 +201,16 @@ final class BackendHouseholdContext: ObservableObject {
     func resolvePendingInvitePreviewFromPersistence() async throws -> HouseholdInvitePreview? {
         guard let session = try await ensuredSession() else { return nil }
         guard let snap = PendingInvitePersistence.load() else { return nil }
-        if snap.prefersToken, let token = snap.inviteToken {
+        switch InviteAcceptCredentialResolver.resolve(snap) {
+        case .inviteId(let inviteId):
+            return try await service.fetchInvitePreviewByInviteId(inviteId, session: session)
+        case .inviteToken(let token):
             return try await service.fetchInvitePreviewByToken(token, session: session)
-        }
-        if let code = snap.inviteCode {
+        case .inviteCode(let code):
             return try await service.fetchInvitePreviewByCode(code, session: session)
+        case nil:
+            return nil
         }
-        return nil
     }
 
     @discardableResult
@@ -219,11 +222,14 @@ final class BackendHouseholdContext: ObservableObject {
             }
             guard let snap = PendingInvitePersistence.load() else { return false }
             let response: HouseholdInviteAcceptRPCResponse
-            if snap.prefersToken, let token = snap.inviteToken {
+            switch InviteAcceptCredentialResolver.resolve(snap) {
+            case .inviteId(let inviteId):
+                response = try await service.acceptHouseholdInviteRPC(inviteId: inviteId, session: session)
+            case .inviteToken(let token):
                 response = try await service.acceptHouseholdInviteRPC(inviteToken: token, session: session)
-            } else if let code = snap.inviteCode {
+            case .inviteCode(let code):
                 response = try await service.acceptHouseholdInviteRPC(inviteCode: code, session: session)
-            } else {
+            case nil:
                 return false
             }
 #if DEBUG

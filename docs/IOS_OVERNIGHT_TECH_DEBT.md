@@ -13,7 +13,7 @@ Notes from the 2026-09-12 iOS sprint. Items here were **not** deleted or rewritt
 | `SystemBootstrap.debugSeedAndGenerate` | Callable in Release but does not seed demo templates (`seedDemoSchedules` is a no-op). Wide call-graph. |
 | `RemoteSyncDebuggable` + `SyncCoordinator` seed helpers | No-op in Release because `remoteDriver` is `nil` and `MockRemoteSyncDriver` is DEBUG-only. System Tools already hides the buttons. |
 | `FamilyRootView.FamilySeed` | Private demo members, unused by the authenticated path. |
-| Invite accept / membership INSERT / Gate A | Security freeze. Client still calls existing `acceptPendingInvitesForSignedInUser` / RPC paths unchanged. |
+| Invite accept / membership INSERT / Gate A | Security freeze. Client still calls existing `acceptPendingInvitesForSignedInUser` / RPC paths unchanged. `InviteAcceptCredentialResolver` is parsing/routing only (id → token → code). |
 | Realtime → websocket | See `REALTIME_POLLING_INVESTIGATION.md`. Doc only this sprint. |
 | `AuthService.checkEmailExists` dependency on `auth-check` | Hardened to fail open to a **choice** UI (sign in *or* create account). Deploying the function is a backend task. |
 

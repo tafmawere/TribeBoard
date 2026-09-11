@@ -414,13 +414,14 @@ struct RootFlowView: View {
         }
         let loaded: HouseholdInvitePreview?
         do {
-            if let inviteId = snap.inviteId {
+            switch InviteAcceptCredentialResolver.resolve(snap) {
+            case .inviteId(let inviteId):
                 loaded = try await householdService.fetchInvitePreviewByInviteId(inviteId, session: session)
-            } else if snap.prefersToken, let token = snap.inviteToken {
+            case .inviteToken(let token):
                 loaded = try await householdService.fetchInvitePreviewByToken(token, session: session)
-            } else if let code = snap.inviteCode {
+            case .inviteCode(let code):
                 loaded = try await householdService.fetchInvitePreviewByCode(code, session: session)
-            } else {
+            case nil:
                 loaded = nil
             }
         } catch {
@@ -471,13 +472,14 @@ struct RootFlowView: View {
                 return
             }
             let response: HouseholdInviteAcceptRPCResponse
-            if let inviteId = snap.inviteId {
+            switch InviteAcceptCredentialResolver.resolve(snap) {
+            case .inviteId(let inviteId):
                 response = try await householdService.acceptHouseholdInviteRPC(inviteId: inviteId, session: session)
-            } else if snap.prefersToken, let token = snap.inviteToken {
+            case .inviteToken(let token):
                 response = try await householdService.acceptHouseholdInviteRPC(inviteToken: token, session: session)
-            } else if let code = snap.inviteCode {
+            case .inviteCode(let code):
                 response = try await householdService.acceptHouseholdInviteRPC(inviteCode: code, session: session)
-            } else {
+            case nil:
                 pendingInvitePreview = nil
                 return
             }
