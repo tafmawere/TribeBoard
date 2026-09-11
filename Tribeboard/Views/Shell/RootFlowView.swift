@@ -269,9 +269,13 @@ struct RootFlowView: View {
         do {
             guard let session = try await authService.restoreSession() else {
 #if DEBUG
-                print("[OnboardingCheck] sessionRestoreFailed=true routingTo=onboarding")
+                print("[OnboardingCheck] sessionRestoreFailed=true")
 #endif
-                postAuthScreen = .onboarding
+                if OnboardingPreferences.hasReturningUserCache(userDefaults: userDefaults) {
+                    postAuthScreen = .mainApp
+                } else {
+                    postAuthScreen = .onboarding
+                }
                 return
             }
             await refreshPendingInviteGate(session: session)
@@ -356,10 +360,21 @@ struct RootFlowView: View {
             print("[RootFlowView] bootstrap refresh complete user_id=\(session.userId), screen=\(screenLabel(postAuthScreen))")
 #endif
         } catch {
-            postAuthScreen = .onboarding
+            if OnboardingPreferences.hasReturningUserCache(userDefaults: userDefaults) {
+                postAuthScreen = .mainApp
 #if DEBUG
-            print("[RootFlowView] onboarding evaluation failed error=\(error.localizedDescription), screen=onboarding")
+                print("[RootFlowView] onboarding evaluation failed error=\(error.localizedDescription), keeping main_app from returning-user cache")
 #endif
+            } else if postAuthScreen == .loading {
+                postAuthScreen = .onboarding
+#if DEBUG
+                print("[RootFlowView] onboarding evaluation failed error=\(error.localizedDescription), screen=onboarding")
+#endif
+            } else {
+#if DEBUG
+                print("[RootFlowView] onboarding evaluation failed error=\(error.localizedDescription), keeping screen=\(screenLabel(postAuthScreen))")
+#endif
+            }
         }
     }
 

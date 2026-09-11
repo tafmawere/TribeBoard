@@ -60,7 +60,7 @@ final class BackendChildrenContext: ObservableObject {
         defer { isLoading = false }
         do {
             guard let session = try await ensuredSession() else {
-                lastError = "No active auth session."
+                lastError = BackendUserFacingErrorMapper.noActiveSession
                 return
             }
 
@@ -102,7 +102,7 @@ final class BackendChildrenContext: ObservableObject {
             )
 #endif
         } catch {
-            lastError = error.localizedDescription
+            lastError = BackendUserFacingErrorMapper.message(for: error) ?? BackendUserFacingErrorMapper.genericLoadFailure
         }
     }
 

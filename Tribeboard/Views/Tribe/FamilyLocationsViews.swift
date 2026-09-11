@@ -24,6 +24,25 @@ struct FamilyLocationsSectionView: View {
                 ProgressView()
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.vertical, 12)
+            } else if backendHouseholdLocationsContext.locations.isEmpty,
+                      let loadError = backendHouseholdLocationsContext.lastError,
+                      !loadError.isEmpty,
+                      !isCancellationMessage(loadError) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(loadError)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.secondary)
+                    Button("Retry") {
+                        Task { await backendHouseholdLocationsContext.refreshForActiveHousehold() }
+                    }
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(TribeTheme.primary)
+                }
+                .padding(.vertical, 4)
+            } else if backendHouseholdLocationsContext.locations.isEmpty {
+                Text("No family locations yet. Add home, school, or pickup places to reuse them on runs.")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.secondary)
             } else {
                 ForEach(sectionTypes, id: \.self) { type in
                     locationGroup(type)

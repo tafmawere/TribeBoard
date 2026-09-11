@@ -91,13 +91,7 @@ final class SupabaseRealtimeService: ObservableObject, RealtimeService {
         subscriptionState = "connecting"
         lastError = nil
         snapshots = [:]
-        subscribedTables = [
-            "children",
-            "child_activities",
-            "household_memberships",
-            "runs",
-            "run_driver_positions"
-        ]
+        subscribedTables = RealtimePollingConfiguration.subscribedTables
 
         pollingTask = Task { [weak self] in
             guard let self else { return }
@@ -120,7 +114,7 @@ final class SupabaseRealtimeService: ObservableObject, RealtimeService {
             do {
                 guard let session = try await authService.restoreSession() else {
                     subscriptionState = "waiting_auth"
-                    try await Task.sleep(nanoseconds: 2_000_000_000)
+                    try await Task.sleep(nanoseconds: RealtimePollingConfiguration.waitingAuthIntervalNanoseconds)
                     continue
                 }
                 try await pollEntity(.child, table: "children", householdId: householdId, accessToken: session.accessToken)
@@ -129,13 +123,13 @@ final class SupabaseRealtimeService: ObservableObject, RealtimeService {
                 try await pollEntity(.run, table: "runs", householdId: householdId, accessToken: session.accessToken)
                 try await pollEntity(.runDriverPosition, table: "run_driver_positions", householdId: householdId, accessToken: session.accessToken)
                 subscriptionState = "subscribed"
-                try await Task.sleep(nanoseconds: 2_000_000_000)
+                try await Task.sleep(nanoseconds: RealtimePollingConfiguration.pollIntervalNanoseconds)
             } catch is CancellationError {
                 break
             } catch {
                 lastError = error.localizedDescription
                 subscriptionState = "error"
-                try? await Task.sleep(nanoseconds: 4_000_000_000)
+                try? await Task.sleep(nanoseconds: RealtimePollingConfiguration.errorBackoffNanoseconds)
             }
         }
     }

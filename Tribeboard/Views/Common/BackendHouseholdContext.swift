@@ -959,12 +959,8 @@ final class BackendHouseholdContext: ObservableObject {
         if isCancellationError(error) {
             return nil
         }
-        let normalized = error.localizedDescription.lowercased()
-        if normalized.contains("session expired")
-            || normalized.contains("jwt expired")
-            || normalized.contains("pgrst303")
-            || normalized.contains("unauthenticated") {
-            return "Session expired. Please sign in again to continue."
+        if let sessionMessage = BackendUserFacingErrorMapper.sessionMessage(for: error) {
+            return sessionMessage
         }
         return SupabaseHouseholdBackendService.ServiceError.userFacingInviteJoinMessage(for: error)
     }

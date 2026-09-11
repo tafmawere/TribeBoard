@@ -4,6 +4,7 @@ private enum HouseholdBootstrapPhase: Equatable {
     case idle
     case loading
     case resolved(hasHousehold: Bool)
+    case loadFailed(message: String)
 }
 
 enum DemoSheet: Identifiable, Equatable {
@@ -299,7 +300,9 @@ struct DemoShellView: View {
     private var homeTab: some View {
         NavigationStack(path: pathBinding(for: .home)) {
             Group {
-                if shouldShowNoHouseholdOnboarding {
+                if shouldShowHouseholdLoadFailure {
+                    householdLoadFailedCard
+                } else if shouldShowNoHouseholdOnboarding {
                     noHouseholdOnboardingCard
                 } else {
                     homeTabContent
@@ -340,7 +343,9 @@ struct DemoShellView: View {
 
     @ViewBuilder
     private var runsTabContent: some View {
-        if shouldShowNoHouseholdOnboarding {
+        if shouldShowHouseholdLoadFailure {
+            householdLoadFailedCard
+        } else if shouldShowNoHouseholdOnboarding {
             noHouseholdOnboardingCard
         } else if shouldShowPendingApprovalState {
             pendingApprovalAccessCard
@@ -394,7 +399,9 @@ struct DemoShellView: View {
 
     @ViewBuilder
     private var calendarTabContent: some View {
-        if shouldShowNoHouseholdOnboarding {
+        if shouldShowHouseholdLoadFailure {
+            householdLoadFailedCard
+        } else if shouldShowNoHouseholdOnboarding {
             noHouseholdOnboardingCard
         } else if shouldShowPendingApprovalState {
             pendingApprovalAccessCard
@@ -430,7 +437,9 @@ struct DemoShellView: View {
 
     @ViewBuilder
     private var familyTabContent: some View {
-        if shouldShowNoHouseholdOnboarding {
+        if shouldShowHouseholdLoadFailure {
+            householdLoadFailedCard
+        } else if shouldShowNoHouseholdOnboarding {
             noHouseholdOnboardingCard
         } else if shouldShowPendingApprovalState {
             pendingApprovalAccessCard
@@ -453,7 +462,9 @@ struct DemoShellView: View {
 
     @ViewBuilder
     private var moreTabContent: some View {
-        if shouldShowNoHouseholdOnboarding {
+        if shouldShowHouseholdLoadFailure {
+            householdLoadFailedCard
+        } else if shouldShowNoHouseholdOnboarding {
             noHouseholdOnboardingCard
         } else if isHouseholdContentLoading {
             HouseholdTabSkeletonView(showsSyncingStatus: true)
@@ -673,11 +684,28 @@ struct DemoShellView: View {
             return true
         case .loading:
             return activeHouseholdStore.restoredActiveHouseholdId == nil
+        case .loadFailed:
+            return false
         case .resolved(let hasHousehold):
             guard hasHousehold else { return false }
             guard let activeHouseholdId = activeHouseholdStore.activeHouseholdId else { return true }
             return isDependentHouseholdDataLoading || dependentDataLoadedHouseholdId != activeHouseholdId
         }
+    }
+
+    private var shouldShowHouseholdLoadFailure: Bool {
+        guard authSession.isAuthenticated, authSession.didRestoreSession else { return false }
+        if case .loadFailed = householdBootstrapPhase {
+            return true
+        }
+        return false
+    }
+
+    private var householdLoadFailureMessage: String {
+        if case .loadFailed(let message) = householdBootstrapPhase {
+            return message
+        }
+        return BackendUserFacingErrorMapper.genericLoadFailure
     }
 
     private var shouldShowNoHouseholdOnboarding: Bool {
@@ -702,6 +730,7 @@ struct DemoShellView: View {
         switch householdBootstrapPhase {
         case .idle: return "idle"
         case .loading: return "loading"
+        case .loadFailed: return "load_failed"
         case .resolved(let hasHousehold): return hasHousehold ? "resolved_with_household" : "resolved_no_household"
         }
     }
@@ -864,6 +893,16 @@ struct DemoShellView: View {
         )
         print("[Bootstrap] MEMBERSHIPS COUNT=\(backendHouseholdContext.memberships.count)")
 #endif
+        if backendHouseholdContext.memberships.isEmpty,
+           let loadError = backendHouseholdContext.lastError,
+           !loadError.isEmpty,
+           !isCancellationMessage(loadError) {
+            householdBootstrapPhase = .loadFailed(message: loadError)
+#if DEBUG
+            print("[Bootstrap] household refresh failed error=\(loadError)")
+#endif
+            return
+        }
         if backendHouseholdContext.memberships.isEmpty {
             activeHouseholdStore.clear()
             childrenLoadedHouseholdId = nil
@@ -994,6 +1033,34 @@ struct DemoShellView: View {
         case .more:
             return $morePath
         }
+    }
+
+    private var householdLoadFailedCard: some View {
+        VStack(spacing: 14) {
+            Image(systemName: "wifi.exclamationmark")
+                .font(.system(size: 28, weight: .semibold))
+                .foregroundStyle(Color.indigo)
+            Text("Couldn't load your tribe")
+                .font(.system(size: 20, weight: .bold))
+                .foregroundStyle(.primary)
+            Text(householdLoadFailureMessage)
+                .font(.system(size: 15, weight: .medium))
+                .multilineTextAlignment(.center)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: 320)
+            Button("Try again") {
+                Task { await runInitializationPipeline() }
+            }
+            .font(.system(size: 15, weight: .semibold))
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 12)
+            .background(Color.indigo)
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        }
+        .padding(24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(uiColor: .systemGroupedBackground))
     }
 
     private var noHouseholdOnboardingCard: some View {

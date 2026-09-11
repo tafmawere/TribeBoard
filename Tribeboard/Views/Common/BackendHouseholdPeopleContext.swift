@@ -28,7 +28,7 @@ final class BackendHouseholdPeopleContext: ObservableObject {
     func refreshForActiveHousehold() async {
         guard let householdId = activeHouseholdStore.activeHouseholdId else {
             people = []
-            lastError = "No active backend household."
+            lastError = nil
             return
         }
         await refreshPeople(householdId: householdId)
@@ -48,7 +48,7 @@ final class BackendHouseholdPeopleContext: ObservableObject {
         }
         do {
             guard let session = try await ensuredSession() else {
-                lastError = "No active auth session."
+                lastError = BackendUserFacingErrorMapper.noActiveSession
                 people = []
                 return
             }
@@ -70,7 +70,7 @@ final class BackendHouseholdPeopleContext: ObservableObject {
             )
 #endif
         } catch {
-            lastError = error.localizedDescription
+            lastError = BackendUserFacingErrorMapper.message(for: error) ?? BackendUserFacingErrorMapper.genericLoadFailure
         }
         if hasPendingRefresh, let activeHouseholdId {
             hasPendingRefresh = false
