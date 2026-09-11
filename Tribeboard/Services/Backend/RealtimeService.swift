@@ -1,7 +1,7 @@
 import Foundation
 import Combine
 
-enum RealtimeEntityType {
+enum RealtimeEntityType: Equatable {
     case child
     case childActivity
     case householdMembership
@@ -110,23 +110,65 @@ final class SupabaseRealtimeService: ObservableObject, RealtimeService {
 
     private func runPollingLoop(for householdId: UUID) async {
         subscriptionState = "subscribed"
+        var cachedSession: AuthUserSession?
         while !Task.isCancelled {
             do {
-                guard let session = try await authService.restoreSession() else {
+                if RealtimePollingConfiguration.shouldRestoreAccessToken(cached: cachedSession) {
+                    cachedSession = try await authService.restoreSession()
+                }
+                guard let session = cachedSession else {
                     subscriptionState = "waiting_auth"
                     try await Task.sleep(nanoseconds: RealtimePollingConfiguration.waitingAuthIntervalNanoseconds)
                     continue
                 }
-                try await pollEntity(.child, table: "children", householdId: householdId, accessToken: session.accessToken)
-                try await pollEntity(.childActivity, table: "child_activities", householdId: householdId, accessToken: session.accessToken)
-                try await pollEntity(.householdMembership, table: "household_memberships", householdId: householdId, accessToken: session.accessToken)
-                try await pollEntity(.run, table: "runs", householdId: householdId, accessToken: session.accessToken)
-                try await pollEntity(.runDriverPosition, table: "run_driver_positions", householdId: householdId, accessToken: session.accessToken)
-                subscriptionState = "subscribed"
-                try await Task.sleep(nanoseconds: RealtimePollingConfiguration.pollIntervalNanoseconds)
+
+                var failedTables: [String] = []
+                var sawUnauthorized = false
+                for spec in RealtimePollingConfiguration.pollTableSpecs {
+                    try Task.checkCancellation()
+                    do {
+                        try await pollEntity(
+                            spec.entity,
+                            table: spec.table,
+                            householdId: householdId,
+                            accessToken: session.accessToken
+                        )
+                    } catch is CancellationError {
+                        throw CancellationError()
+                    } catch {
+                        failedTables.append(spec.table)
+                        if RealtimePollingConfiguration.isUnauthorized(error) {
+                            sawUnauthorized = true
+                        }
+                    }
+                }
+
+                if sawUnauthorized {
+                    cachedSession = nil
+                }
+
+                let outcome = RealtimePollTickOutcome.from(
+                    failedTables: failedTables,
+                    totalTables: RealtimePollingConfiguration.pollTableSpecs.count
+                )
+                switch outcome {
+                case .allSucceeded:
+                    lastError = nil
+                    subscriptionState = "subscribed"
+                    try await Task.sleep(nanoseconds: RealtimePollingConfiguration.pollIntervalNanoseconds)
+                case .partialFailure(let tables):
+                    lastError = "Partial poll failure: \(tables.joined(separator: ", "))"
+                    subscriptionState = "subscribed"
+                    try await Task.sleep(nanoseconds: RealtimePollingConfiguration.pollIntervalNanoseconds)
+                case .allFailed(let tables):
+                    lastError = "Realtime polling failed: \(tables.joined(separator: ", "))"
+                    subscriptionState = "error"
+                    try await Task.sleep(nanoseconds: RealtimePollingConfiguration.errorBackoffNanoseconds)
+                }
             } catch is CancellationError {
                 break
             } catch {
+                cachedSession = nil
                 lastError = error.localizedDescription
                 subscriptionState = "error"
                 try? await Task.sleep(nanoseconds: RealtimePollingConfiguration.errorBackoffNanoseconds)
@@ -188,22 +230,18 @@ final class SupabaseRealtimeService: ObservableObject, RealtimeService {
         request.allHTTPHeaderFields = try SupabaseClientProvider.defaultHeaders(accessToken: accessToken)
 
         let (data, response) = try await URLSession.shared.data(for: request)
-        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+        guard let http = response as? HTTPURLResponse else {
+            throw RealtimePollingHTTPError(table: table, statusCode: 0, body: "Unknown backend error.")
+        }
+        guard (200..<300).contains(http.statusCode) else {
             let text = String(data: data, encoding: .utf8) ?? "Unknown backend error."
-            throw NSError(domain: "SupabaseRealtimeService", code: 1, userInfo: [NSLocalizedDescriptionKey: "Realtime polling failed: \(text)"])
+            throw RealtimePollingHTTPError(table: table, statusCode: http.statusCode, body: text)
         }
         return try JSONDecoder().decode([RealtimeRow].self, from: data)
     }
 
     private func markerColumn(for table: String) -> String {
-        switch table {
-        case "household_memberships":
-            return "created_at"
-        case "run_assignments":
-            return "assigned_at"
-        default:
-            return "updated_at"
-        }
+        RealtimePollingConfiguration.markerColumn(for: table)
     }
 
     private func entityName(_ entityType: RealtimeEntityType) -> String {
