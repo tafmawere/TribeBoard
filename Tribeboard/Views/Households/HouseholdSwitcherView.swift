@@ -136,8 +136,22 @@ struct HouseholdSwitcherView: View {
 
     private var backendHouseholdsSection: some View {
         Section {
-            if backendHouseholdContext.isLoading {
+            if backendHouseholdContext.isLoading && backendHouseholdContext.households.isEmpty {
                 ProgressView("Loading households...")
+            } else if backendHouseholdContext.households.isEmpty,
+                      let loadError = backendHouseholdContext.lastError,
+                      !loadError.isEmpty,
+                      !isCancellationMessage(loadError) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(loadError)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.secondary)
+                    Button("Retry") {
+                        Task { await backendHouseholdContext.refresh() }
+                    }
+                    .font(.system(size: 13, weight: .semibold))
+                }
+                .padding(.vertical, 4)
             } else if backendHouseholdContext.households.isEmpty {
                 Text("No shared households yet. Create one or join with a family code.")
                     .font(.system(size: 13, weight: .medium))
@@ -156,8 +170,14 @@ struct HouseholdSwitcherView: View {
 
     private var localHouseholdsSection: some View {
         Section {
-            ForEach(householdDataSource.households) { household in
-                localHouseholdRow(household)
+            if householdDataSource.households.isEmpty {
+                Text("No local household cache yet.")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(householdDataSource.households) { household in
+                    localHouseholdRow(household)
+                }
             }
         } footer: {
             Text("All runs, schedules and drivers belong to a household.")

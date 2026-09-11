@@ -7,8 +7,10 @@
 
 import Foundation
 
-/// Demo seed data service providing test user IDs
+/// Demo seed data service providing test user IDs. DEBUG-only; unused in Release.
 enum DemoSeedDataService {
+#if DEBUG
     static let rueId = "rue-demo-id"
     static let tafadzwaId = "tafadzwa-demo-id"
+#endif
 }

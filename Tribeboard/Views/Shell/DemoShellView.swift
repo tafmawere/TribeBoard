@@ -1,11 +1,5 @@
 import SwiftUI
 
-private enum HouseholdBootstrapPhase: Equatable {
-    case idle
-    case loading
-    case resolved(hasHousehold: Bool)
-}
-
 enum DemoSheet: Identifiable, Equatable {
     case runCreation
     case scheduleEditor(scheduleId: String?)
@@ -299,7 +293,9 @@ struct DemoShellView: View {
     private var homeTab: some View {
         NavigationStack(path: pathBinding(for: .home)) {
             Group {
-                if shouldShowNoHouseholdOnboarding {
+                if shouldShowHouseholdLoadFailure {
+                    householdLoadFailedCard
+                } else if shouldShowNoHouseholdOnboarding {
                     noHouseholdOnboardingCard
                 } else {
                     homeTabContent
@@ -340,7 +336,9 @@ struct DemoShellView: View {
 
     @ViewBuilder
     private var runsTabContent: some View {
-        if shouldShowNoHouseholdOnboarding {
+        if shouldShowHouseholdLoadFailure {
+            householdLoadFailedCard
+        } else if shouldShowNoHouseholdOnboarding {
             noHouseholdOnboardingCard
         } else if shouldShowPendingApprovalState {
             pendingApprovalAccessCard
@@ -394,7 +392,9 @@ struct DemoShellView: View {
 
     @ViewBuilder
     private var calendarTabContent: some View {
-        if shouldShowNoHouseholdOnboarding {
+        if shouldShowHouseholdLoadFailure {
+            householdLoadFailedCard
+        } else if shouldShowNoHouseholdOnboarding {
             noHouseholdOnboardingCard
         } else if shouldShowPendingApprovalState {
             pendingApprovalAccessCard
@@ -430,7 +430,9 @@ struct DemoShellView: View {
 
     @ViewBuilder
     private var familyTabContent: some View {
-        if shouldShowNoHouseholdOnboarding {
+        if shouldShowHouseholdLoadFailure {
+            householdLoadFailedCard
+        } else if shouldShowNoHouseholdOnboarding {
             noHouseholdOnboardingCard
         } else if shouldShowPendingApprovalState {
             pendingApprovalAccessCard
@@ -453,7 +455,9 @@ struct DemoShellView: View {
 
     @ViewBuilder
     private var moreTabContent: some View {
-        if shouldShowNoHouseholdOnboarding {
+        if shouldShowHouseholdLoadFailure {
+            householdLoadFailedCard
+        } else if shouldShowNoHouseholdOnboarding {
             noHouseholdOnboardingCard
         } else if isHouseholdContentLoading {
             HouseholdTabSkeletonView(showsSyncingStatus: true)
@@ -500,8 +504,8 @@ struct DemoShellView: View {
                 .environmentObject(activeRunDriverSessionStore)
         }
         .task {
-            if activeHouseholdStore.restoredActiveHouseholdId != nil {
-                householdBootstrapPhase = .resolved(hasHousehold: true)
+            if let restoredId = activeHouseholdStore.restoredActiveHouseholdId {
+                householdBootstrapPhase = HouseholdBootstrapSequencer.phaseAfterSelection(resolvedHouseholdId: restoredId)
             }
             locationService.prepareMapsAndLocation()
             networkMonitor.onReconnect = {
@@ -547,6 +551,7 @@ struct DemoShellView: View {
             await runInitializationPipeline()
         }
         .onChange(of: scenePhase) { _, newPhase in
+            reconcileLiveRunSystems()
             guard newPhase == .active else { return }
             Task {
                 await runInitializationPipeline(forceRemotePull: shouldPullRemoteNow)
@@ -666,26 +671,40 @@ struct DemoShellView: View {
     }
 
     private var isHouseholdContentLoading: Bool {
-        guard authSession.isAuthenticated, authSession.didRestoreSession else { return false }
-        if shouldShowNoHouseholdOnboarding { return false }
-        switch householdBootstrapPhase {
-        case .idle:
-            return true
-        case .loading:
-            return activeHouseholdStore.restoredActiveHouseholdId == nil
-        case .resolved(let hasHousehold):
-            guard hasHousehold else { return false }
-            guard let activeHouseholdId = activeHouseholdStore.activeHouseholdId else { return true }
-            return isDependentHouseholdDataLoading || dependentDataLoadedHouseholdId != activeHouseholdId
-        }
+        HouseholdBootstrapSequencer.isContentLoading(
+            isAuthenticated: authSession.isAuthenticated,
+            didRestoreSession: authSession.didRestoreSession,
+            phase: householdBootstrapPhase,
+            showsCreateFlow: shouldShowNoHouseholdOnboarding,
+            restoredActiveHouseholdId: activeHouseholdStore.restoredActiveHouseholdId,
+            activeHouseholdId: activeHouseholdStore.activeHouseholdId,
+            isDependentDataLoading: isDependentHouseholdDataLoading,
+            dependentDataLoadedHouseholdId: dependentDataLoadedHouseholdId
+        )
+    }
+
+    private var shouldShowHouseholdLoadFailure: Bool {
+        HouseholdBootstrapSequencer.showsLoadFailure(
+            isAuthenticated: authSession.isAuthenticated,
+            didRestoreSession: authSession.didRestoreSession,
+            phase: householdBootstrapPhase
+        )
+    }
+
+    private var householdLoadFailureMessage: String {
+        HouseholdBootstrapSequencer.loadFailureMessage(
+            phase: householdBootstrapPhase,
+            fallback: BackendUserFacingErrorMapper.genericLoadFailure
+        )
     }
 
     private var shouldShowNoHouseholdOnboarding: Bool {
-        guard authSession.isAuthenticated, authSession.didRestoreSession else { return false }
-        if case .resolved(let hasHousehold) = householdBootstrapPhase {
-            return !hasHousehold || !backendHouseholdContext.hasActiveMembership
-        }
-        return false
+        HouseholdBootstrapSequencer.showsCreateFlow(
+            isAuthenticated: authSession.isAuthenticated,
+            didRestoreSession: authSession.didRestoreSession,
+            phase: householdBootstrapPhase,
+            hasActiveMembership: backendHouseholdContext.hasActiveMembership
+        )
     }
 
     private var currentUserMembershipStatusForActiveHousehold: HouseholdMembershipStatus? {
@@ -702,6 +721,7 @@ struct DemoShellView: View {
         switch householdBootstrapPhase {
         case .idle: return "idle"
         case .loading: return "loading"
+        case .loadFailed: return "load_failed"
         case .resolved(let hasHousehold): return hasHousehold ? "resolved_with_household" : "resolved_no_household"
         }
     }
@@ -732,7 +752,14 @@ struct DemoShellView: View {
             drivers: backendDriversContext.drivers
         )
         let householdId = activeHouseholdStore.activeHouseholdId ?? householdContext.householdId
-        runLocationObserverStore.startObserving(householdId: householdId)
+        let inProgressRunIds = Set(
+            runDataSource.runs.filter { $0.status == .inProgress }.map(\.id)
+        )
+        runLocationObserverStore.reconcile(
+            householdId: householdId,
+            inProgressRunIds: inProgressRunIds,
+            isSceneActive: scenePhase == .active
+        )
     }
 
     private func logTabState(tab: String) {
@@ -864,19 +891,29 @@ struct DemoShellView: View {
         )
         print("[Bootstrap] MEMBERSHIPS COUNT=\(backendHouseholdContext.memberships.count)")
 #endif
-        if backendHouseholdContext.memberships.isEmpty {
-            activeHouseholdStore.clear()
-            childrenLoadedHouseholdId = nil
-            dependentDataLoadedHouseholdId = nil
-            await realtimeService.unsubscribe()
-            runDataSource.clearHouseholdScopedData()
-            scheduleDataSource.clearHouseholdScopedData()
-            householdBootstrapPhase = .resolved(hasHousehold: false)
+        if let earlyPhase = HouseholdBootstrapSequencer.phaseAfterMembershipRefresh(
+            membershipCount: backendHouseholdContext.memberships.count,
+            lastError: backendHouseholdContext.lastError,
+            treatsErrorAsCancellation: isCancellationMessage(backendHouseholdContext.lastError)
+        ) {
+            if case .resolved(hasHousehold: false) = earlyPhase {
+                activeHouseholdStore.clear()
+                childrenLoadedHouseholdId = nil
+                dependentDataLoadedHouseholdId = nil
+                await realtimeService.unsubscribe()
+                runDataSource.clearHouseholdScopedData()
+                scheduleDataSource.clearHouseholdScopedData()
+            }
+            householdBootstrapPhase = earlyPhase
 #if DEBUG
-            print(
-                "[Bootstrap] auth.uid=\(authSession.currentUserId ?? "nil"), selected_active_household_id=nil, " +
-                "activeHouseholdId.after=nil, no-household-ui=true"
-            )
+            if case .loadFailed(let loadError) = earlyPhase {
+                print("[Bootstrap] household refresh failed error=\(loadError)")
+            } else {
+                print(
+                    "[Bootstrap] auth.uid=\(authSession.currentUserId ?? "nil"), selected_active_household_id=nil, " +
+                    "activeHouseholdId.after=nil, no-household-ui=true"
+                )
+            }
 #endif
             return
         }
@@ -889,7 +926,7 @@ struct DemoShellView: View {
             await realtimeService.unsubscribe()
             runDataSource.clearHouseholdScopedData()
             scheduleDataSource.clearHouseholdScopedData()
-            householdBootstrapPhase = .resolved(hasHousehold: false)
+            householdBootstrapPhase = HouseholdBootstrapSequencer.phaseAfterSelection(resolvedHouseholdId: nil)
 #if DEBUG
             print(
                 "[Bootstrap] auth.uid=\(authSession.currentUserId ?? "nil"), selected_active_household_id=nil, " +
@@ -940,7 +977,7 @@ struct DemoShellView: View {
             await refreshDataSourcesAfterRemotePull()
             lastRemotePullAt = Date()
         }
-        householdBootstrapPhase = .resolved(hasHousehold: true)
+        householdBootstrapPhase = HouseholdBootstrapSequencer.phaseAfterSelection(resolvedHouseholdId: activeHouseholdId)
         requestSync(reason: "initialization_pipeline")
 
         reconcileLiveRunSystems()
@@ -994,6 +1031,34 @@ struct DemoShellView: View {
         case .more:
             return $morePath
         }
+    }
+
+    private var householdLoadFailedCard: some View {
+        VStack(spacing: 14) {
+            Image(systemName: "wifi.exclamationmark")
+                .font(.system(size: 28, weight: .semibold))
+                .foregroundStyle(Color.indigo)
+            Text("Couldn't load your tribe")
+                .font(.system(size: 20, weight: .bold))
+                .foregroundStyle(.primary)
+            Text(householdLoadFailureMessage)
+                .font(.system(size: 15, weight: .medium))
+                .multilineTextAlignment(.center)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: 320)
+            Button("Try again") {
+                Task { await runInitializationPipeline() }
+            }
+            .font(.system(size: 15, weight: .semibold))
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 12)
+            .background(Color.indigo)
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        }
+        .padding(24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(uiColor: .systemGroupedBackground))
     }
 
     private var noHouseholdOnboardingCard: some View {
@@ -1261,6 +1326,7 @@ struct DemoShellView: View {
         householdBootstrapPhase = .idle
         syncDebounceTask?.cancel()
         await realtimeService.unsubscribe()
+        runLocationObserverStore.stopObserving()
         backendProfileContext.reset()
         backendHouseholdContext.reset()
         activeHouseholdStore.clear()

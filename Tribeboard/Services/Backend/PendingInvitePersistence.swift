@@ -102,7 +102,7 @@ enum PendingInvitePersistence {
     }
 
     /// Parses universal links and custom scheme invite URLs.
-    static func ingestInviteURL(_ url: URL) -> Bool {
+    static func ingestInviteURL(_ url: URL, userDefaults: UserDefaults = .standard) -> Bool {
         guard isInviteURL(url) else { return false }
         let parsed = parseInviteParameters(from: url)
         guard parsed.hasAnyIdentifier else { return false }
@@ -111,7 +111,8 @@ enum PendingInvitePersistence {
             token: parsed.token,
             inviteId: parsed.inviteId,
             householdId: parsed.householdId,
-            email: parsed.email
+            email: parsed.email,
+            userDefaults: userDefaults
         )
 #if DEBUG
         print("[InviteLink] parsed invite_id=\(parsed.inviteId?.uuidString ?? "nil")")
@@ -123,8 +124,21 @@ enum PendingInvitePersistence {
     }
 
     static func parseInviteToken(from url: URL) -> String? {
+        parseInviteLink(url)?.token
+    }
+
+    /// Parsing only — does not persist or call the backend.
+    static func parseInviteLink(_ url: URL) -> ParsedInviteLink? {
         guard isInviteURL(url) else { return nil }
-        return parseInviteParameters(from: url).token
+        let parsed = parseInviteParameters(from: url)
+        guard parsed.hasAnyIdentifier else { return nil }
+        return ParsedInviteLink(
+            token: parsed.token,
+            inviteId: parsed.inviteId,
+            householdId: parsed.householdId,
+            email: parsed.email,
+            inviteCode: parsed.inviteCode
+        )
     }
 
     private static func isInviteURL(_ url: URL) -> Bool {
@@ -191,6 +205,37 @@ enum PendingInvitePersistence {
             }
         }
         return parsed
+    }
+}
+
+struct ParsedInviteLink: Equatable {
+    let token: String?
+    let inviteId: UUID?
+    let householdId: UUID?
+    let email: String?
+    let inviteCode: String?
+}
+
+/// Parse + persist only. Accept/membership INSERT stays on the existing signed-in RPC path.
+enum InviteDeepLinkIngest {
+    enum NextStep: Equatable {
+        case ignored
+        case savedForSignIn
+        case evaluatePostAuth
+    }
+
+    static let savedForSignInBanner =
+        "We saved your invite. Sign in or create an account to finish joining."
+
+    static func handle(
+        url: URL,
+        isAuthenticated: Bool,
+        userDefaults: UserDefaults = .standard
+    ) -> NextStep {
+        guard PendingInvitePersistence.ingestInviteURL(url, userDefaults: userDefaults) else {
+            return .ignored
+        }
+        return isAuthenticated ? .evaluatePostAuth : .savedForSignIn
     }
 }
 

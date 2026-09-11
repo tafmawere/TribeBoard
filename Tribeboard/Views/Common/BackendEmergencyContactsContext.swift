@@ -32,7 +32,7 @@ final class BackendEmergencyContactsContext: ObservableObject {
     func refreshForActiveHousehold() async {
         guard let householdId = activeHouseholdStore.activeHouseholdId else {
             contacts = []
-            lastError = "No active backend household."
+            lastError = nil
             return
         }
         await refreshContacts(householdId: householdId)
@@ -52,7 +52,7 @@ final class BackendEmergencyContactsContext: ObservableObject {
         }
         do {
             guard let session = try await ensuredSession() else {
-                lastError = "No active auth session."
+                lastError = BackendUserFacingErrorMapper.noActiveSession
                 contacts = []
                 return
             }
@@ -60,7 +60,7 @@ final class BackendEmergencyContactsContext: ObservableObject {
             contacts = Self.sorted(fetched)
             lastError = nil
         } catch {
-            lastError = error.localizedDescription
+            lastError = BackendUserFacingErrorMapper.message(for: error) ?? BackendUserFacingErrorMapper.genericLoadFailure
         }
         if hasPendingRefresh, let activeHouseholdId {
             hasPendingRefresh = false

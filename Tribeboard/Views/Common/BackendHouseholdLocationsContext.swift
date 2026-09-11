@@ -48,13 +48,13 @@ final class BackendHouseholdLocationsContext: ObservableObject {
         defer { isLoading = false }
         do {
             guard let session = try await ensuredSession() else {
-                lastError = "No active auth session."
+                lastError = BackendUserFacingErrorMapper.noActiveSession
                 return
             }
             locations = try await service.fetchLocations(householdId: householdId, session: session)
             lastError = nil
         } catch {
-            lastError = error.localizedDescription
+            lastError = BackendUserFacingErrorMapper.message(for: error) ?? BackendUserFacingErrorMapper.genericLoadFailure
         }
     }
 

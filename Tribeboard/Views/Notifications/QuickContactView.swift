@@ -6,8 +6,16 @@ struct QuickContactView: View {
     @State private var showUnsupportedAlert = false
     @State private var unsupportedMessage = ""
 
-    private let driverContacts = NotificationMockData.driverContacts
-    private let parentContacts = NotificationMockData.parentContacts
+    let driverContacts: [ContactShortcut]
+    let parentContacts: [ContactShortcut]
+
+    init(
+        driverContacts: [ContactShortcut] = [],
+        parentContacts: [ContactShortcut] = []
+    ) {
+        self.driverContacts = driverContacts
+        self.parentContacts = parentContacts
+    }
 
     var body: some View {
         ScrollView {
@@ -19,8 +27,23 @@ struct QuickContactView: View {
                     )
                 }
 
-                contactsSection(title: "Driver", contacts: driverContacts)
-                contactsSection(title: "Parents", contacts: parentContacts)
+                if driverContacts.isEmpty && parentContacts.isEmpty {
+                    NotificationStitchCard {
+                        VStack(spacing: 8) {
+                            Text("No saved numbers")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(NotificationTheme.textPrimary)
+                            Text("Household contacts with a phone number will show here.")
+                                .font(.system(size: 13, weight: .regular))
+                                .foregroundStyle(NotificationTheme.textSecondary)
+                                .multilineTextAlignment(.center)
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                } else {
+                    contactsSection(title: "Driver", contacts: driverContacts)
+                    contactsSection(title: "Family", contacts: parentContacts)
+                }
             }
             .padding(16)
         }
@@ -40,9 +63,15 @@ struct QuickContactView: View {
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(NotificationTheme.textPrimary)
 
-            ForEach(contacts) { contact in
-                QuickContactButton(contact: contact) {
-                    call(contact)
+            if contacts.isEmpty {
+                Text("None saved")
+                    .font(.system(size: 13, weight: .regular))
+                    .foregroundStyle(NotificationTheme.textSecondary)
+            } else {
+                ForEach(contacts) { contact in
+                    QuickContactButton(contact: contact) {
+                        call(contact)
+                    }
                 }
             }
         }
@@ -65,6 +94,9 @@ struct QuickContactView: View {
 
 #Preview {
     NavigationStack {
-        QuickContactView()
+        QuickContactView(
+            driverContacts: NotificationMockData.driverContacts,
+            parentContacts: NotificationMockData.parentContacts
+        )
     }
 }

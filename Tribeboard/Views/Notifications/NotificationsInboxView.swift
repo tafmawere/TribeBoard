@@ -2,7 +2,11 @@ import SwiftUI
 
 struct NotificationsInboxView: View {
     @State private var selectedFilter: NotificationsFilter = .all
-    @State private var notifications: [NotificationInboxItem] = NotificationMockData.inboxItems
+    @State private var notifications: [NotificationInboxItem]
+
+    init(notifications: [NotificationInboxItem] = NotificationInboxBootstrap.liveItems) {
+        _notifications = State(initialValue: notifications)
+    }
 
     private var filteredItems: [NotificationInboxItem] {
         switch selectedFilter {
@@ -30,10 +34,12 @@ struct NotificationsInboxView: View {
                             Image(systemName: "bell.slash")
                                 .font(.system(size: 24, weight: .semibold))
                                 .foregroundStyle(NotificationTheme.textSecondary)
-                            Text("No unread notifications")
+                            Text(selectedFilter == .unread ? "No unread notifications" : "No notifications")
                                 .font(.system(size: 16, weight: .semibold))
                                 .foregroundStyle(NotificationTheme.textPrimary)
-                            Text("You are all caught up for now.")
+                            Text(selectedFilter == .unread
+                                 ? "You are all caught up for now."
+                                 : "New run and household updates will appear here.")
                                 .font(.system(size: 13, weight: .regular))
                                 .foregroundStyle(NotificationTheme.textSecondary)
                         }
@@ -66,6 +72,6 @@ struct NotificationsInboxView: View {
 
 #Preview {
     NavigationStack {
-        NotificationsInboxView()
+        NotificationsInboxView(notifications: NotificationMockData.inboxItems)
     }
 }

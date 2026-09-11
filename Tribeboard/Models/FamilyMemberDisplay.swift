@@ -29,9 +29,9 @@ struct FamilyMemberDisplay: Identifiable, Hashable {
         }
     }
     
-    /// Create display model from user data
+    /// Create display model from user data. Parent status follows `FamilyRole`, not demo IDs.
     static func from(userId: String, displayName: String, role: FamilyRole, phone: String? = nil) -> FamilyMemberDisplay {
-        let isParent = userId == DemoSeedDataService.rueId || userId == DemoSeedDataService.tafadzwaId
+        let isParent = role == .admin
         let initials = makeInitials(from: displayName)
         let badges = makeBadges(for: userId, role: role, isParent: isParent)
         let capabilities = makeCapabilities(for: userId, role: role, isParent: isParent)

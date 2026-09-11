@@ -111,6 +111,45 @@ final class RunStateMachineTests: XCTestCase {
         }
     }
 
+    func testStartRejectsInProgressRun() {
+        XCTAssertThrowsError(try machine.start(makeRun(status: .inProgress), now: Date())) { error in
+            XCTAssertEqual(error as? RunTransitionError, .invalidTransition)
+        }
+    }
+
+    func testCompleteRejectsUnfinishedStops() {
+        var run = makeRun(status: .inProgress)
+        run.stops = [
+            SystemDomain.RunStopProgress(stopId: UUID(), status: .arrived, arrivedAt: Date(), departedAt: nil)
+        ]
+        XCTAssertThrowsError(try machine.complete(run, now: Date())) { error in
+            XCTAssertEqual(error as? RunTransitionError, .invalidTransition)
+        }
+    }
+
+    func testSkipStopAdvancesAndCancelRejectsCompleted() throws {
+        let first = UUID()
+        let second = UUID()
+        let now = Date(timeIntervalSince1970: 1_700_000_400)
+        var run = makeRun(status: .inProgress)
+        run.activeStopIndex = 0
+        run.stops = [
+            SystemDomain.RunStopProgress(stopId: first, status: .enRoute, arrivedAt: nil, departedAt: nil),
+            SystemDomain.RunStopProgress(stopId: second, status: .pending, arrivedAt: nil, departedAt: nil)
+        ]
+
+        let skipped = try machine.skipStop(run, stopIndex: 0, now: now)
+        XCTAssertEqual(skipped.stops[0].status, .skipped)
+        XCTAssertEqual(skipped.stops[1].status, .enRoute)
+        XCTAssertEqual(skipped.activeStopIndex, 1)
+
+        var completed = skipped
+        completed.status = .completed
+        XCTAssertThrowsError(try machine.cancel(completed, now: now)) { error in
+            XCTAssertEqual(error as? RunTransitionError, .alreadyCompleted)
+        }
+    }
+
     func testCancelSetsCancelledAt() throws {
         let now = Date(timeIntervalSince1970: 1_700_000_000)
         let run = makeRun(status: .assigned)
@@ -120,6 +159,34 @@ final class RunStateMachineTests: XCTestCase {
         XCTAssertEqual(updated.status, .cancelled)
         XCTAssertEqual(updated.cancelledAt, now)
         XCTAssertNil(updated.completedAt)
+    }
+
+    func testCancelInProgressAndScheduledAreLegal() throws {
+        let now = Date(timeIntervalSince1970: 1_700_000_500)
+        let scheduled = try machine.cancel(makeRun(status: .scheduled), now: now)
+        XCTAssertEqual(scheduled.status, .cancelled)
+        XCTAssertEqual(scheduled.cancelledAt, now)
+
+        var live = makeRun(status: .inProgress)
+        live.activeStopIndex = 0
+        let cancelledLive = try machine.cancel(live, now: now)
+        XCTAssertEqual(cancelledLive.status, .cancelled)
+        XCTAssertNil(cancelledLive.activeStopIndex)
+    }
+
+    func testIllegalTransitionsFromTerminalAndUnstarted() {
+        XCTAssertThrowsError(try machine.cancel(makeRun(status: .cancelled), now: Date())) { error in
+            XCTAssertEqual(error as? RunTransitionError, .alreadyCancelled)
+        }
+        XCTAssertThrowsError(try machine.start(makeRun(status: .completed), now: Date())) { error in
+            XCTAssertEqual(error as? RunTransitionError, .alreadyCompleted)
+        }
+        XCTAssertThrowsError(try machine.arriveAtStop(makeRun(status: .assigned), stopIndex: 0, now: Date())) { error in
+            XCTAssertEqual(error as? RunTransitionError, .notStarted)
+        }
+        XCTAssertThrowsError(try machine.complete(makeRun(status: .scheduled), now: Date())) { error in
+            XCTAssertEqual(error as? RunTransitionError, .notStarted)
+        }
     }
 
     private func makeRun(status: SystemDomain.RunStatus) -> SystemDomain.RunInstance {

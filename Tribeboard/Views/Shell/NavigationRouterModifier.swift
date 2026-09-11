@@ -39,7 +39,7 @@ struct DestinationNavigationRouter: ViewModifier {
                     NotificationSettingsView()
 
                 case .quickContact:
-                    QuickContactView()
+                    QuickContactLiveRouteView()
 
                 // Safety & privacy
                 case .locationSharing:
@@ -99,31 +99,87 @@ private struct RunDetailsRouteView: View {
 
 private struct RunEditRouteView: View {
     let runId: String
+    @EnvironmentObject private var runDataSource: RunDataSource
     @EnvironmentObject private var locationService: LocationReadinessService
     @EnvironmentObject private var familyQuickPlacesStore: FamilyQuickPlacesStore
+    @EnvironmentObject private var backendChildrenContext: BackendChildrenContext
 
     var body: some View {
-        RunEditRescheduleView(mode: .edit(RunDetailsData.scheduledRun)) { _ in true }
-            .navigationTitle("Edit Run")
-            .environmentObject(locationService)
-            .environmentObject(familyQuickPlacesStore)
+        if let uiRun = resolvedUIRun {
+            RunEditRescheduleView(mode: .edit(uiRun)) { _ in true }
+                .navigationTitle("Edit Run")
+                .environmentObject(locationService)
+                .environmentObject(familyQuickPlacesStore)
+        } else {
+            ErrorStateView(kind: .runNotFound)
+                .navigationTitle("Edit Run")
+        }
+    }
+
+    private var resolvedUIRun: RunDetailsData.UIRun? {
+        RunDetailsUIMapper.resolve(
+            runId: runId,
+            run: runDataSource.run(withId:),
+            childName: runDataSource.run(withId: runId).map {
+                RunDisplayStrings.childName(for: $0, children: backendChildrenContext.children)
+            }
+        )
     }
 }
 
 private struct RunHistoryDetailRouteView: View {
     let runId: String
+    @EnvironmentObject private var runDataSource: RunDataSource
+    @EnvironmentObject private var backendChildrenContext: BackendChildrenContext
 
     var body: some View {
-        RunHistoryDetailView(run: RunDetailsData.completedRun)
+        if let uiRun = resolvedUIRun {
+            RunHistoryDetailView(run: uiRun)
+        } else {
+            ErrorStateView(kind: .runNotFound)
+                .navigationTitle("Run History")
+        }
+    }
+
+    private var resolvedUIRun: RunDetailsData.UIRun? {
+        RunDetailsUIMapper.resolve(
+            runId: runId,
+            run: runDataSource.run(withId:),
+            childName: runDataSource.run(withId: runId).map {
+                RunDisplayStrings.childName(for: $0, children: backendChildrenContext.children)
+            }
+        )
     }
 }
 
 private struct CancelRunRouteView: View {
     let runId: String
+    @EnvironmentObject private var runDataSource: RunDataSource
+    @EnvironmentObject private var locationService: LocationReadinessService
 
     var body: some View {
-        CancelRunDemoHostView()
+        if let run = runDataSource.run(withId: runId),
+           run.status != .completed,
+           run.status != .cancelled {
+            CancelRunConfirmView { _ in
+                Task {
+                    await runDataSource.cancelRun(id: run.id, locationService: locationService)
+                }
+            }
             .navigationTitle("Cancel Run")
+        } else {
+            ErrorStateView(kind: .runNotFound)
+                .navigationTitle("Cancel Run")
+        }
+    }
+}
+
+private struct QuickContactLiveRouteView: View {
+    @EnvironmentObject private var backendHouseholdPeopleContext: BackendHouseholdPeopleContext
+
+    var body: some View {
+        let mapped = NotificationLiveContacts.from(people: backendHouseholdPeopleContext.people)
+        QuickContactView(driverContacts: mapped.drivers, parentContacts: mapped.parents)
     }
 }
 

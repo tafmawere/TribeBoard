@@ -228,18 +228,24 @@ struct RootFlowView: View {
 
     @MainActor
     private func handleInviteDeepLink(_ url: URL) {
-        guard PendingInvitePersistence.ingestInviteURL(url) else { return }
-        InviteFlowLogger.inviteDeepLinkIngested(
-            authPresent: authSession.isAuthenticated,
-            host: url.host
-        )
-        if authSession.isAuthenticated {
+        switch InviteDeepLinkIngest.handle(url: url, isAuthenticated: authSession.isAuthenticated) {
+        case .ignored:
+            return
+        case .savedForSignIn:
+            InviteFlowLogger.inviteDeepLinkIngested(
+                authPresent: false,
+                host: url.host
+            )
+            unauthenticatedInviteBanner = InviteDeepLinkIngest.savedForSignInBanner
+        case .evaluatePostAuth:
+            InviteFlowLogger.inviteDeepLinkIngested(
+                authPresent: true,
+                host: url.host
+            )
             globalInviteNotice = nil
             Task {
                 await evaluatePostAuthScreen()
             }
-        } else {
-            unauthenticatedInviteBanner = "We saved your invite. Sign in or create an account to finish joining."
         }
     }
 
@@ -269,9 +275,13 @@ struct RootFlowView: View {
         do {
             guard let session = try await authService.restoreSession() else {
 #if DEBUG
-                print("[OnboardingCheck] sessionRestoreFailed=true routingTo=onboarding")
+                print("[OnboardingCheck] sessionRestoreFailed=true")
 #endif
-                postAuthScreen = .onboarding
+                if OnboardingPreferences.hasReturningUserCache(userDefaults: userDefaults) {
+                    postAuthScreen = .mainApp
+                } else {
+                    postAuthScreen = .onboarding
+                }
                 return
             }
             await refreshPendingInviteGate(session: session)
@@ -356,10 +366,21 @@ struct RootFlowView: View {
             print("[RootFlowView] bootstrap refresh complete user_id=\(session.userId), screen=\(screenLabel(postAuthScreen))")
 #endif
         } catch {
-            postAuthScreen = .onboarding
+            if OnboardingPreferences.hasReturningUserCache(userDefaults: userDefaults) {
+                postAuthScreen = .mainApp
 #if DEBUG
-            print("[RootFlowView] onboarding evaluation failed error=\(error.localizedDescription), screen=onboarding")
+                print("[RootFlowView] onboarding evaluation failed error=\(error.localizedDescription), keeping main_app from returning-user cache")
 #endif
+            } else if postAuthScreen == .loading {
+                postAuthScreen = .onboarding
+#if DEBUG
+                print("[RootFlowView] onboarding evaluation failed error=\(error.localizedDescription), screen=onboarding")
+#endif
+            } else {
+#if DEBUG
+                print("[RootFlowView] onboarding evaluation failed error=\(error.localizedDescription), keeping screen=\(screenLabel(postAuthScreen))")
+#endif
+            }
         }
     }
 
@@ -399,13 +420,14 @@ struct RootFlowView: View {
         }
         let loaded: HouseholdInvitePreview?
         do {
-            if let inviteId = snap.inviteId {
+            switch InviteAcceptCredentialResolver.resolve(snap) {
+            case .inviteId(let inviteId):
                 loaded = try await householdService.fetchInvitePreviewByInviteId(inviteId, session: session)
-            } else if snap.prefersToken, let token = snap.inviteToken {
+            case .inviteToken(let token):
                 loaded = try await householdService.fetchInvitePreviewByToken(token, session: session)
-            } else if let code = snap.inviteCode {
+            case .inviteCode(let code):
                 loaded = try await householdService.fetchInvitePreviewByCode(code, session: session)
-            } else {
+            case nil:
                 loaded = nil
             }
         } catch {
@@ -456,13 +478,14 @@ struct RootFlowView: View {
                 return
             }
             let response: HouseholdInviteAcceptRPCResponse
-            if let inviteId = snap.inviteId {
+            switch InviteAcceptCredentialResolver.resolve(snap) {
+            case .inviteId(let inviteId):
                 response = try await householdService.acceptHouseholdInviteRPC(inviteId: inviteId, session: session)
-            } else if snap.prefersToken, let token = snap.inviteToken {
+            case .inviteToken(let token):
                 response = try await householdService.acceptHouseholdInviteRPC(inviteToken: token, session: session)
-            } else if let code = snap.inviteCode {
+            case .inviteCode(let code):
                 response = try await householdService.acceptHouseholdInviteRPC(inviteCode: code, session: session)
-            } else {
+            case nil:
                 pendingInvitePreview = nil
                 return
             }

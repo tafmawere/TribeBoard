@@ -46,8 +46,8 @@ final class HouseholdDataSource: ObservableObject {
     }
 
     func createHousehold(name: String) async {
-        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else {
+        let trimmed = HouseholdCreateName.normalized(name)
+        guard HouseholdCreateName.isUsable(trimmed) else {
             lastError = "Household name is required."
             return
         }

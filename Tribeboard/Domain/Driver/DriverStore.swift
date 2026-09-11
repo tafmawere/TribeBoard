@@ -95,6 +95,7 @@ final class DriverStore {
     }
 
     func seedDemoDrivers() {
+        guard AppConfig.isDemoFlowEnabled else { return }
         var drivers = load()
         let now = Date()
         for demo in Self.demoSeeds {

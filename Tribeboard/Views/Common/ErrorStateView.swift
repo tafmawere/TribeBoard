@@ -4,6 +4,7 @@ enum ErrorStateKind: CaseIterable, Identifiable {
     case noInternet
     case runNotFound
     case permissionDenied
+    case loadFailed
 
     var id: String { title }
 
@@ -12,6 +13,7 @@ enum ErrorStateKind: CaseIterable, Identifiable {
         case .noInternet: return "wifi.slash"
         case .runNotFound: return "map.fill"
         case .permissionDenied: return "lock.shield"
+        case .loadFailed: return "exclamationmark.triangle"
         }
     }
 
@@ -20,6 +22,7 @@ enum ErrorStateKind: CaseIterable, Identifiable {
         case .noInternet: return "No internet connection"
         case .runNotFound: return "Run not found"
         case .permissionDenied: return "Permission denied"
+        case .loadFailed: return "Couldn't load"
         }
     }
 
@@ -31,6 +34,8 @@ enum ErrorStateKind: CaseIterable, Identifiable {
             return "This run might have been removed or moved to a different day."
         case .permissionDenied:
             return "Your account cannot access this area. Contact your family admin."
+        case .loadFailed:
+            return BackendUserFacingErrorMapper.genericLoadFailure
         }
     }
 }

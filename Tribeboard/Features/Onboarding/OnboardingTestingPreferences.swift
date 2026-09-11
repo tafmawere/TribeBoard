@@ -7,18 +7,35 @@ enum OnboardingTestingPreferences {
     private static let fastFamilyDraftKey = "tb.onboarding.fastFamilySetup.v1"
 
     static var forceOnboardingOnNextLaunch: Bool {
-        get { UserDefaults.standard.bool(forKey: forceOnboardingKey) }
-        set { UserDefaults.standard.set(newValue, forKey: forceOnboardingKey) }
+        get {
+#if DEBUG
+            UserDefaults.standard.bool(forKey: forceOnboardingKey)
+#else
+            false
+#endif
+        }
+        set {
+#if DEBUG
+            UserDefaults.standard.set(newValue, forKey: forceOnboardingKey)
+#else
+            UserDefaults.standard.removeObject(forKey: forceOnboardingKey)
+#endif
+        }
     }
 
     /// Marks onboarding incomplete in memory and persists a launch flag so RootFlowView routes to onboarding.
     static func resetForNextLaunch(flow: AppFlowState, userDefaults: UserDefaults = .standard) {
+#if DEBUG
         userDefaults.set(true, forKey: forceOnboardingKey)
         flow.updateOnboardingSnapshot(membershipCount: 0, childCount: 0, onboardingComplete: false)
         OnboardingPreferences.clear(userDefaults: userDefaults)
         userDefaults.removeObject(forKey: onboardingDraftKey)
         userDefaults.removeObject(forKey: fastFamilyDraftKey)
         OnboardingInviteDismissalStore.clear(userDefaults: userDefaults)
+#else
+        _ = flow
+        _ = userDefaults
+#endif
     }
 
     static func clearForceOnboardingOnNextLaunch(userDefaults: UserDefaults = .standard) {

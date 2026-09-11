@@ -113,6 +113,57 @@ private final class RunPermissionHouseholdBackendServiceMock: HouseholdBackendSe
 
 @MainActor
 final class ManualRunCreationTests: XCTestCase {
+    func testResolveChildIdIgnoresOtherHouseholdAndFallsBackToFirstScoped() {
+        let householdId = UUID()
+        let otherHousehold = UUID()
+        let local = BackendChild(
+            id: UUID(),
+            householdId: householdId,
+            legalName: "Local Legal",
+            displayName: "Local",
+            dateOfBirth: nil,
+            schoolName: nil,
+            gradeOrClass: nil,
+            createdAt: nil,
+            updatedAt: nil
+        )
+        let outsider = BackendChild(
+            id: UUID(),
+            householdId: otherHousehold,
+            legalName: "TJ",
+            displayName: "TJ",
+            dateOfBirth: nil,
+            schoolName: nil,
+            gradeOrClass: nil,
+            createdAt: nil,
+            updatedAt: nil
+        )
+        XCTAssertEqual(
+            ManualRunCreationSupport.resolveChildId(
+                passengerNames: ["TJ"],
+                children: [outsider, local],
+                householdId: householdId
+            ),
+            local.id
+        )
+        XCTAssertNil(
+            ManualRunCreationSupport.resolveChildId(
+                passengerNames: ["TJ"],
+                children: [outsider],
+                householdId: householdId
+            )
+        )
+    }
+
+    func testStopLabelCodecInfersPickupAndDropoff() {
+        XCTAssertEqual(RunStopLabelCodec.inferredKind(order: 0, total: 2), RunStopLabelCodec.pickup)
+        XCTAssertEqual(RunStopLabelCodec.inferredKind(order: 1, total: 2), RunStopLabelCodec.dropoff)
+        XCTAssertEqual(RunStopLabelCodec.normalizedKind(" pickup "), RunStopLabelCodec.pickup)
+        XCTAssertNil(RunStopLabelCodec.normalizedKind("Home"))
+        XCTAssertTrue(RunStopLabelCodec.isStopKind("Dropoff"))
+        XCTAssertFalse(RunStopLabelCodec.isStopKind("School"))
+    }
+
     func testResolveChildIdMatchesDisplayName() {
         let householdId = UUID()
         let childA = BackendChild(

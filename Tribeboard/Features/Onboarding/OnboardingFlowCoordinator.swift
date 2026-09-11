@@ -572,13 +572,14 @@ final class OnboardingFlowCoordinator: ObservableObject {
 
         if let snap = PendingInvitePersistence.load() {
             let response: HouseholdInviteAcceptRPCResponse?
-            if let inviteId = snap.inviteId {
+            switch InviteAcceptCredentialResolver.resolve(snap) {
+            case .inviteId(let inviteId):
                 response = try await householdService.acceptHouseholdInviteRPC(inviteId: inviteId, session: session)
-            } else if snap.prefersToken, let token = snap.inviteToken, !token.isEmpty {
+            case .inviteToken(let token):
                 response = try await householdService.acceptHouseholdInviteRPC(inviteToken: token, session: session)
-            } else if let code = snap.inviteCode, !normalized(code).isEmpty {
+            case .inviteCode(let code):
                 response = try await householdService.acceptHouseholdInviteRPC(inviteCode: code, session: session)
-            } else {
+            case nil:
                 response = nil
             }
             if let response {

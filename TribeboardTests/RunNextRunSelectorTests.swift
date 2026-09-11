@@ -83,6 +83,68 @@ final class RunNextRunSelectorTests: XCTestCase {
         XCTAssertEqual(result.run?.title, "Nyerere")
     }
 
+    func testPrefersInProgressOverLaterAssigned() {
+        let reference = calendar.date(from: DateComponents(year: 2026, month: 6, day: 23, hour: 12))!
+        let later = makeRun(
+            title: "Later",
+            date: reference.addingTimeInterval(3600),
+            createdAt: reference,
+            status: .assigned,
+            stopCount: 2
+        )
+        let active = makeRun(
+            title: "Live",
+            date: reference.addingTimeInterval(7200),
+            createdAt: reference.addingTimeInterval(-60),
+            status: .inProgress,
+            stopCount: 2
+        )
+
+        let result = RunNextRunSelector.select(from: [later, active], referenceDate: reference, calendar: calendar)
+        XCTAssertEqual(result.run?.title, "Live")
+        XCTAssertTrue(result.selectionReason.contains("in_progress"))
+    }
+
+    func testEmptyInputAndAllPastAssignedAreIneligible() {
+        let reference = calendar.date(from: DateComponents(year: 2026, month: 6, day: 23, hour: 12))!
+        let empty = RunNextRunSelector.select(from: [], referenceDate: reference, calendar: calendar)
+        XCTAssertNil(empty.run)
+        XCTAssertEqual(empty.selectionReason, "no_eligible_runs")
+
+        let yesterday = calendar.date(byAdding: .day, value: -1, to: reference)!
+        let lastWeek = calendar.date(byAdding: .day, value: -7, to: reference)!
+        let past = [
+            makeRun(title: "Yesterday", date: yesterday, createdAt: yesterday, status: .assigned, stopCount: 2),
+            makeRun(title: "Last week", date: lastWeek, createdAt: lastWeek, status: .scheduled, stopCount: 2)
+        ]
+        let result = RunNextRunSelector.select(from: past, referenceDate: reference, calendar: calendar)
+        XCTAssertNil(result.run)
+        XCTAssertEqual(result.selectionReason, "no_eligible_runs")
+        XCTAssertTrue(result.logs.allSatisfy { $0.exclusionReason == "run_date_before_today" })
+    }
+
+    func testReturnsNilWhenOnlyTerminalRunsExist() {
+        let reference = calendar.date(from: DateComponents(year: 2026, month: 6, day: 23, hour: 12))!
+        let completed = makeRun(
+            title: "Done",
+            date: reference,
+            createdAt: reference,
+            status: .completed,
+            stopCount: 2
+        )
+        let cancelled = makeRun(
+            title: "Cancelled",
+            date: reference,
+            createdAt: reference,
+            status: .cancelled,
+            stopCount: 2
+        )
+
+        let result = RunNextRunSelector.select(from: [completed, cancelled], referenceDate: reference, calendar: calendar)
+        XCTAssertNil(result.run)
+        XCTAssertEqual(result.selectionReason, "no_eligible_runs")
+    }
+
     private func makeRun(
         id: UUID = UUID(),
         title: String,
