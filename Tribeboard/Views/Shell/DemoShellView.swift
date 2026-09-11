@@ -558,6 +558,7 @@ struct DemoShellView: View {
             await runInitializationPipeline()
         }
         .onChange(of: scenePhase) { _, newPhase in
+            reconcileLiveRunSystems()
             guard newPhase == .active else { return }
             Task {
                 await runInitializationPipeline(forceRemotePull: shouldPullRemoteNow)
@@ -761,7 +762,14 @@ struct DemoShellView: View {
             drivers: backendDriversContext.drivers
         )
         let householdId = activeHouseholdStore.activeHouseholdId ?? householdContext.householdId
-        runLocationObserverStore.startObserving(householdId: householdId)
+        let inProgressRunIds = Set(
+            runDataSource.runs.filter { $0.status == .inProgress }.map(\.id)
+        )
+        runLocationObserverStore.reconcile(
+            householdId: householdId,
+            inProgressRunIds: inProgressRunIds,
+            isSceneActive: scenePhase == .active
+        )
     }
 
     private func logTabState(tab: String) {
@@ -1328,6 +1336,7 @@ struct DemoShellView: View {
         householdBootstrapPhase = .idle
         syncDebounceTask?.cancel()
         await realtimeService.unsubscribe()
+        runLocationObserverStore.stopObserving()
         backendProfileContext.reset()
         backendHouseholdContext.reset()
         activeHouseholdStore.clear()
