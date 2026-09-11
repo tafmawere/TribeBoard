@@ -1874,10 +1874,7 @@ struct SupabaseHouseholdBackendService: HouseholdBackendService {
         session: AuthUserSession,
         logPrefix: String
     ) async throws {
-        let url = URL(string: "https://bxiyosyhkbyvnbqgictr.functions.supabase.co/sendInviteEmail")
-        guard let url else {
-            throw ServiceError.requestFailed("Invalid sendInviteEmail URL.")
-        }
+        let url = try SupabaseClientProvider.functionsURL(path: "sendInviteEmail")
         let anonKey = BackendConfig.supabaseAnonKey.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !anonKey.isEmpty else {
             throw ServiceError.requestFailed("Missing SUPABASE_ANON_KEY for sendInviteEmail.")
