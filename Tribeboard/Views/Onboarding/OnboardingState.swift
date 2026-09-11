@@ -100,7 +100,15 @@ struct VenueRule: Identifiable, Hashable {
 struct OnboardingChildDraft: Identifiable, Hashable {
     let id: UUID
     var name: String
+    var displayName: String?
     var dateOfBirth: Date?
+    var schoolName: String?
+    var schoolAddress: String?
+    var gradeOrClass: String?
+    var schoolStartTime: DateComponents?
+    var schoolEndTime: DateComponents?
+    var schoolDays: Set<Weekday>?
+    var activities: [ChildActivity]
     var avatarImageName: String
     var avatarId: String?
     var avatarSymbol: AvatarSymbol?
@@ -112,7 +120,15 @@ struct OnboardingChildDraft: Identifiable, Hashable {
     init(
         id: UUID = UUID(),
         name: String = "",
+        displayName: String? = nil,
         dateOfBirth: Date? = nil,
+        schoolName: String? = nil,
+        schoolAddress: String? = nil,
+        gradeOrClass: String? = nil,
+        schoolStartTime: DateComponents? = nil,
+        schoolEndTime: DateComponents? = nil,
+        schoolDays: Set<Weekday>? = nil,
+        activities: [ChildActivity] = [],
         avatarImageName: String = "",
         avatarId: String? = nil,
         avatarSymbol: AvatarSymbol? = nil,
@@ -123,7 +139,15 @@ struct OnboardingChildDraft: Identifiable, Hashable {
     ) {
         self.id = id
         self.name = name
+        self.displayName = displayName
         self.dateOfBirth = dateOfBirth
+        self.schoolName = schoolName
+        self.schoolAddress = schoolAddress
+        self.gradeOrClass = gradeOrClass
+        self.schoolStartTime = schoolStartTime
+        self.schoolEndTime = schoolEndTime
+        self.schoolDays = schoolDays
+        self.activities = activities
         self.avatarImageName = avatarImageName
         self.avatarId = avatarId
         self.avatarSymbol = avatarSymbol ?? AvatarSymbol.fromLegacyImageName(avatarId ?? avatarImageName)
@@ -145,6 +169,64 @@ struct OnboardingChildDraft: Identifiable, Hashable {
     var age: Int? {
         guard let dob = dateOfBirth else { return nil }
         return Calendar.current.dateComponents([.year], from: dob, to: Date()).year
+    }
+
+    var preferredDisplayName: String {
+        let preferred = displayName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !preferred.isEmpty {
+            return preferred
+        }
+        return name
+    }
+
+    var ageText: String? {
+        guard let age else { return nil }
+        let suffix = age == 1 ? "year" : "years"
+        return "\(age) \(suffix) old"
+    }
+
+    var schoolRoutineSummary: String {
+        let school = schoolName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard !school.isEmpty else { return "No school configured" }
+        guard let schoolDays,
+              !schoolDays.isEmpty,
+              let schoolStartTime,
+              let schoolEndTime else {
+            return school
+        }
+        let dayText = formattedSchoolDays(schoolDays)
+        let timeText = formattedTimeRange(start: schoolStartTime, end: schoolEndTime)
+        return "\(school) • \(dayText) • \(timeText)"
+    }
+
+    var hasSchoolConfigured: Bool {
+        schoolName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty != nil
+    }
+
+    var activityCountText: String {
+        let count = activities.count
+        let noun = count == 1 ? "activity" : "activities"
+        return "\(count) \(noun)"
+    }
+
+    private func formattedSchoolDays(_ days: Set<Weekday>) -> String {
+        let ordered = Weekday.allCases.filter { days.contains($0) }
+        let weekdaysOnly: [Weekday] = [.monday, .tuesday, .wednesday, .thursday, .friday]
+        if ordered == weekdaysOnly {
+            return "Mon–Fri"
+        }
+        return ordered.map(\.shortLabel).joined(separator: ", ")
+    }
+
+    private func formattedTimeRange(start: DateComponents, end: DateComponents) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm"
+        let calendar = Calendar.current
+        let startDate = calendar.date(from: start)
+        let endDate = calendar.date(from: end)
+        let startText = startDate.map { formatter.string(from: $0) } ?? "--:--"
+        let endText = endDate.map { formatter.string(from: $0) } ?? "--:--"
+        return "\(startText)-\(endText)"
     }
 
     var runsPerWeek: Int {
@@ -405,7 +487,15 @@ final class OnboardingState: ObservableObject {
     func addChild(
         id: UUID = UUID(),
         name: String = "",
+        displayName: String? = nil,
         dateOfBirth: Date? = nil,
+        schoolName: String? = nil,
+        schoolAddress: String? = nil,
+        gradeOrClass: String? = nil,
+        schoolStartTime: DateComponents? = nil,
+        schoolEndTime: DateComponents? = nil,
+        schoolDays: Set<Weekday>? = nil,
+        activities: [ChildActivity] = [],
         avatarImageName: String = "",
         avatarURL: String? = nil,
         avatarId: String? = nil,
@@ -414,7 +504,15 @@ final class OnboardingState: ObservableObject {
         let newChild = OnboardingChildDraft(
             id: id,
             name: name,
+            displayName: displayName,
             dateOfBirth: dateOfBirth,
+            schoolName: schoolName,
+            schoolAddress: schoolAddress,
+            gradeOrClass: gradeOrClass,
+            schoolStartTime: schoolStartTime,
+            schoolEndTime: schoolEndTime,
+            schoolDays: schoolDays,
+            activities: activities,
             avatarImageName: avatarImageName,
             avatarId: avatarId,
             avatarSymbol: avatarSymbol,
@@ -512,6 +610,14 @@ final class OnboardingState: ObservableObject {
                 avatarSymbol: child.avatarSymbol ?? AvatarSymbol.fromLegacyImageName(resolvedAvatarImageName),
                 memberType: .child,
                 dateOfBirth: child.dateOfBirth,
+                displayName: child.displayName,
+                schoolName: child.schoolName ?? child.venues.first(where: { $0.type == .school })?.label,
+                schoolAddress: child.schoolAddress ?? child.venues.first(where: { $0.type == .school })?.place.formattedAddress,
+                gradeOrClass: child.gradeOrClass,
+                schoolStartTime: child.schoolStartTime,
+                schoolEndTime: child.schoolEndTime,
+                schoolDays: child.schoolDays,
+                activities: child.activities,
                 roles: [.child, .passenger]
             )
             store.addMember(childMember)

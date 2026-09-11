@@ -28,23 +28,19 @@ final class HouseholdDataSource: ObservableObject {
 
     func refresh() async {
         do {
-            var loaded = try await repository.loadHouseholds()
+            let loaded = try await repository.loadHouseholds()
                 .sorted { $0.createdAt < $1.createdAt }
-
-            if loaded.isEmpty {
-                let seeded = Household(
-                    id: HouseholdDefaults.defaultHouseholdId,
-                    name: HouseholdDefaults.defaultHouseholdName,
-                    createdAt: Date()
-                )
-                loaded = [seeded]
-                try await repository.saveHouseholds(loaded)
-            }
 
             households = loaded
             alignActiveContextToLoadedHouseholds()
             lastError = nil
         } catch {
+            if isCancellationError(error) {
+#if DEBUG
+                print("[HouseholdDataSource] ignored cancellation during refresh")
+#endif
+                return
+            }
             lastError = "Failed to load households."
         }
     }
@@ -75,6 +71,12 @@ final class HouseholdDataSource: ObservableObject {
             lastError = nil
             await switchHousehold(id: newHousehold.id)
         } catch {
+            if isCancellationError(error) {
+#if DEBUG
+                print("[HouseholdDataSource] ignored cancellation during create")
+#endif
+                return
+            }
             lastError = "Failed to create household."
         }
     }
@@ -136,7 +138,29 @@ final class HouseholdDataSource: ObservableObject {
         }
     }
 
+    func adoptBackendHousehold(id: UUID, name: String) async {
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let fallbackName = trimmedName.isEmpty ? "Shared Household" : trimmedName
+        var updated = households
+
+        if let index = updated.firstIndex(where: { $0.id == id }) {
+            updated[index].name = fallbackName
+        } else {
+            updated.append(Household(id: id, name: fallbackName, createdAt: Date()))
+            updated.sort { $0.createdAt < $1.createdAt }
+        }
+
+        do {
+            try await repository.saveHouseholds(updated)
+            households = updated
+            await switchHousehold(id: id)
+        } catch {
+            lastError = "Failed to adopt backend household."
+        }
+    }
+
     private func alignActiveContextToLoadedHouseholds() {
+        guard !households.isEmpty else { return }
         if let current = households.first(where: { $0.id == activeContext.householdId }) {
             activeContext.householdName = current.name
             return

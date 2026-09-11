@@ -76,7 +76,14 @@ struct UISecondaryButton: View {
 
 struct UIRunCard: View {
     let run: UIRun
+    let driverNameOverride: String?
     let action: () -> Void
+
+    init(run: UIRun, driverNameOverride: String? = nil, action: @escaping () -> Void) {
+        self.run = run
+        self.driverNameOverride = driverNameOverride
+        self.action = action
+    }
 
     var body: some View {
         Button(action: action) {
@@ -102,7 +109,7 @@ struct UIRunCard: View {
                     .foregroundStyle(UIRunDesignSystem.textSecondary)
 
                     HStack {
-                        Text("Driver: \(run.driverName)")
+                        Text("Driver: \(displayDriverName)")
                             .font(.system(size: 13, weight: .medium))
                             .foregroundStyle(UIRunDesignSystem.textSecondary)
                         Spacer()
@@ -115,10 +122,20 @@ struct UIRunCard: View {
         .buttonStyle(.plain)
     }
 
+    private var displayDriverName: String {
+        let override = driverNameOverride?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !override.isEmpty {
+            return override
+        }
+        return run.driverName
+    }
+
     private func statusBadgeStyle(_ status: UIRunStatus) -> BadgeStyle {
         switch status {
         case .scheduled:
             return .scheduled
+        case .assigned:
+            return .info
         case .active:
             return .enRoute
         case .completed:
@@ -132,20 +149,18 @@ struct UIPassengerRow: View {
     var isSelectable = false
     var isSelected = false
     var onTap: (() -> Void)? = nil
+    var accessToken: String? = nil
 
     var body: some View {
         Button {
             onTap?()
         } label: {
             HStack(spacing: 12) {
-                Circle()
-                    .fill(UIRunDesignSystem.primary.opacity(0.14))
-                    .frame(width: 42, height: 42)
-                    .overlay {
-                        Text(initials(passenger.name))
-                            .font(.system(size: 13, weight: .bold))
-                            .foregroundStyle(UIRunDesignSystem.primary)
-                    }
+                TribeAvatarView(
+                    identity: TribeAvatarIdentity(displayName: passenger.name),
+                    size: TribeAvatarSize.closest(to: 42),
+                    accessToken: accessToken
+                )
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(passenger.name)
@@ -183,10 +198,6 @@ struct UIPassengerRow: View {
         case .onboard: return UIRunDesignSystem.primary
         case .droppedOff: return UIRunDesignSystem.success
         }
-    }
-
-    private func initials(_ fullName: String) -> String {
-        fullName.split(separator: " ").prefix(2).compactMap(\.first).map(String.init).joined().uppercased()
     }
 }
 

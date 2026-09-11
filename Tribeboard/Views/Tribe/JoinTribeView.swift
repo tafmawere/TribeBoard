@@ -2,10 +2,12 @@ import SwiftUI
 
 struct JoinTribeView: View {
     @ObservedObject var store: TribeStore
+    @EnvironmentObject private var backendHouseholdContext: BackendHouseholdContext
     let onJoin: () -> Void
 
-    @State private var inviteCode = ""
+    @State private var joinCode = ""
     @State private var inlineError: String?
+    @State private var isJoining = false
 
     var body: some View {
         ZStack {
@@ -16,11 +18,11 @@ struct JoinTribeView: View {
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Join a family")
                             .font(.system(size: 30, weight: .bold))
-                        Text("Enter the invite code shared with you.")
+                        Text("Enter the family code shared with you.")
                             .font(.system(size: 16))
                             .foregroundStyle(.secondary)
 
-                        TextField("Invite code", text: $inviteCode)
+                        TextField("Family code (H-XXXXXXXX)", text: $joinCode)
                             .textInputAutocapitalization(.characters)
                             .foregroundStyle(.primary)
                             .tint(TribeTheme.primary)
@@ -45,19 +47,9 @@ struct JoinTribeView: View {
                 }
 
                 Button("Continue") {
-                    let trimmed = inviteCode.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
-                    guard !trimmed.isEmpty else { return }
-                    guard isValidInviteCode(trimmed) else {
-                        inlineError = "Invalid invite code. Use format TRIBE-XXXX."
-                        return
+                    Task {
+                        await joinFamily()
                     }
-                    let currentName = (store.tribe?.name ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-                    store.createTribe(
-                        name: currentName.isEmpty ? "Joined Family" : currentName,
-                        tribeCode: trimmed
-                    )
-                    inlineError = nil
-                    onJoin()
                 }
                 .buttonStyle(.plain)
                 .font(.system(size: 17, weight: .semibold))
@@ -66,8 +58,8 @@ struct JoinTribeView: View {
                 .padding(.vertical, 14)
                 .background(TribeTheme.primary)
                 .clipShape(Capsule())
-                .disabled(inviteCode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                .opacity(inviteCode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.6 : 1)
+                .disabled(joinCode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isJoining)
+                .opacity((joinCode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isJoining) ? 0.6 : 1)
 
                 Spacer()
             }
@@ -76,19 +68,34 @@ struct JoinTribeView: View {
         }
         .navigationTitle("Join Tribe")
         .navigationBarTitleDisplayMode(.inline)
-        .onChange(of: inviteCode) { _, _ in
+        .onChange(of: joinCode) { _, _ in
             if inlineError != nil {
                 inlineError = nil
             }
         }
     }
 
-    private func isValidInviteCode(_ code: String) -> Bool {
-        let parts = code.split(separator: "-", omittingEmptySubsequences: false)
-        guard parts.count == 2, parts[0] == "TRIBE" else { return false }
-        let suffix = String(parts[1])
-        guard suffix.count == 4 else { return false }
-        return suffix.unicodeScalars.allSatisfy { CharacterSet.alphanumerics.contains($0) }
+    private func joinFamily() async {
+        let trimmed = joinCode.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        guard !trimmed.isEmpty else { return }
+        guard parseHouseholdJoinCode(trimmed) != nil else {
+            inlineError = "Enter a valid family code."
+            return
+        }
+        isJoining = true
+        defer { isJoining = false }
+        await backendHouseholdContext.joinHousehold(inviteCode: trimmed)
+        guard backendHouseholdContext.householdAlertError == nil else {
+            inlineError = backendHouseholdContext.householdAlertError ?? "We couldn't join this family. Please try again."
+            return
+        }
+        let currentName = (store.tribe?.name ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        store.createTribe(
+            name: currentName.isEmpty ? "Joined Family" : currentName,
+            tribeCode: trimmed
+        )
+        inlineError = nil
+        onJoin()
     }
 }
 

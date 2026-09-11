@@ -8,23 +8,114 @@ private enum UIRunRoute: Hashable {
     case completion(UIRun)
 }
 
+/// Standalone Runs module preview host — mirrors shell wiring so `DailyDispatchView` and `RunDataSource` behave consistently.
 struct UIRunModuleRootView: View {
     @State private var path: [UIRunRoute] = []
     @State private var selectedTab: RunsOverviewTab = .today
-    @State private var boardMode: RunsBoardMode = .runs
-    @StateObject private var runDataSource = RunDataSource()
-    @StateObject private var driverDataSource = DriverDataSource()
+    @State private var isDispatchPresented = false
+
+    @StateObject private var activeHouseholdStore: ActiveHouseholdStore
+    @StateObject private var householdDataSource: HouseholdDataSource
+    @StateObject private var backendHouseholdContext: BackendHouseholdContext
+    @StateObject private var backendRunsContext: BackendRunsContext
+    @StateObject private var backendDriversContext: BackendDriversContext
+    @StateObject private var runDataSource: RunDataSource
+    @StateObject private var driverDataSource: DriverDataSource
+    @StateObject private var locationService: LocationReadinessService
+    @StateObject private var notificationService: NotificationService
+    @StateObject private var familyQuickPlacesStore: FamilyQuickPlacesStore
+    @StateObject private var householdContext: ActiveHouseholdContext
+    @StateObject private var tribeStore: TribeStore
+    @StateObject private var backendChildrenContext: BackendChildrenContext
+
+    init() {
+        let runRepository = LocalRunRepository()
+        let scheduleRepository = LocalScheduleRepository()
+        let driverRepository = LocalDriverRepository()
+        let householdContext = ActiveHouseholdContext()
+        let activeHouseholdStore = ActiveHouseholdStore()
+        let householdRepository = LocalHouseholdRepository()
+        let syncCoordinator = SyncCoordinator(
+            queueRepository: LocalSyncQueueRepository(),
+            auditRepository: LocalSyncAuditRepository(),
+            processedChangeRepository: LocalProcessedChangeRepository(),
+            remoteDriver: nil,
+            runRepository: runRepository,
+            scheduleRepository: scheduleRepository,
+            driverRepository: driverRepository,
+            householdRepository: householdRepository
+        )
+        let backendRunsContext = BackendRunsContext(
+            runRepository: runRepository,
+            scheduleRepository: scheduleRepository,
+            driverRepository: driverRepository
+        )
+        let runDataSource = RunDataSource(
+            repository: runRepository,
+            scheduleRepository: scheduleRepository,
+            driverRepository: driverRepository,
+            householdContext: householdContext,
+            backendRunsContext: backendRunsContext,
+            syncCoordinator: syncCoordinator
+        )
+        let driverDataSource = DriverDataSource(
+            repository: driverRepository,
+            householdContext: householdContext,
+            syncCoordinator: syncCoordinator
+        )
+        let householdDataSource = HouseholdDataSource(
+            repository: householdRepository,
+            activeContext: householdContext,
+            syncCoordinator: syncCoordinator
+        )
+        let backendHouseholdContext = BackendHouseholdContext(
+            localHouseholdContext: householdContext,
+            localHouseholdDataSource: householdDataSource,
+            activeHouseholdStore: activeHouseholdStore
+        )
+        let backendDriversContext = BackendDriversContext(
+            backendRunsContext: backendRunsContext,
+            syncCoordinator: syncCoordinator
+        )
+        let tribeStore = TribeStore()
+        let backendChildrenContext = BackendChildrenContext(
+            householdContext: backendHouseholdContext,
+            store: tribeStore
+        )
+
+        _householdContext = StateObject(wrappedValue: householdContext)
+        _tribeStore = StateObject(wrappedValue: tribeStore)
+        _backendChildrenContext = StateObject(wrappedValue: backendChildrenContext)
+        _activeHouseholdStore = StateObject(wrappedValue: activeHouseholdStore)
+        _householdDataSource = StateObject(wrappedValue: householdDataSource)
+        _backendHouseholdContext = StateObject(wrappedValue: backendHouseholdContext)
+        _backendRunsContext = StateObject(wrappedValue: backendRunsContext)
+        _backendDriversContext = StateObject(wrappedValue: backendDriversContext)
+        _runDataSource = StateObject(wrappedValue: runDataSource)
+        _driverDataSource = StateObject(wrappedValue: driverDataSource)
+        _locationService = StateObject(wrappedValue: LocationReadinessService())
+        _notificationService = StateObject(wrappedValue: NotificationService())
+        _familyQuickPlacesStore = StateObject(wrappedValue: FamilyQuickPlacesStore())
+    }
 
     var body: some View {
         NavigationStack(path: $path) {
             RunsOverviewView(
                 selectedTab: $selectedTab,
-                boardMode: $boardMode,
+                isDispatchPresented: $isDispatchPresented,
+                permissions: RunsOverviewPermissions(canPerformRunActions: true),
                 todayRuns: todayRuns,
                 upcomingRuns: upcomingRuns,
                 historyRuns: historyRuns,
                 activeRun: activeRun,
                 suggestedRuns: [],
+                onCreateRun: nil,
+                onOpenDriverMode: {
+                    guard let run = activeRun else { return }
+                    path.append(.driverMode(run))
+                },
+                onDispatchCreateRun: nil,
+                onDispatchOpenCalendar: nil,
                 onOpenRunDetails: { run in
                     path.append(.runDetails(run.backingRunId))
                 },
@@ -33,10 +124,19 @@ struct UIRunModuleRootView: View {
                 },
                 onStartSuggestion: { _ in },
                 onSnoozeSuggestion: { _ in },
-                onDismissSuggestion: { _ in }
+                onDismissSuggestion: { _ in },
+                onViewCalendar: nil
             )
             .environmentObject(runDataSource)
             .environmentObject(driverDataSource)
+            .environmentObject(activeHouseholdStore)
+            .environmentObject(backendDriversContext)
+            .environmentObject(backendHouseholdContext)
+            .environmentObject(locationService)
+            .environmentObject(notificationService)
+            .environmentObject(familyQuickPlacesStore)
+            .environmentObject(householdContext)
+            .environmentObject(backendChildrenContext)
             .navigationDestination(for: UIRunRoute.self) { route in
                 switch route {
                 case let .runDetails(runId):
@@ -75,7 +175,7 @@ struct UIRunModuleRootView: View {
     }
 
     private var allUIRuns: [UIRun] {
-        allSystemRuns.map(RunUIAdapter.mapToUIRun)
+        allSystemRuns.map(mapToUIRun)
     }
 
     private var activeRun: UIRun? {
@@ -88,7 +188,7 @@ struct UIRunModuleRootView: View {
         return allSystemRuns.filter { run in
             let isTerminal = run.status == .completed || run.status == .cancelled
             return calendar.isDate(run.date, inSameDayAs: today) && !isTerminal
-        }.map(RunUIAdapter.mapToUIRun)
+        }.map(mapToUIRun)
     }
 
     private var upcomingRuns: [UIRun] {
@@ -96,13 +196,20 @@ struct UIRunModuleRootView: View {
         let today = Date()
         return allSystemRuns.filter { run in
             run.status == .scheduled && !calendar.isDate(run.date, inSameDayAs: today) && run.date > today
-        }.map(RunUIAdapter.mapToUIRun)
+        }.map(mapToUIRun)
     }
 
     private var historyRuns: [UIRun] {
         allSystemRuns.filter { run in
             run.status == .completed || run.status == .cancelled
-        }.map(RunUIAdapter.mapToUIRun)
+        }.map(mapToUIRun)
+    }
+
+    private func mapToUIRun(_ run: SystemDomain.RunInstance) -> UIRun {
+        RunUIAdapter.mapToUIRun(
+            run,
+            childName: RunDisplayStrings.childName(for: run, children: backendChildrenContext.children)
+        )
     }
 
     private func runForRunId(_ runId: String) -> UIRun? {
@@ -110,8 +217,15 @@ struct UIRunModuleRootView: View {
     }
 
     private func runDetailsDestination(runId: String) -> some View {
-        let mapped = mapUIRunToRunDetails(runForRunId(runId))
-        return RunDetailsView(run: mapped)
+        RunExecutionDetailView(runId: runId)
+            .environmentObject(runDataSource)
+            .environmentObject(driverDataSource)
+            .environmentObject(householdContext)
+            .environmentObject(backendHouseholdContext)
+            .environmentObject(backendDriversContext)
+            .environmentObject(backendChildrenContext)
+            .environmentObject(locationService)
+            .environmentObject(familyQuickPlacesStore)
     }
 
     private func mapUIRunToRunDetails(_ run: UIRun?) -> RunDetailsData.UIRun {
@@ -124,6 +238,7 @@ struct UIRunModuleRootView: View {
         let statusLabel: String = {
             switch run.status {
             case .scheduled: return "Scheduled"
+            case .assigned: return "Assigned"
             case .active: return "Active"
             case .completed: return "Completed"
             }
@@ -140,7 +255,10 @@ struct UIRunModuleRootView: View {
                 .init(
                     type: $0.type.rawValue.capitalized,
                     label: $0.label,
+                    placeName: "",
                     address: $0.passengerNames.joined(separator: ", "),
+                    latitude: nil,
+                    longitude: nil,
                     timeEstimate: run.etaText
                 )
             },

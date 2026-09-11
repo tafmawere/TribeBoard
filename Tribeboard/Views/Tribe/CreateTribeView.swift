@@ -3,11 +3,18 @@ import UIKit
 
 struct CreateTribeView: View {
     @ObservedObject var store: TribeStore
+    @EnvironmentObject private var backendHouseholdContext: BackendHouseholdContext
     let onCreate: () -> Void
 
     @State private var tribeName = ""
     @State private var tribeCode = TribeStore.generateTribeCode()
+    @State private var homeAddress = ""
     @State private var didCopyTribeCode = false
+    @StateObject private var homeSearchModel = LocationSearchModel()
+    @State private var selectedHomeLatitude: Double?
+    @State private var selectedHomeLongitude: Double?
+    @State private var isCreating = false
+    @State private var createErrorMessage: String?
 
     var body: some View {
         ZStack {
@@ -40,6 +47,24 @@ struct CreateTribeView: View {
                                         .stroke(Color(uiColor: .separator).opacity(0.35), lineWidth: 1)
                                 }
                                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        }
+
+                        VStack(alignment: .leading, spacing: 8) {
+                            LocationSearchField(
+                                title: "Home Address",
+                                placeholder: "Search home address (optional)",
+                                model: homeSearchModel,
+                                onSelected: { result in
+                                    homeAddress = result.fullAddress
+                                    selectedHomeLatitude = result.latitude
+                                    selectedHomeLongitude = result.longitude
+                                },
+                                onCleared: {
+                                    homeAddress = ""
+                                    selectedHomeLatitude = nil
+                                    selectedHomeLongitude = nil
+                                }
+                            )
                         }
 
                         VStack(alignment: .leading, spacing: 8) {
@@ -112,8 +137,9 @@ struct CreateTribeView: View {
                 .shadow(color: Color.black.opacity(0.04), radius: 14, x: 0, y: 6)
 
                 Button {
-                    store.createTribe(name: tribeName, tribeCode: tribeCode)
-                    onCreate()
+                    Task {
+                        await createFamily()
+                    }
                 } label: {
                     Text("Create Family")
                         .font(.system(size: 18, weight: .semibold))
@@ -125,8 +151,8 @@ struct CreateTribeView: View {
                         .shadow(color: TribeTheme.primary.opacity(0.20), radius: 12, x: 0, y: 8)
                         .scaleEffect(isCreateEnabled ? 1.0 : 0.985)
                 }
-                .disabled(!isCreateEnabled)
-                .opacity(isCreateEnabled ? 1.0 : 0.65)
+                .disabled(!isCreateEnabled || isCreating)
+                .opacity((isCreateEnabled && !isCreating) ? 1.0 : 0.65)
                 .animation(.easeInOut(duration: 0.18), value: isCreateEnabled)
 
                 Text("You can edit your tribe later in Settings.")
@@ -141,6 +167,23 @@ struct CreateTribeView: View {
         }
         .navigationTitle("New Family")
         .navigationBarTitleDisplayMode(.inline)
+        .scrollDismissesKeyboard(.interactively)
+        .onAppear {
+            if homeAddress.isEmpty { return }
+            homeSearchModel.applySelectedAddress(homeAddress)
+        }
+        .alert("Unable to Create Family", isPresented: Binding(
+            get: { createErrorMessage != nil },
+            set: { newValue in
+                if !newValue { createErrorMessage = nil }
+            }
+        )) {
+            Button("OK", role: .cancel) {
+                createErrorMessage = nil
+            }
+        } message: {
+            Text(createErrorMessage ?? "Create failed.")
+        }
     }
 
     private var isCreateEnabled: Bool {
@@ -161,6 +204,39 @@ struct CreateTribeView: View {
                 didCopyTribeCode = false
             }
         }
+    }
+
+    private func createFamily() async {
+        isCreating = true
+        defer { isCreating = false }
+        await backendHouseholdContext.createHousehold(name: tribeName)
+        guard backendHouseholdContext.householdAlertError == nil else {
+            createErrorMessage = backendHouseholdContext.householdAlertError ?? "We couldn't create your family. Please try again."
+            return
+        }
+
+        store.createTribe(name: tribeName, tribeCode: tribeCode)
+        let manualFallback = homeSearchModel.query.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedAddress = (homeAddress.isEmpty ? manualFallback : homeAddress)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedAddress.isEmpty {
+            let coordText: String?
+            if let lat = selectedHomeLatitude, let lon = selectedHomeLongitude {
+                coordText = "lat=\(lat),lon=\(lon)"
+            } else {
+                coordText = nil
+            }
+            let home = TribeLocation(
+                name: "Home",
+                address: trimmedAddress,
+                type: .home,
+                tribeId: store.tribe?.id,
+                notes: coordText
+            )
+            store.addOrUpdateLocation(home, setAsHome: true)
+        }
+        createErrorMessage = nil
+        onCreate()
     }
 }
 

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ScheduleDetailView: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var backendHouseholdContext: BackendHouseholdContext
 
     @Binding var schedule: UIScheduleTemplate
     let onDelete: () -> Void
@@ -174,6 +175,7 @@ struct ScheduleDetailView: View {
                     .foregroundStyle(CalendarUITheme.textPrimary)
 
                 Button("Edit Schedule") {
+                    guard backendHouseholdContext.canEditSchedules else { return }
                     if supportsScheduleEditor {
                         isShowingEditor = true
                     } else {
@@ -190,8 +192,10 @@ struct ScheduleDetailView: View {
                 Toggle("Enabled", isOn: $schedule.isEnabled)
                     .font(.system(size: 15, weight: .semibold))
                     .tint(CalendarUITheme.indigo)
+                    .disabled(!backendHouseholdContext.canEditSchedules)
 
                 Button(role: .destructive) {
+                    guard backendHouseholdContext.canEditSchedules else { return }
                     isShowingDeleteConfirmation = true
                 } label: {
                     Text("Delete Schedule")
@@ -203,6 +207,12 @@ struct ScheduleDetailView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 }
                 .buttonStyle(.plain)
+                .disabled(!backendHouseholdContext.canEditSchedules)
+                if !backendHouseholdContext.canEditSchedules {
+                    Text("Only organisers can manage schedules.")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }

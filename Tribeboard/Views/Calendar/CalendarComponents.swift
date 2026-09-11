@@ -125,7 +125,10 @@ struct CalendarOccurrenceCard: View {
     let onTap: () -> Void
     let onCreateRunNow: () -> Void
     var showsCreateAction = true
+    var canCreateRunNow = true
     var isCompact = false
+
+    @EnvironmentObject private var authSession: AuthSessionContext
 
     var body: some View {
         Button(action: onTap) {
@@ -151,9 +154,13 @@ struct CalendarOccurrenceCard: View {
                         .foregroundStyle(CalendarUITheme.textSecondary)
 
                     if !isCompact {
-                        HStack(spacing: 6) {
+                        HStack(spacing: -6) {
                             ForEach(passengers, id: \.self) { passenger in
-                                CalendarChip(text: initials(passenger), selected: false, action: nil)
+                                TribeAvatarView(
+                                    identity: TribeAvatarIdentity(displayName: passenger),
+                                    size: .compact,
+                                    accessToken: authSession.currentAccessToken
+                                )
                             }
                         }
                     }
@@ -168,24 +175,21 @@ struct CalendarOccurrenceCard: View {
                         Button {
                             onCreateRunNow()
                         } label: {
-                            Text(isCreated ? "Run Created" : "Create Run Now")
+                            Text(isCreated ? "Run Created" : (canCreateRunNow ? "Create Run Now" : "Template unavailable"))
                                 .font(.system(size: 15, weight: .semibold))
                                 .foregroundStyle(.white)
                                 .frame(maxWidth: .infinity)
                                 .frame(height: 44)
-                                .background(isCreated ? CalendarUITheme.success : CalendarUITheme.indigo)
+                                .background(isCreated ? CalendarUITheme.success : (canCreateRunNow ? CalendarUITheme.indigo : CalendarUITheme.textSecondary))
                                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                         }
                         .buttonStyle(.plain)
+                        .disabled(!canCreateRunNow || isCreated)
                         .accessibilityLabel("Create Run Now")
                     }
                 }
             }
         }
         .buttonStyle(.plain)
-    }
-
-    private func initials(_ name: String) -> String {
-        name.split(separator: " ").prefix(2).compactMap(\.first).map(String.init).joined().uppercased()
     }
 }

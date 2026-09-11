@@ -19,6 +19,17 @@ struct DriverDaySummary {
 
 typealias AttentionSummary = (critical: Int, warning: Int)
 
+private enum RunMutationGuardError: LocalizedError {
+    case missingAssignedDriver
+
+    var errorDescription: String? {
+        switch self {
+        case .missingAssignedDriver:
+            return "Assign a driver before starting this run."
+        }
+    }
+}
+
 @MainActor
 final class RunDataSource: ObservableObject {
     private struct DayCacheKey: Hashable {
@@ -56,6 +67,9 @@ final class RunDataSource: ObservableObject {
     private let scheduleRepository: any ScheduleRepository
     private let driverRepository: any DriverRepository
     private let householdContext: ActiveHouseholdContext
+    private let backendRunsContext: BackendRunsContext?
+    private let authService: AuthService
+    private let householdBackendService: HouseholdBackendService
     private let syncCoordinator: SyncCoordinator?
     private let repositoryTypeName: String
     private let scheduleRepositoryTypeName: String
@@ -69,6 +83,10 @@ final class RunDataSource: ObservableObject {
     private let runAdjustmentService = RunAdjustmentService()
     private let dispatchCalendar = Calendar.current
     private var didBootstrap = false
+#if DEBUG
+    /// Unit tests set this to skip remote permission checks when Supabase is configured in the host Info.plist.
+    var testBypassRunMutationPermission = false
+#endif
     private var inFlightCreateKeys: Set<String> = []
     private var inFlightRunMutationIDs: Set<UUID> = []
     private var cachedNextRun: SystemDomain.RunInstance?
@@ -81,31 +99,31 @@ final class RunDataSource: ObservableObject {
     private let minimumETADistanceDeltaMeters: Double = 15
 
     init(
-        repository: any RunRepository = LocalRunRepository(),
-        scheduleRepository: any ScheduleRepository = LocalScheduleRepository(),
-        driverRepository: any DriverRepository = LocalDriverRepository(),
+        repository: (any RunRepository)? = nil,
+        scheduleRepository: (any ScheduleRepository)? = nil,
+        driverRepository: (any DriverRepository)? = nil,
         householdContext: ActiveHouseholdContext? = nil,
+        backendRunsContext: BackendRunsContext? = nil,
+        authService: AuthService? = nil,
+        householdBackendService: HouseholdBackendService? = nil,
         syncCoordinator: SyncCoordinator? = nil
     ) {
-        self.repository = repository
-        self.scheduleRepository = scheduleRepository
-        self.driverRepository = driverRepository
+        self.repository = repository ?? LocalRunRepository()
+        self.scheduleRepository = scheduleRepository ?? LocalScheduleRepository()
+        self.driverRepository = driverRepository ?? LocalDriverRepository()
         self.householdContext = householdContext ?? ActiveHouseholdContext()
+        self.backendRunsContext = backendRunsContext
+        self.authService = authService ?? SupabaseAuthService()
+        self.householdBackendService = householdBackendService ?? SupabaseHouseholdBackendService()
         self.syncCoordinator = syncCoordinator
-        self.repositoryTypeName = String(describing: type(of: repository))
-        self.scheduleRepositoryTypeName = String(describing: type(of: scheduleRepository))
-        self.driverRepositoryTypeName = String(describing: type(of: driverRepository))
+        self.repositoryTypeName = String(describing: type(of: self.repository))
+        self.scheduleRepositoryTypeName = String(describing: type(of: self.scheduleRepository))
+        self.driverRepositoryTypeName = String(describing: type(of: self.driverRepository))
     }
 
     func bootstrapIfNeeded() async {
         guard !didBootstrap else { return }
         didBootstrap = true
-#if DEBUG
-        if AppConfig.isDemoFlowEnabled {
-            let result = SystemBootstrap.debugSeedAndGenerate(daysAhead: 14)
-            print("RunDataSource.bootstrapIfNeeded -> seeded: \(result.seeded), generated: \(result.newRuns)")
-        }
-#endif
         await refresh()
     }
 
@@ -118,24 +136,22 @@ final class RunDataSource: ObservableObject {
             isRefreshing = false
         }
         do {
-            let loadedRuns = try await repository.loadRuns(for: activeHouseholdId)
-            let templates = try await scheduleRepository.loadTemplates(for: activeHouseholdId)
-            let drivers = try await driverRepository.loadDrivers(for: activeHouseholdId)
-            let templatesByID = Dictionary(uniqueKeysWithValues: templates.map { ($0.id, $0) })
-            let driversByID = Dictionary(uniqueKeysWithValues: drivers.map { ($0.id, $0) })
-            let backfillResult = backfilledRunsIfNeeded(
-                loadedRuns,
-                templatesByID: templatesByID,
-                driversByID: driversByID
-            )
-            if backfillResult.didBackfill {
-                try await repository.saveRuns(backfillResult.runs, for: activeHouseholdId)
+            if let backendRunsContext {
+                let loadedRuns = await backendRunsContext.refreshRuns(householdId: activeHouseholdId)
+                runs = loadedRuns
+                if backendRunsContext.lastSyncFailed, let syncError = backendRunsContext.lastError {
+                    lastError = syncError
+                } else {
+                    lastError = nil
+                }
+            } else {
+                let loadedRuns = try await repository.loadRuns(for: activeHouseholdId)
+                runs = loadedRuns.sorted { $0.date < $1.date }
+                lastError = nil
             }
-            runs = backfillResult.runs.sorted { $0.date < $1.date }
 #if DEBUG
-            print("RunDataSource.refresh -> loaded runs count: \(runs.count)")
+            print("RunDataSource.refresh -> source=supabase loaded runs count: \(runs.count)")
 #endif
-            lastError = nil
         } catch {
             lastError = "Failed to load runs."
         }
@@ -144,6 +160,12 @@ final class RunDataSource: ObservableObject {
     func reloadForHouseholdChange() async {
         invalidateDerivedCaches()
         await refresh()
+    }
+
+    func clearHouseholdScopedData() {
+        runs = []
+        lastError = nil
+        invalidateDerivedCaches()
     }
 
     func run(withId id: String) -> SystemDomain.RunInstance? {
@@ -162,7 +184,7 @@ final class RunDataSource: ObservableObject {
         var today: [SystemDomain.RunInstance] = []
         var upcoming: [SystemDomain.RunInstance] = []
         var history: [SystemDomain.RunInstance] = []
-        var active: [SystemDomain.RunInstance] = activeRuns()
+        let active: [SystemDomain.RunInstance] = activeRuns()
 
         for run in sorted {
             let isTerminal = run.status == .completed || run.status == .cancelled
@@ -175,9 +197,9 @@ final class RunDataSource: ObservableObject {
             if runDay == referenceDay {
                 today.append(run)
             } else if run.date > referenceDate {
-                // Treat newly created/scheduled future runs as upcoming.
                 upcoming.append(run)
             } else {
+                // Overdue non-terminal runs (e.g. past assigned) belong in history, not the active card.
                 history.append(run)
             }
         }
@@ -229,23 +251,14 @@ final class RunDataSource: ObservableObject {
         runsForDriver(driverId, on: date).first(where: { $0.status == .inProgress })
     }
 
-    func nextRun(referenceDate: Date = Date()) -> SystemDomain.RunInstance? {
-        if let cachedNextRun, cachedNextRun.date >= referenceDate {
-            return cachedNextRun
-        }
-        if let cachedNextRun, cachedNextRun.status == .inProgress {
-            return cachedNextRun
-        }
-        let computed = runs
-            .filter { $0.status == .inProgress || ($0.status == .scheduled && $0.date >= referenceDate) }
-            .sorted { lhs, rhs in
-                if lhs.status == .inProgress && rhs.status != .inProgress { return true }
-                if rhs.status == .inProgress && lhs.status != .inProgress { return false }
-                return lhs.date < rhs.date
-            }
-            .first
-        cachedNextRun = computed
-        return computed
+    func nextRun(referenceDate: Date = Date(), calendar: Calendar = .current) -> SystemDomain.RunInstance? {
+        let result = RunNextRunSelector.select(
+            from: runs,
+            referenceDate: referenceDate,
+            calendar: calendar
+        )
+        cachedNextRun = result.run
+        return result.run
     }
 
     func activeRuns() -> [SystemDomain.RunInstance] {
@@ -388,6 +401,9 @@ final class RunDataSource: ObservableObject {
 
     func reconcileTrackingState(
         locationService: LocationReadinessService,
+        locationPublishService: RunLocationPublishService? = nil,
+        currentUserId: UUID? = nil,
+        drivers: [BackendDriver] = [],
         now: Date = Date()
     ) {
         let hasInProgressToday = runsForDay(now).contains { $0.status == .inProgress }
@@ -395,6 +411,22 @@ final class RunDataSource: ObservableObject {
             locationService.startRunTracking()
         } else {
             locationService.stopRunTracking()
+        }
+
+        guard let locationPublishService else { return }
+        if let activeRun = runsForDay(now).first(where: { $0.status == .inProgress }),
+           RunDriverIdentityResolver.isCurrentUserDriver(
+               run: activeRun,
+               drivers: drivers,
+               currentUserId: currentUserId
+           ) {
+            locationPublishService.startPublishing(
+                runId: activeRun.id,
+                householdId: activeRun.householdId,
+                driverId: activeRun.assignedDriverId ?? activeRun.driverId
+            )
+        } else {
+            locationPublishService.stopPublishing()
         }
     }
 
@@ -469,6 +501,25 @@ final class RunDataSource: ObservableObject {
     }
 
     func createRun(template: SystemDomain.ScheduleTemplate, date: Date) async -> Bool {
+        guard await ensureRunMutationPermission(action: "createRun") else {
+            return false
+        }
+        if template.householdId != activeHouseholdId {
+            lastError = "This schedule is not fully configured yet."
+            return false
+        }
+        let scopedTemplates: [SystemDomain.ScheduleTemplate]
+        do {
+            scopedTemplates = try await scheduleRepository.loadTemplates(for: activeHouseholdId)
+        } catch {
+            lastError = "Unable to validate schedule template right now."
+            return false
+        }
+        guard scopedTemplates.contains(where: { $0.id == template.id }) else {
+            lastError = "This schedule is not fully configured yet."
+            return false
+        }
+
         let calendar = Calendar.current
         let day = DayKey.key(for: date, calendar: calendar)
         let createKey = "\(template.id.uuidString)-\(Int(day.timeIntervalSince1970))"
@@ -483,14 +534,10 @@ final class RunDataSource: ObservableObject {
             lastError = "Unable to load runs right now."
             return false
         }
-        guard let runDate = calendar.date(
-            bySettingHour: template.hour,
-            minute: template.minute,
-            second: 0,
-            of: day
-        ) else {
+        guard let runDate = RunScheduleSnapshot.scheduledDate(on: day, template: template, calendar: calendar) else {
             return false
         }
+        let departureTime = RunScheduleSnapshot.departureTime(from: template)
 
         let duplicate = existingRuns.contains { run in
             run.templateId == template.id && DayKey.key(for: run.date, calendar: calendar) == day
@@ -506,33 +553,31 @@ final class RunDataSource: ObservableObject {
             templateId: template.id,
             title: template.name,
             date: runDate,
-            status: .scheduled,
+            departureTime: departureTime,
+            status: template.driverId == nil ? .scheduled : .assigned,
             stops: progressStops,
             stopSnapshots: template.stops,
             startedAt: nil,
             completedAt: nil,
             cancelledAt: nil,
             activeStopIndex: nil,
-            assignedDriverId: nil,
+            assignedDriverId: template.driverId,
             driverId: template.driverId,
             childId: template.childId,
             createdAt: Date()
         )
         let updatedRuns = existingRuns + [newRun]
         do {
-            try await repository.saveRuns(updatedRuns, for: activeHouseholdId)
-            if let syncCoordinator {
-                let change = SyncChangeFactory.makeRunChange(
-                    householdId: activeHouseholdId,
-                    entityId: newRun.id,
-                    operation: .create
-                )
-                await syncCoordinator.enqueue(change)
+            try RunCreationValidator.validate(newRun)
+            guard let backendRunsContext else {
+                lastError = "Backend is not available to create runs."
+                return false
             }
-            applyPersistedRuns(updatedRuns)
-            lastError = nil
+            _ = try await backendRunsContext.createRun(from: newRun)
+            await refresh()
+            lastError = backendRunsContext.lastError
         } catch {
-            lastError = "Unable to save run right now."
+            lastError = error.localizedDescription
             return false
         }
 #if DEBUG
@@ -542,9 +587,249 @@ final class RunDataSource: ObservableObject {
         return true
     }
 
+    /// Creates a one-off run from the Create Run editor (not tied to calendar schedule generation).
+    /// Persists to `RunRepository` and updates in-memory `runs` after success; may skip remote schedule validation
+    /// when the anchor template is local-only.
+    func createRunFromManualForm(
+        _ uiRun: RunDetailsData.UIRun,
+        children: [BackendChild]
+    ) async -> Bool {
+        await createRunFromManualForm(
+            uiRun,
+            children: children,
+            selectedDriverId: nil,
+            selectedDriverSource: nil
+        )
+    }
+
+    func createRunFromManualForm(
+        _ uiRun: RunDetailsData.UIRun,
+        children: [BackendChild],
+        selectedDriverId: UUID? = nil,
+        selectedDriverSource: String? = nil
+    ) async -> Bool {
+        print("[CreateRun] validation started")
+        let householdId = activeHouseholdId
+        print("[CreateRun] activeHouseholdId=\(householdId.uuidString)")
+
+        guard await ensureRunMutationPermission(action: "createRunFromManualForm") else {
+            print("[CreateRun] save aborted -> \(lastError ?? "permission denied")")
+            return false
+        }
+
+        guard !children.isEmpty, let childId = ManualRunCreationSupport.resolveChildId(
+            passengerNames: uiRun.passengerNames,
+            children: children,
+            householdId: householdId
+        ) else {
+            lastError = "Add at least one child in this household and select a passenger."
+            print("[CreateRun] save error -> no childId resolved")
+            return false
+        }
+
+        let driversScoped = (try? await driverRepository.loadDrivers(for: householdId)) ?? []
+        let driverNameKey = uiRun.driverName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let matchedDriverById = selectedDriverId.flatMap { selectedId in
+            driversScoped.first { $0.id == selectedId }
+        }
+        let matchedDriverByName = driversScoped.first(where: {
+            $0.name.trimmingCharacters(in: .whitespacesAndNewlines).caseInsensitiveCompare(driverNameKey) == .orderedSame
+        })
+        let matchedDriver = matchedDriverById ?? (selectedDriverId == nil ? matchedDriverByName : nil)
+
+        let resolvedDriverId: UUID
+        if let matchedDriver {
+            resolvedDriverId = matchedDriver.id
+        } else {
+            resolvedDriverId = selectedDriverId
+                ?? ManualRunCreationSupport.stableUUID(namespace: householdId, string: "driver:\(driverNameKey)")
+            let synthetic = SystemDomain.Driver(
+                id: resolvedDriverId,
+                householdId: householdId,
+                name: driverNameKey,
+                phoneNumber: nil,
+                isActive: true,
+                createdAt: Date()
+            )
+            var updatedDrivers = driversScoped.filter { $0.id != resolvedDriverId }
+            updatedDrivers.append(synthetic)
+            do {
+                try await driverRepository.saveDrivers(updatedDrivers, for: householdId)
+#if DEBUG
+                print("[CreateRun] persisted synthetic driver id=\(resolvedDriverId.uuidString) name=\(driverNameKey)")
+#endif
+            } catch {
+                lastError = "Unable to save driver assignment."
+                print("[CreateRun] save error -> driver persistence \(error.localizedDescription)")
+                return false
+            }
+        }
+        #if DEBUG
+        NSLog(
+            "[CreateRunPayload] driver fields selectedDriverId=%@ selectedDriverSource=%@ driver_id=%@ assigned_driver_id=%@ assigned_driver_name=%@",
+            selectedDriverId?.uuidString ?? "nil",
+            selectedDriverSource ?? "unknown",
+            resolvedDriverId.uuidString,
+            resolvedDriverId.uuidString,
+            driverNameKey
+        )
+        #endif
+
+        let orderedStops = uiRun.stops
+        let stopSnapshots: [SystemDomain.Stop] = orderedStops.enumerated().map { index, ui in
+            let lat = ui.latitude ?? 0
+            let lng = ui.longitude ?? 0
+            let placeLabel = ui.label.trimmingCharacters(in: .whitespacesAndNewlines)
+            let selectedPlaceName = ui.placeName.trimmingCharacters(in: .whitespacesAndNewlines)
+            let placeName = selectedPlaceName.isEmpty ? placeLabel : selectedPlaceName
+            return SystemDomain.Stop(
+                id: ui.id,
+                name: placeName,
+                latitude: lat,
+                longitude: lng,
+                order: index,
+                locationId: ui.locationId,
+                kind: ui.type
+            )
+        }
+        let progressStops = stopSnapshots.map {
+            SystemDomain.RunStopProgress(stopId: $0.id, status: .pending, arrivedAt: nil, departedAt: nil)
+        }
+
+        let templates = (try? await scheduleRepository.loadTemplates(for: householdId)) ?? []
+        let templateId: UUID
+        if let anchor = templates.first(where: { $0.id == ManualRunCreationSupport.manualRunAnchorTemplateId }) {
+            templateId = anchor.id
+        } else if let first = templates.first {
+            templateId = first.id
+        } else {
+            let placeholder = ManualRunCreationSupport.placeholderScheduleTemplate(
+                householdId: householdId,
+                childId: childId,
+                anchorDate: uiRun.scheduledTime
+            )
+            do {
+                try await scheduleRepository.saveTemplates([placeholder], for: householdId)
+            } catch {
+                lastError = "Unable to save a local schedule anchor for this run."
+                print("[CreateRun] save error -> schedule placeholder \(error.localizedDescription)")
+                return false
+            }
+            templateId = placeholder.id
+#if DEBUG
+            print("[CreateRun] created local placeholder schedule template id=\(templateId.uuidString)")
+#endif
+        }
+
+        let newRunId = uiRun.id
+        let runTitle = uiRun.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let createdAt = Date()
+        let initialStatus: SystemDomain.RunStatus = resolvedDriverId == nil ? .scheduled : .assigned
+        let newRun = SystemDomain.RunInstance(
+            id: newRunId,
+            householdId: householdId,
+            templateId: templateId,
+            title: runTitle.isEmpty ? nil : runTitle,
+            date: uiRun.scheduledTime,
+            departureTime: RunScheduledTime.from(date: uiRun.scheduledTime),
+            status: initialStatus,
+            stops: progressStops,
+            stopSnapshots: stopSnapshots,
+            startedAt: nil,
+            completedAt: nil,
+            cancelledAt: nil,
+            activeStopIndex: nil,
+            assignedDriverId: resolvedDriverId,
+            assignedDriverName: driverNameKey,
+            driverId: resolvedDriverId,
+            childId: childId,
+            createdAt: createdAt
+        )
+
+        print("[CreateRun] run object created id=\(newRun.id.uuidString) templateId=\(templateId.uuidString) childId=\(childId.uuidString) driverId=\(resolvedDriverId.uuidString) status=\(newRun.status.rawValue)")
+
+        do {
+            try RunCreationValidator.validate(newRun)
+            guard let backendRunsContext else {
+                lastError = "Backend is not available to create runs."
+                print("[CreateRun] save error -> backend unavailable")
+                return false
+            }
+            _ = try await backendRunsContext.createRun(
+                from: newRun,
+                requireRemoteScheduleValidation: false
+            )
+            await refresh()
+            lastError = backendRunsContext.lastError
+            print("[CreateRun] save success id=\(newRun.id.uuidString) refreshedRuns=\(runs.count)")
+            return true
+        } catch {
+            lastError = userFacingCreateRunError(error)
+            print("[CreateRun] save error category=\(createRunFailureCategory(error)) detail=\(error.localizedDescription)")
+            return false
+        }
+    }
+
+    func invalidateRuns(templateId: UUID) async {
+        do {
+            let existingRuns = try await repository.loadRuns(for: activeHouseholdId)
+            let removedRuns = existingRuns.filter { $0.templateId == templateId }
+            let filteredRuns = existingRuns.filter { $0.templateId != templateId }
+            guard !removedRuns.isEmpty else { return }
+            if let backendRunsContext {
+                for removed in removedRuns {
+                    try? await backendRunsContext.deleteRun(id: removed.id, householdId: activeHouseholdId)
+                }
+            }
+            applyPersistedRuns(filteredRuns)
+        } catch {
+            lastError = "Unable to clean up runs for deleted schedule."
+        }
+    }
+
     func startRun(id: UUID, locationService: LocationReadinessService? = nil) async {
-        await mutateRun(id: id, locationService: locationService) { run in
-            try RunStateMachine().start(run, now: Date())
+        guard await ensureRunMutationPermission(action: "startRun") else {
+            return
+        }
+        if isLoading || isRefreshing {
+            lastError = "Run data is still loading. Please try again."
+            return
+        }
+        guard !inFlightRunMutationIDs.contains(id) else {
+            lastError = "An update for this run is already in progress."
+            return
+        }
+        guard let sourceRun = runs.first(where: { $0.id == id }) else {
+            lastError = "Run not found."
+            return
+        }
+        guard let backendRunsContext else {
+            lastError = "Backend is not available to update runs."
+            return
+        }
+
+        inFlightRunMutationIDs.insert(id)
+        defer { inFlightRunMutationIDs.remove(id) }
+
+        do {
+            let persisted = try await backendRunsContext.startRun(sourceRun)
+            var allRuns = runs
+            if let index = allRuns.firstIndex(where: { $0.id == id }) {
+                allRuns[index] = persisted
+            } else {
+                allRuns.append(persisted)
+            }
+            applyPersistedRuns(allRuns)
+            lastError = backendRunsContext.lastError
+            if let locationService {
+                reconcileTrackingState(locationService: locationService)
+            }
+        } catch let error as RunTransitionError {
+            lastError = readableTransitionError(error)
+        } catch let error as RunPersistenceError {
+            lastError = error.localizedDescription
+        } catch {
+            lastError = "Could not start run on server: \(error.localizedDescription)"
         }
     }
 
@@ -590,6 +875,144 @@ final class RunDataSource: ObservableObject {
         }
     }
 
+    /// Persists driver assignment locally without backend permission gates (organiser UI path).
+    @discardableResult
+    func assignDriverLocally(runId: UUID, driverId: UUID, driverName: String) async -> Bool {
+        let trimmedName = driverName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedName.isEmpty else {
+            lastError = "Driver name is required."
+            return false
+        }
+        if isLoading || isRefreshing {
+            NSLog("[AssignDriver] local assign blocked: run data still loading")
+            lastError = "Run data is still loading. Please try again."
+            return false
+        }
+        guard !inFlightRunMutationIDs.contains(runId) else {
+            lastError = "An update for this run is already in progress."
+            return false
+        }
+        inFlightRunMutationIDs.insert(runId)
+        defer { inFlightRunMutationIDs.remove(runId) }
+
+        let transform: (SystemDomain.RunInstance) throws -> SystemDomain.RunInstance = { run in
+            guard run.status != .completed && run.status != .cancelled else {
+                throw RunTransitionError.invalidTransition
+            }
+            var updated = run
+            updated.assignedDriverId = driverId
+            updated.assignedDriverName = trimmedName
+            updated.driverId = driverId
+            if updated.status == .scheduled {
+                updated.status = .assigned
+            }
+            return updated
+        }
+
+        guard let sourceRun = runs.first(where: { $0.id == runId }) else {
+            lastError = "Run not found."
+            return false
+        }
+        guard let backendRunsContext else {
+            lastError = "Backend is not available to assign drivers."
+            return false
+        }
+
+        do {
+            let updated = try transform(sourceRun)
+            let persisted = try await backendRunsContext.persistRun(updated)
+            var allRuns = runs
+            if let index = allRuns.firstIndex(where: { $0.id == runId }) {
+                allRuns[index] = persisted
+            }
+            applyPersistedRuns(allRuns)
+            lastError = backendRunsContext.lastError
+            return true
+        } catch let error as RunTransitionError {
+            lastError = readableTransitionError(error)
+        } catch {
+            lastError = "Could not save driver assignment: \(error.localizedDescription)"
+        }
+        return false
+    }
+
+    func hydrateStopCoordinatesIfNeeded(
+        runId: UUID,
+        placeIndex: [String: StopCoordinateHydrator.PlaceCoordinate]
+    ) async {
+        guard !placeIndex.isEmpty else { return }
+        guard let index = runs.firstIndex(where: { $0.id == runId }) else { return }
+
+        let current = runs[index]
+        let hydratedStops = StopCoordinateHydrator.hydrate(stops: current.stopSnapshots, places: placeIndex)
+        await persistHydratedStopsIfNeeded(runId: runId, current: current, hydratedStops: hydratedStops)
+    }
+
+    func hydrateStopCoordinatesFromHouseholdLocations(
+        runId: UUID,
+        locations: [BackendHouseholdLocation]
+    ) async {
+        guard !locations.isEmpty else { return }
+        guard let index = runs.firstIndex(where: { $0.id == runId }) else { return }
+
+        let current = runs[index]
+        let hydratedStops = StopCoordinateHydrator.hydrate(
+            stops: current.stopSnapshots,
+            locations: locations,
+            legacyPlaces: [:]
+        )
+        await persistHydratedStopsIfNeeded(runId: runId, current: current, hydratedStops: hydratedStops)
+    }
+
+    private func persistHydratedStopsIfNeeded(
+        runId: UUID,
+        current: SystemDomain.RunInstance,
+        hydratedStops: [SystemDomain.Stop]
+    ) async {
+        let didChange = zip(current.stopSnapshots, hydratedStops).contains { existing, updated in
+            existing.latitude != updated.latitude
+                || existing.longitude != updated.longitude
+                || existing.locationId != updated.locationId
+        } || current.stopSnapshots.count != hydratedStops.count
+        guard didChange else { return }
+
+        var updated = current
+        updated.stopSnapshots = hydratedStops
+        if let runIndex = runs.firstIndex(where: { $0.id == runId }) {
+            runs[runIndex] = updated
+        }
+
+        do {
+            var persistedRuns = try await repository.loadRuns(for: activeHouseholdId)
+            guard let persistedIndex = persistedRuns.firstIndex(where: { $0.id == runId }) else { return }
+            persistedRuns[persistedIndex] = updated
+            try await repository.saveRuns(persistedRuns, for: activeHouseholdId)
+        } catch {
+            NSLog("[RunRoute] failed to persist hydrated stop coordinates error=\(error.localizedDescription)")
+        }
+    }
+
+    func assignDriver(runId: UUID, driverId: UUID, driverName: String) async {
+        let trimmedName = driverName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedName.isEmpty else {
+            lastError = "Driver name is required."
+            return
+        }
+        await mutateRun(id: runId) { run in
+            guard run.status != .completed && run.status != .cancelled else {
+                throw RunTransitionError.invalidTransition
+            }
+            var updated = run
+            updated.assignedDriverId = driverId
+            updated.assignedDriverName = trimmedName
+            updated.driverId = driverId
+            if updated.status == .scheduled {
+                updated.status = .assigned
+            }
+            return updated
+        }
+    }
+
     func assignDriver(runId: UUID, driverId: UUID) async {
         let activeDrivers: [SystemDomain.Driver]
         do {
@@ -599,19 +1022,11 @@ final class RunDataSource: ObservableObject {
             lastError = "Unable to load drivers right now."
             return
         }
-        await mutateRun(id: runId) { run in
-            guard run.status != .completed && run.status != .cancelled else {
-                throw RunTransitionError.invalidTransition
-            }
-            guard let driver = activeDrivers.first(where: { $0.id == driverId }) else {
-                throw RunTransitionError.invalidTransition
-            }
-            var updated = run
-            updated.assignedDriverId = driver.id
-            updated.assignedDriverName = driver.name
-            updated.driverId = driver.id
-            return updated
+        guard let driver = activeDrivers.first(where: { $0.id == driverId }) else {
+            lastError = "Selected driver is no longer available."
+            return
         }
+        await assignDriver(runId: runId, driverId: driver.id, driverName: driver.name)
     }
 
     func insertStop(
@@ -659,12 +1074,6 @@ final class RunDataSource: ObservableObject {
         var didBackfill = false
         let updated = runs.map { run in
             var mutable = run
-            let trimmedTitle = mutable.title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            if trimmedTitle.isEmpty, let template = templatesByID[mutable.templateId] {
-                mutable.title = template.name
-                didBackfill = true
-            }
-
             let trimmedDriverName = mutable.assignedDriverName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             let effectiveDriverId = mutable.assignedDriverId ?? mutable.driverId
             if trimmedDriverName.isEmpty,
@@ -684,6 +1093,9 @@ final class RunDataSource: ObservableObject {
         locationService: LocationReadinessService? = nil,
         _ transform: (SystemDomain.RunInstance) throws -> SystemDomain.RunInstance
     ) async {
+        guard await ensureRunMutationPermission(action: "updateRun") else {
+            return
+        }
         if isLoading || isRefreshing {
             lastError = "Run data is still loading. Please try again."
             return
@@ -695,65 +1107,26 @@ final class RunDataSource: ObservableObject {
         inFlightRunMutationIDs.insert(id)
         defer { inFlightRunMutationIDs.remove(id) }
 
-        if let inMemoryRun = runs.first(where: { $0.id == id }) {
-            do {
-                let updatedInMemory = try transform(inMemoryRun)
-                var persistedRuns = try await repository.loadRuns(for: activeHouseholdId)
-                guard let persistedIndex = persistedRuns.firstIndex(where: { $0.id == id }) else {
-                    lastError = "Run not found."
-                    return
-                }
-                persistedRuns[persistedIndex] = updatedInMemory
-                try await repository.saveRuns(persistedRuns, for: activeHouseholdId)
-                if let syncCoordinator {
-                    let change = SyncChangeFactory.makeRunChange(
-                        householdId: activeHouseholdId,
-                        entityId: updatedInMemory.id,
-                        operation: .update
-                    )
-                    await syncCoordinator.enqueue(change)
-                }
-                applyPersistedRuns(persistedRuns)
-                lastError = nil
-                if let locationService {
-                    reconcileTrackingState(locationService: locationService)
-                }
-            } catch let error as RunTransitionError {
-                lastError = readableTransitionError(error)
-            } catch let error as RunAdjustmentError {
-                lastError = readableAdjustmentError(error)
-            } catch {
-                lastError = "Unable to update run right now."
-            }
-            return
-        }
-
-        var allRuns: [SystemDomain.RunInstance]
-        do {
-            allRuns = try await repository.loadRuns(for: activeHouseholdId)
-        } catch {
-            lastError = "Unable to update run right now."
-            return
-        }
-        guard let index = allRuns.firstIndex(where: { $0.id == id }) else {
+        guard let sourceRun = runs.first(where: { $0.id == id }) else {
             lastError = "Run not found."
             return
         }
+        guard let backendRunsContext else {
+            lastError = "Backend is not available to update runs."
+            return
+        }
 
         do {
-            let updated = try transform(allRuns[index])
-            allRuns[index] = updated
-            try await repository.saveRuns(allRuns, for: activeHouseholdId)
-            if let syncCoordinator {
-                let change = SyncChangeFactory.makeRunChange(
-                    householdId: activeHouseholdId,
-                    entityId: updated.id,
-                    operation: .update
-                )
-                await syncCoordinator.enqueue(change)
+            let updated = try transform(sourceRun)
+            let persisted = try await backendRunsContext.persistRun(updated)
+            var allRuns = runs
+            if let index = allRuns.firstIndex(where: { $0.id == id }) {
+                allRuns[index] = persisted
+            } else {
+                allRuns.append(persisted)
             }
             applyPersistedRuns(allRuns)
-            lastError = nil
+            lastError = backendRunsContext.lastError
             if let locationService {
                 reconcileTrackingState(locationService: locationService)
             }
@@ -761,8 +1134,11 @@ final class RunDataSource: ObservableObject {
             lastError = readableTransitionError(error)
         } catch let error as RunAdjustmentError {
             lastError = readableAdjustmentError(error)
+        } catch let error as RunMutationGuardError {
+            lastError = error.localizedDescription
         } catch {
-            lastError = "Unable to update run right now."
+            NSLog("[RunMutation] save failed category=%@ detail=%@", createRunFailureCategory(error), error.localizedDescription)
+            lastError = userFacingRunMutationError(error)
         }
     }
 
@@ -785,6 +1161,30 @@ final class RunDataSource: ObservableObject {
         error.errorDescription ?? "Unable to adjust the route."
     }
 
+    private func userFacingRunMutationError(_ error: Error) -> String {
+        let normalized = error.localizedDescription.lowercased()
+        if normalized.contains("permission")
+            || normalized.contains("row-level security")
+            || normalized.contains("rls")
+            || normalized.contains("403") {
+            return Self.runPermissionDeniedMessage
+        }
+        if normalized.contains("session")
+            || normalized.contains("jwt")
+            || normalized.contains("auth")
+            || normalized.contains("unauthorized") {
+            return Self.expiredSessionMessage
+        }
+        if normalized.contains("network") || normalized.contains("could not reach") {
+            return "Could not reach the server. Check your connection and try again."
+        }
+        return "Could not save the run update. Please try again."
+    }
+
+    private func hasAssignedDriver(_ run: SystemDomain.RunInstance) -> Bool {
+        run.assignedDriverId != nil || run.driverId != nil
+    }
+
     private func notificationDayKey(for date: Date, calendar: Calendar) -> String {
         let comps = calendar.dateComponents([.year, .month, .day], from: date)
         let y = comps.year ?? 0
@@ -805,6 +1205,101 @@ final class RunDataSource: ObservableObject {
     private func applyPersistedRuns(_ persistedRuns: [SystemDomain.RunInstance]) {
         // Keep UI state in sync immediately after successful persistence writes.
         runs = persistedRuns.sorted { $0.date < $1.date }
+    }
+
+    private func ensureRunMutationPermission(action: String) async -> Bool {
+#if DEBUG
+        if testBypassRunMutationPermission {
+            return true
+        }
+#endif
+        guard BackendConfig.isBackendConfigured else {
+            return true
+        }
+        do {
+            guard let session = try await authService.restoreSession() else {
+                lastError = Self.expiredSessionMessage
+                NSLog("[CreateRun] permission_check auth=session_missing action=%@", action)
+                return false
+            }
+            NSLog(
+                "[CreateRun] permission_check auth=session_present tokenPresent=%@ userId=%@ householdId=%@ action=%@",
+                session.accessToken.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "no" : "yes",
+                session.userId,
+                activeHouseholdId.uuidString,
+                action
+            )
+            let memberships = try await householdBackendService.fetchMyMemberships(session: session)
+            let membership = BackendPermissionGuard.activeMembership(
+                for: activeHouseholdId,
+                memberships: memberships
+            )
+            try BackendPermissionGuard.requireRunOperator(membership, action: action)
+            return true
+        } catch let error as BackendPermissionError {
+            lastError = Self.runPermissionDeniedMessage
+            NSLog("[CreateRun] permission_check category=permission error=%@", error.localizedDescription)
+            return false
+        } catch {
+            lastError = userFacingCreateRunError(error)
+            NSLog("[CreateRun] permission_check category=%@ error=%@", createRunFailureCategory(error), error.localizedDescription)
+            return false
+        }
+    }
+
+    private static let expiredSessionMessage = "Your session expired. Please sign in again, then try saving the run."
+    private static let runPermissionDeniedMessage = "You don't have permission to create runs for this household."
+
+    private func userFacingCreateRunError(_ error: Error) -> String {
+        if let validation = error as? RunCreationValidator.ValidationError {
+            return validation.localizedDescription
+        }
+        if error is BackendPermissionError {
+            return Self.runPermissionDeniedMessage
+        }
+        let message = error.localizedDescription
+        let normalized = message.lowercased()
+        if normalized.contains("session expired")
+            || normalized.contains("no active auth session")
+            || normalized.contains("jwt expired")
+            || normalized.contains("invalid jwt")
+            || normalized.contains("unauthorized")
+            || normalized.contains("not authenticated") {
+            return Self.expiredSessionMessage
+        }
+        if normalized.contains("permission denied")
+            || normalized.contains("row-level security")
+            || normalized.contains("rls")
+            || normalized.contains("not allowed")
+            || normalized.contains("403") {
+            return Self.runPermissionDeniedMessage
+        }
+        if normalized.contains("network") || normalized.contains("could not reach") {
+            return "Could not reach the server. Check your connection and try again."
+        }
+        return message.isEmpty ? "Unable to save this run." : message
+    }
+
+    private func createRunFailureCategory(_ error: Error) -> String {
+        if error is RunCreationValidator.ValidationError { return "validation" }
+        if error is BackendPermissionError { return "permission" }
+        let normalized = error.localizedDescription.lowercased()
+        if normalized.contains("session")
+            || normalized.contains("jwt")
+            || normalized.contains("auth")
+            || normalized.contains("unauthorized") {
+            return "auth"
+        }
+        if normalized.contains("permission")
+            || normalized.contains("row-level security")
+            || normalized.contains("rls")
+            || normalized.contains("403") {
+            return "permission"
+        }
+        if normalized.contains("network") || normalized.contains("could not reach") {
+            return "network"
+        }
+        return "backend"
     }
 
     private func invalidateDerivedCaches() {

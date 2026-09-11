@@ -1,6 +1,5 @@
-import Foundation
 import CoreLocation
-import MapKit
+import Foundation
 
 struct RunMapPoint: Identifiable, Equatable {
     let id: UUID
@@ -27,7 +26,7 @@ enum RunMapPointKind: Equatable {
 
 struct RunMapModel: Equatable {
     let points: [RunMapPoint]
-    let region: MKCoordinateRegion?
+    let region: CoordinateRegionDegrees?
 
     static func == (lhs: RunMapModel, rhs: RunMapModel) -> Bool {
         guard lhs.points == rhs.points else { return false }
@@ -37,8 +36,8 @@ struct RunMapModel: Equatable {
         case let (.some(left), .some(right)):
             return left.center.latitude == right.center.latitude
                 && left.center.longitude == right.center.longitude
-                && left.span.latitudeDelta == right.span.latitudeDelta
-                && left.span.longitudeDelta == right.span.longitudeDelta
+                && left.latitudeDelta == right.latitudeDelta
+                && left.longitudeDelta == right.longitudeDelta
         default:
             return false
         }
@@ -46,15 +45,32 @@ struct RunMapModel: Equatable {
 }
 
 struct RunMapAdapter {
-    private static let driverPointID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+    static let driverPointID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
 
     func makeModel(
         run: SystemDomain.RunInstance,
-        currentLocation: CLLocation?
+        currentLocation: CLLocation?,
+        routeContext: RunRouteValidationContext = RunRouteValidationContext()
     ) -> RunMapModel {
+        let routeValidation = RunRouteValidator.validate(run: run, context: routeContext)
+        guard routeValidation.isValid else {
+            if let fallback = RunRouteValidator.fallbackMapCenter(run: run, context: routeContext) {
+                return RunMapModel(
+                    points: [],
+                    region: CoordinateRegionDegrees(
+                        center: fallback,
+                        latitudeDelta: 0.02,
+                        longitudeDelta: 0.02
+                    )
+                )
+            }
+            return RunMapModel(points: [], region: nil)
+        }
+
         var points: [RunMapPoint] = []
 
-        if let currentLocation {
+        if let currentLocation,
+           RunRouteValidator.isPlausibleCoordinate(currentLocation.coordinate) {
             points.append(
                 RunMapPoint(
                     id: Self.driverPointID,
@@ -69,6 +85,9 @@ struct RunMapAdapter {
         let progressByStopId = Dictionary(uniqueKeysWithValues: run.stops.map { ($0.stopId, $0) })
 
         for stop in run.stopSnapshots.sorted(by: { $0.order < $1.order }) {
+            let coordinate = CLLocationCoordinate2D(latitude: stop.latitude, longitude: stop.longitude)
+            guard RunRouteValidator.isPlausibleCoordinate(coordinate) else { continue }
+
             let progress = progressByStopId[stop.id]
             let kind: RunMapPointKind
             if let activeIndex,
@@ -90,22 +109,73 @@ struct RunMapAdapter {
                 RunMapPoint(
                     id: stop.id,
                     name: stop.name,
-                    coordinate: CLLocationCoordinate2D(latitude: stop.latitude, longitude: stop.longitude),
+                    coordinate: coordinate,
                     kind: kind
                 )
             )
         }
 
-        return RunMapModel(points: points, region: regionFitting(points: points))
+        return RunMapModel(points: points, region: regionFitting(points: points, run: run, context: routeContext))
     }
 
-    private func regionFitting(points: [RunMapPoint]) -> MKCoordinateRegion? {
-        guard !points.isEmpty else { return nil }
+    /// Ordered coordinates along scheduled stops (for route polyline on the map).
+    func orderedRouteCoordinates(
+        for run: SystemDomain.RunInstance,
+        context: RunRouteValidationContext = RunRouteValidationContext()
+    ) -> [CLLocationCoordinate2D] {
+        guard RunRouteValidator.validate(run: run, context: context).isValid else {
+            return []
+        }
+        return RunRouteValidator.validCoordinates(for: run)
+    }
+
+    /// Remaining stops from the active stop onward (straight-line fallback).
+    func remainingRouteCoordinates(
+        for run: SystemDomain.RunInstance,
+        context: RunRouteValidationContext = RunRouteValidationContext()
+    ) -> [CLLocationCoordinate2D] {
+        guard RunRouteValidator.validate(run: run, context: context).isValid else { return [] }
+        let ordered = run.stopSnapshots.sorted { $0.order < $1.order }
+        let coords = ordered.map { CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude) }
+            .filter(RunRouteValidator.isPlausibleCoordinate)
+        guard let activeIndex = run.activeStopIndex else { return coords }
+        let startOrder = ordered.indices.contains(activeIndex) ? ordered[activeIndex].order : 0
+        return ordered
+            .filter { $0.order >= startOrder }
+            .map { CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude) }
+            .filter(RunRouteValidator.isPlausibleCoordinate)
+    }
+
+    func roadRouteCoordinates(
+        roadLeg: [CLLocationCoordinate2D],
+        run: SystemDomain.RunInstance,
+        context: RunRouteValidationContext = RunRouteValidationContext()
+    ) -> [CLLocationCoordinate2D] {
+        if !roadLeg.isEmpty { return roadLeg }
+        return remainingRouteCoordinates(for: run, context: context)
+    }
+
+    private func regionFitting(
+        points: [RunMapPoint],
+        run: SystemDomain.RunInstance,
+        context: RunRouteValidationContext
+    ) -> CoordinateRegionDegrees? {
+        guard !points.isEmpty else {
+            guard let fallback = RunRouteValidator.fallbackMapCenter(run: run, context: context) else {
+                return nil
+            }
+            return CoordinateRegionDegrees(
+                center: fallback,
+                latitudeDelta: 0.02,
+                longitudeDelta: 0.02
+            )
+        }
 
         if points.count == 1, let only = points.first {
-            return MKCoordinateRegion(
+            return CoordinateRegionDegrees(
                 center: only.coordinate,
-                span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
+                latitudeDelta: 0.01,
+                longitudeDelta: 0.01
             )
         }
 
@@ -126,9 +196,10 @@ struct RunMapAdapter {
         let latitudeDelta = max((maxLat - minLat) * 1.4, 0.006)
         let longitudeDelta = max((maxLon - minLon) * 1.4, 0.006)
 
-        return MKCoordinateRegion(
+        return CoordinateRegionDegrees(
             center: center,
-            span: MKCoordinateSpan(latitudeDelta: latitudeDelta, longitudeDelta: longitudeDelta)
+            latitudeDelta: latitudeDelta,
+            longitudeDelta: longitudeDelta
         )
     }
 }

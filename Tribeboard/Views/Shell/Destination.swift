@@ -52,9 +52,11 @@ enum Destination: Hashable {
     case emergencyContacts
 
     // General
+    case profile
     case calendarSync
     case settings
     case helpSupport
+    case legalSafety
     case about
     case systemTools
     case driverModeSelector

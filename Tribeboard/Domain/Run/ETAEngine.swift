@@ -56,7 +56,19 @@ struct ETAEngine {
         let nextStop = orderedStops[nextIndex]
         let finalStop = orderedStops[finalIndex]
 
-        guard isValidCoordinate(nextStop), isValidCoordinate(finalStop) else { return nil }
+        guard isValidCoordinate(nextStop), isValidCoordinate(finalStop) else {
+            NSLog("[RunRoute] invalid coordinates")
+            return nil
+        }
+
+        let routeCoordinates = visitableIndices.map { orderedStops[$0] }.map {
+            CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude)
+        }
+        let routeDistance = RunRouteValidator.polylineDistanceMeters(routeCoordinates)
+        if routeDistance > RunRouteValidationContext().maxRouteDistanceMeters {
+            NSLog("[RunRoute] invalid route distance=\(routeDistance)")
+            return nil
+        }
 
         let usedLiveSpeed = liveSpeedMetersPerSecond != nil
         let selectedSpeed = liveSpeedMetersPerSecond ?? config.defaultSpeedMetersPerSecond
@@ -132,7 +144,9 @@ struct ETAEngine {
     }
 
     private func isValidCoordinate(_ stop: SystemDomain.Stop) -> Bool {
-        (-90.0...90.0).contains(stop.latitude) && (-180.0...180.0).contains(stop.longitude)
+        RunRouteValidator.isPlausibleCoordinate(
+            CLLocationCoordinate2D(latitude: stop.latitude, longitude: stop.longitude)
+        )
     }
 
     private func qualityForPrediction(

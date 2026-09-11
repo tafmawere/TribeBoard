@@ -2,6 +2,18 @@ import SwiftUI
 import CoreLocation
 
 struct SystemToolsView: View {
+    @EnvironmentObject private var flow: AppFlowState
+    @EnvironmentObject private var activeHouseholdStore: ActiveHouseholdStore
+    @EnvironmentObject private var authSession: AuthSessionContext
+    @EnvironmentObject private var backendProfileContext: BackendProfileContext
+    @EnvironmentObject private var backendHouseholdContext: BackendHouseholdContext
+    @EnvironmentObject private var backendHouseholdPeopleContext: BackendHouseholdPeopleContext
+    @EnvironmentObject private var backendChildrenContext: BackendChildrenContext
+    @EnvironmentObject private var backendSchedulesContext: BackendSchedulesContext
+    @EnvironmentObject private var backendRunsContext: BackendRunsContext
+    @EnvironmentObject private var backendDriversContext: BackendDriversContext
+    @EnvironmentObject private var realtimeService: SupabaseRealtimeService
+    @EnvironmentObject private var networkMonitor: NetworkMonitor
     @EnvironmentObject private var runDataSource: RunDataSource
     @EnvironmentObject private var scheduleDataSource: ScheduleDataSource
     @EnvironmentObject private var driverDataSource: DriverDataSource
@@ -10,6 +22,7 @@ struct SystemToolsView: View {
     @EnvironmentObject private var locationService: LocationReadinessService
     @EnvironmentObject private var notificationService: NotificationService
     @EnvironmentObject private var syncCoordinator: SyncCoordinator
+    @EnvironmentObject private var backendWriteDiagnostics: BackendWriteDiagnosticsStore
 
     @State private var statusMessage: String?
     @State private var isBusy = false
@@ -17,6 +30,8 @@ struct SystemToolsView: View {
     @State private var storeHealthReport = StoreHealthReporter().generate()
     @State private var exportedFiles: [URL] = []
     @State private var showResetAllConfirmation = false
+    @State private var showOnboardingPreview = false
+    @State private var showResetOnboardingConfirmation = false
     @State private var remoteMirrorCounts: RemoteMirrorCounts?
     @State private var syncDiagnostics: SyncDiagnosticsSnapshot?
     @StateObject private var etaSmoothingService = ETASmoothingService()
@@ -26,10 +41,20 @@ struct SystemToolsView: View {
         ScrollView {
             VStack(spacing: 14) {
                 storageCard
+                onboardingCard
                 countsCard
                 storeHealthCard
                 repositoryDiagnosticsCard
                 performanceDiagnosticsCard
+                initializationDiagnosticsCard
+                authDiagnosticsCard
+                backendWriteDiagnosticsCard
+                profileDiagnosticsCard
+                backendHouseholdDiagnosticsCard
+                backendChildrenDiagnosticsCard
+                backendScheduleDiagnosticsCard
+                backendRunDiagnosticsCard
+                realtimeDiagnosticsCard
                 householdsDebugCard
                 exportDebugCard
                 appReadyCheckCard
@@ -38,6 +63,7 @@ struct SystemToolsView: View {
                 routeAdjustmentDebugCard
                 etaDebugCard
                 syncDebugCard
+                offlineSyncDiagnosticsCard
                 syncAuditDebugCard
                 navigationDebugCard
                 liveTrackingDebugCard
@@ -68,6 +94,21 @@ struct SystemToolsView: View {
         } message: {
             Text("This clears runs, schedules, drivers, and pending notifications, then refreshes all data.")
         }
+        .fullScreenCover(isPresented: $showOnboardingPreview) {
+            OnboardingPreviewContainer()
+                .environmentObject(flow)
+                .environmentObject(authSession)
+                .environmentObject(backendProfileContext)
+        }
+        .alert("Reset Onboarding State?", isPresented: $showResetOnboardingConfirmation) {
+            Button("Cancel", role: .cancel) {}
+            Button("Reset", role: .destructive) {
+                OnboardingTestingPreferences.resetForNextLaunch(flow: flow)
+                statusMessage = "Onboarding will be shown again the next time the app starts."
+            }
+        } message: {
+            Text("Onboarding will be shown again the next time the app starts.")
+        }
 #else
         VStack(spacing: 12) {
             Image(systemName: "lock.fill")
@@ -82,6 +123,76 @@ struct SystemToolsView: View {
         .navigationTitle("System Tools")
         .navigationBarTitleDisplayMode(.inline)
 #endif
+    }
+
+    private var onboardingCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(TribePalette.primary)
+                Text("Onboarding")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(TribePalette.ink)
+            }
+
+            onboardingToolRow(
+                icon: "play.circle.fill",
+                title: "Preview Onboarding",
+                subtitle: "View the onboarding experience",
+                action: { showOnboardingPreview = true }
+            )
+
+            Divider()
+
+            onboardingToolRow(
+                icon: "arrow.counterclockwise.circle.fill",
+                title: "Reset Onboarding State",
+                subtitle: "Show onboarding again on next app launch",
+                action: { showResetOnboardingConfirmation = true }
+            )
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .shadow(color: .black.opacity(0.05), radius: 10, x: 0, y: 4)
+    }
+
+    private func onboardingToolRow(
+        icon: String,
+        title: String,
+        subtitle: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(alignment: .center, spacing: 12) {
+                Image(systemName: icon)
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(TribePalette.primary)
+                    .frame(width: 40, height: 40)
+                    .background(TribePalette.primarySoft)
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(TribePalette.ink)
+                    Text(subtitle)
+                        .font(.system(size: 12, weight: .regular))
+                        .foregroundStyle(TribePalette.muted)
+                        .multilineTextAlignment(.leading)
+                }
+
+                Spacer(minLength: 8)
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Color(red: 0.78, green: 0.80, blue: 0.84))
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     private var storageCard: some View {
@@ -115,16 +226,255 @@ struct SystemToolsView: View {
         .shadow(color: .black.opacity(0.05), radius: 10, x: 0, y: 4)
     }
 
+    private var authDiagnosticsCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Auth")
+                .font(.system(size: 16, weight: .bold))
+            countRow(title: "Authenticated", value: authSession.isAuthenticated ? "Yes" : "No")
+            countRow(title: "Session restored", value: authSession.didRestoreSession ? "Yes" : "No")
+            countRow(title: "Provider", value: authSession.currentAuthProvider ?? "Unknown")
+            countRow(title: "User ID", value: authSession.currentUserId ?? "None")
+            countRow(title: "Email", value: authSession.currentUserEmail ?? "None")
+            countRow(title: "Last auth error", value: authSession.lastError ?? "None")
+            if let error = authSession.lastError, !error.isEmpty {
+                Text(error)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.orange)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .shadow(color: .black.opacity(0.05), radius: 10, x: 0, y: 4)
+    }
+
+    private var profileDiagnosticsCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Backend Profile")
+                .font(.system(size: 16, weight: .bold))
+            countRow(title: "Profile loaded", value: backendProfileContext.profile == nil ? "No" : "Yes")
+            countRow(title: "Profile ID", value: backendProfileContext.profile?.id.uuidString ?? "None")
+            countRow(title: "Email", value: backendProfileContext.profile?.email ?? "None")
+            countRow(title: "Display name", value: backendProfileContext.profile?.display_name ?? "None")
+            if let error = backendProfileContext.lastError, !error.isEmpty {
+                Text(error)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.orange)
+            }
+            actionButton("Refresh Backend Profile") {
+                await backendProfileContext.refreshProfile()
+                statusMessage = backendProfileContext.lastError == nil
+                    ? "Refreshed backend profile."
+                    : backendProfileContext.lastError
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .shadow(color: .black.opacity(0.05), radius: 10, x: 0, y: 4)
+    }
+
+    private var backendWriteDiagnosticsCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Backend Write Diagnostics")
+                .font(.system(size: 16, weight: .bold))
+            countRow(title: "Last operation", value: backendWriteDiagnostics.lastEvent?.operation ?? "None")
+            countRow(title: "Target", value: backendWriteDiagnostics.lastEvent?.tableOrEndpoint ?? "None")
+            countRow(title: "HTTP status", value: backendWriteDiagnostics.lastEvent?.statusCode.map(String.init) ?? "None")
+            countRow(title: "Auth token present", value: (backendWriteDiagnostics.lastEvent?.hadAuthToken ?? false) ? "Yes" : "No")
+            countRow(title: "Likely RLS", value: backendWriteDiagnostics.lastEvent?.likelyRLSWarning ?? "None")
+            countRow(title: "Last error", value: backendWriteDiagnostics.lastEvent?.errorSummary ?? "None")
+            if let body = backendWriteDiagnostics.lastEvent?.responseBody, !body.isEmpty {
+                Text(body)
+                    .font(.system(size: 11, weight: .medium, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+            }
+            actionButton("Retry Household Refresh") {
+                await backendHouseholdContext.refresh()
+                statusMessage = backendHouseholdContext.lastError ?? "Household refresh complete."
+            }
+            actionButton("Retry Child Refresh") {
+                await backendChildrenContext.refreshForActiveHousehold()
+                statusMessage = backendChildrenContext.lastError ?? "Child refresh complete."
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .shadow(color: .black.opacity(0.05), radius: 10, x: 0, y: 4)
+    }
+
+    private var backendHouseholdDiagnosticsCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Backend Households")
+                .font(.system(size: 16, weight: .bold))
+            countRow(title: "Household count", value: backendHouseholdContext.households.count)
+            countRow(title: "Membership count", value: backendHouseholdContext.memberships.count)
+            countRow(title: "Household people count", value: backendHouseholdPeopleContext.people.count)
+            countRow(title: "Active backend household", value: backendHouseholdContext.activeHouseholdId?.uuidString ?? "None")
+            if let error = backendHouseholdContext.lastError, !error.isEmpty {
+                Text(error)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.orange)
+            }
+            countRow(title: "Last household people error", value: backendHouseholdPeopleContext.lastError ?? "None")
+            actionButton("Refresh Backend Households") {
+                await backendHouseholdContext.refresh()
+                await backendHouseholdPeopleContext.refreshForActiveHousehold()
+                statusMessage = backendHouseholdContext.lastError == nil
+                    ? "Refreshed backend households."
+                    : backendHouseholdContext.lastError
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .shadow(color: .black.opacity(0.05), radius: 10, x: 0, y: 4)
+    }
+
+    private var backendChildrenDiagnosticsCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Backend Children")
+                .font(.system(size: 16, weight: .bold))
+            countRow(title: "Backend child count", value: backendChildrenContext.children.count)
+            countRow(title: "Backend activity count", value: backendChildrenContext.activities.count)
+            if let error = backendChildrenContext.lastError, !error.isEmpty {
+                Text(error)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.orange)
+            }
+            actionButton("Refresh Backend Children") {
+                await backendChildrenContext.refreshForActiveHousehold()
+                statusMessage = backendChildrenContext.lastError == nil
+                    ? "Refreshed backend children."
+                    : backendChildrenContext.lastError
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .shadow(color: .black.opacity(0.05), radius: 10, x: 0, y: 4)
+    }
+
+    private var backendScheduleDiagnosticsCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Backend Schedule Templates")
+                .font(.system(size: 16, weight: .bold))
+            countRow(title: "Schedule templates loaded", value: backendSchedulesContext.schedules.count)
+            countRow(title: "Templates for active household", value: scheduleDataSource.templatesForActiveHouseholdCount)
+            countRow(title: "Last schedule sync error", value: backendSchedulesContext.lastError ?? "None")
+            actionButton("Refresh Backend Schedule Templates") {
+                guard let householdId = backendHouseholdContext.activeHouseholdId else {
+                    statusMessage = "No active household to refresh schedule templates."
+                    return
+                }
+                await backendSchedulesContext.refreshSchedules(householdId: householdId)
+                statusMessage = backendSchedulesContext.lastError ?? "Refreshed backend schedule templates."
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .shadow(color: .black.opacity(0.05), radius: 10, x: 0, y: 4)
+    }
+
+    private var backendRunDiagnosticsCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Backend Runs")
+                .font(.system(size: 16, weight: .bold))
+            countRow(title: "Run count", value: backendRunsContext.runs.count)
+            countRow(
+                title: "Runs loaded for household",
+                value: runDataSource.runs.filter { $0.householdId == householdContext.householdId }.count
+            )
+            countRow(title: "Last run sync error", value: backendRunsContext.lastError ?? "None")
+            countRow(title: "Driver count", value: backendDriversContext.drivers.count)
+            countRow(title: "Assigned runs (driver_id)", value: backendDriversContext.assignedRunCount)
+            countRow(title: "Last assignment error", value: backendDriversContext.lastError ?? "None")
+            actionButton("Refresh Backend Runs") {
+                let householdId = backendHouseholdContext.activeHouseholdId ?? householdContext.householdId
+                await backendRunsContext.refreshRuns(householdId: householdId)
+                await backendDriversContext.refreshDrivers(householdId: householdId)
+                await runDataSource.refresh()
+                statusMessage = backendRunsContext.lastError ?? backendDriversContext.lastError ?? "Refreshed backend runs."
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .shadow(color: .black.opacity(0.05), radius: 10, x: 0, y: 4)
+    }
+
+    private var realtimeDiagnosticsCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Realtime")
+                .font(.system(size: 16, weight: .bold))
+            countRow(title: "Active household id", value: activeHouseholdStore.activeHouseholdId?.uuidString ?? "None")
+            countRow(title: "Subscription state", value: realtimeService.subscriptionState)
+            countRow(title: "Active household", value: realtimeService.activeHouseholdId?.uuidString ?? "None")
+            countRow(
+                title: "Subscribed tables",
+                value: realtimeService.subscribedTables.isEmpty ? "None" : realtimeService.subscribedTables.joined(separator: ", ")
+            )
+            countRow(title: "Last event", value: realtimeService.lastEventSummary ?? "None")
+            if let error = realtimeService.lastError, !error.isEmpty {
+                Text(error)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.orange)
+            }
+            actionButton("Reconnect Realtime") {
+                if let householdId = activeHouseholdStore.activeHouseholdId, authSession.isAuthenticated {
+                    await realtimeService.reconnectForHousehold(householdId: householdId)
+                    statusMessage = "Realtime reconnected."
+                } else {
+                    await realtimeService.unsubscribe()
+                    statusMessage = "Realtime disconnected (no active household/auth)."
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .shadow(color: .black.opacity(0.05), radius: 10, x: 0, y: 4)
+    }
+
     private var actionsCard: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Actions")
                 .font(.system(size: 16, weight: .bold))
 
-            actionButton("Seed demo schedules") {
-                try await SystemBootstrap.seedDemoSchedules()
+            actionButton("Re-run Initialization") {
+                await backendProfileContext.ensureProfileExists(email: authSession.currentUserEmail)
+                await backendHouseholdContext.refresh()
+                await backendChildrenContext.refreshForActiveHousehold()
+                if authSession.isAuthenticated, let householdId = backendHouseholdContext.activeHouseholdId {
+                    await realtimeService.subscribeToHousehold(householdId: householdId)
+                } else {
+                    await realtimeService.unsubscribe()
+                }
+                statusMessage = backendChildrenContext.lastError
+                    ?? backendHouseholdContext.lastError
+                    ?? backendProfileContext.lastError
+                    ?? "Initialization completed."
+            }
+
+            actionButton("Refresh Memberships") {
+                await backendHouseholdContext.refresh()
+                statusMessage = backendHouseholdContext.lastError ?? "Memberships refreshed."
+            }
+
+            actionButton("Refresh Schedules") {
                 await scheduleDataSource.refresh()
-                await runDataSource.refresh()
-                statusMessage = "Seeded demo schedules."
+                statusMessage = scheduleDataSource.lastError ?? "Schedules refreshed."
             }
 
             actionButton("Generate runs (14d)") {
@@ -193,6 +543,28 @@ struct SystemToolsView: View {
             countRow(title: "Run count", value: runDataSource.runs.count)
             countRow(title: "Schedule count", value: scheduleDataSource.templates.count)
             countRow(title: "Driver count", value: driverDataSource.totalDriversCount)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .shadow(color: .black.opacity(0.05), radius: 10, x: 0, y: 4)
+    }
+
+    private var initializationDiagnosticsCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Initialization Diagnostics")
+                .font(.system(size: 16, weight: .bold))
+            countRow(title: "Auth user id", value: authSession.currentUserId ?? "None")
+            countRow(title: "Active household id", value: backendHouseholdContext.activeHouseholdId?.uuidString ?? "None")
+            countRow(title: "Membership role", value: backendHouseholdContext.roleForActiveHousehold() ?? "None")
+            countRow(title: "Invite count", value: backendHouseholdContext.activeHouseholdInvites.count)
+            countRow(title: "Household count", value: backendHouseholdContext.households.count)
+            countRow(title: "Child count", value: backendChildrenContext.children.count)
+            countRow(title: "Schedule count", value: scheduleDataSource.templates.count)
+            countRow(title: "Schedule templates loaded", value: scheduleDataSource.templatesLoadedCount)
+            countRow(title: "Schedules in active household", value: scheduleDataSource.templatesForActiveHouseholdCount)
+            countRow(title: "Realtime state", value: realtimeService.subscriptionState)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
@@ -771,6 +1143,34 @@ struct SystemToolsView: View {
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .shadow(color: .black.opacity(0.05), radius: 10, x: 0, y: 4)
     }
+    
+    private var offlineSyncDiagnosticsCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Offline Sync Diagnostics")
+                .font(.system(size: 16, weight: .bold))
+            countRow(title: "Sync state", value: syncCoordinator.isSyncing ? "syncing" : "idle")
+            countRow(title: "Network", value: networkMonitor.isConnected ? "connected" : "offline")
+            countRow(title: "Pending sync operations", value: syncCoordinator.pendingCount)
+            countRow(title: "Last sync error", value: syncCoordinator.lastError ?? "None")
+            countRow(title: "Last processed op", value: syncCoordinator.lastProcessedOperationType ?? "None")
+            countRow(title: "Last skipped duplicate", value: syncCoordinator.lastSkippedDuplicateOperation ?? "None")
+            countRow(title: "Oldest pending op", value: oldestPendingOperationText())
+            countRow(title: "Pending groups", value: pendingGroupsText())
+            actionButton("Force Sync Now") {
+                await syncCoordinator.startSync()
+                statusMessage = syncCoordinator.lastError ?? "Forced sync completed."
+            }
+            actionButton("Clear Sync Error State") {
+                syncCoordinator.clearSyncErrorState()
+                statusMessage = "Cleared sync error state."
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .shadow(color: .black.opacity(0.05), radius: 10, x: 0, y: 4)
+    }
 #endif
 
     private func statusCard(message: String) -> some View {
@@ -898,7 +1298,6 @@ struct SystemToolsView: View {
 
 #if DEBUG
             if AppConfig.isDemoFlowEnabled {
-                try await SystemBootstrap.seedDemoSchedules()
                 await driverDataSource.seedDemoDrivers()
             }
 #endif
@@ -916,6 +1315,20 @@ struct SystemToolsView: View {
         statusMessage = result.exportedFiles.isEmpty
             ? "No JSON files were found to export."
             : "Exported: \(names)"
+    }
+    
+    private func oldestPendingOperationText() -> String {
+        guard let operation = syncCoordinator.oldestPendingOperation() else { return "None" }
+        return "\(operation.entityType.rawValue).\(operation.operationType.rawValue)"
+    }
+    
+    private func pendingGroupsText() -> String {
+        let groups = syncCoordinator.pendingOperationGroups()
+        if groups.isEmpty { return "None" }
+        let formatted = groups
+            .sorted { $0.key.rawValue < $1.key.rawValue }
+            .map { "\($0.key.rawValue):\($0.value)" }
+        return formatted.joined(separator: ", ")
     }
 
     private func nextFutureStopIndex(for run: SystemDomain.RunInstance) -> Int? {
@@ -951,9 +1364,32 @@ struct SystemToolsView: View {
     }
 }
 
+#if DEBUG
+private struct OnboardingPreviewContainer: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        TribeOnboardingRootView()
+            .overlay(alignment: .topTrailing) {
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 28))
+                        .symbolRenderingMode(.hierarchical)
+                        .foregroundStyle(.secondary)
+                        .padding(16)
+                }
+                .accessibilityLabel("Close onboarding preview")
+            }
+    }
+}
+#endif
+
 #Preview {
     NavigationStack {
         SystemToolsView()
+            .environmentObject(AppFlowState())
             .environmentObject(RunDataSource())
             .environmentObject(ScheduleDataSource())
             .environmentObject(DriverDataSource())
@@ -964,8 +1400,10 @@ struct SystemToolsView: View {
                 )
             )
             .environmentObject(ActiveHouseholdContext())
+            .environmentObject(NetworkMonitor())
             .environmentObject(LocationReadinessService())
             .environmentObject(NotificationService())
             .environmentObject(SyncCoordinator(queueRepository: LocalSyncQueueRepository()))
+            .environmentObject(BackendWriteDiagnosticsStore.shared)
     }
 }

@@ -52,10 +52,18 @@ struct UIOccurrence: Identifiable, Hashable {
 }
 
 struct SchedulesListView: View {
+    @EnvironmentObject private var activeHouseholdStore: ActiveHouseholdStore
+    @EnvironmentObject private var authSession: AuthSessionContext
+    @EnvironmentObject private var backendProfileContext: BackendProfileContext
+    @EnvironmentObject private var backendHouseholdContext: BackendHouseholdContext
+    @EnvironmentObject private var backendHouseholdPeopleContext: BackendHouseholdPeopleContext
+    @EnvironmentObject private var backendChildrenContext: BackendChildrenContext
+    @EnvironmentObject private var backendSchedulesContext: BackendSchedulesContext
     @EnvironmentObject private var scheduleDataSource: ScheduleDataSource
     @EnvironmentObject private var runDataSource: RunDataSource
 
     @State private var isShowingEditor = false
+    @State private var isShowingCreator = false
     @State private var editingTemplate: SystemDomain.ScheduleTemplate?
     @State private var generationMessage: String?
 
@@ -63,16 +71,27 @@ struct SchedulesListView: View {
         ZStack {
             CalendarUITheme.offWhite.ignoresSafeArea()
 
-            if scheduleDataSource.templates.isEmpty && !scheduleDataSource.isLoading {
+            if !hasHouseholdScope {
+                emptyHouseholdState
+                    .padding(16)
+            } else if scopedTemplates.isEmpty && !scheduleDataSource.isLoading {
                 emptyState
                     .padding(16)
             } else {
                 ScrollView {
                     VStack(spacing: 12) {
+                        if backendHouseholdContext.hasActiveMembership,
+                           !backendHouseholdContext.canManageSchedules {
+                            generationBanner(
+                                text: backendHouseholdContext.isCurrentUserDriver
+                                    ? "Drivers can start runs but cannot edit schedules."
+                                    : "Observers have view-only access."
+                            )
+                        }
                         if let generationMessage {
                             generationBanner(text: generationMessage)
                         }
-                        ForEach(scheduleDataSource.templates) { template in
+                        ForEach(scopedTemplates) { template in
                             scheduleCard(template)
                         }
                     }
@@ -98,6 +117,10 @@ struct SchedulesListView: View {
 #endif
                 Button("Generate Runs") {
                     Task {
+                        guard backendHouseholdContext.canStartRuns else {
+                            generationMessage = "Only organisers and drivers can start runs."
+                            return
+                        }
                         let newRuns = await scheduleDataSource.generateRuns(daysAhead: 14)
                         await runDataSource.refresh()
                         generationMessage = newRuns == 0
@@ -105,19 +128,38 @@ struct SchedulesListView: View {
                             : "Generated \(newRuns) new runs"
                     }
                 }
-                .disabled(scheduleDataSource.isWorking)
+                .disabled(scheduleDataSource.isWorking || !backendHouseholdContext.canStartRuns)
 
-                Button("New Schedule") {
-                    editingTemplate = nil
-                    isShowingEditor = true
+                if backendHouseholdContext.canManageSchedules {
+                    Button("New Schedule") {
+                        isShowingCreator = true
+                    }
+                    .disabled(!hasHouseholdScope || !backendHouseholdContext.canManageSchedules)
                 }
             }
         }
         .task {
+            guard hasHouseholdScope else { return }
             await scheduleDataSource.refresh()
-#if DEBUG
-            await scheduleDataSource.seedDemoIfNeeded()
-#endif
+        }
+        .onChange(of: activeHouseholdStore.activeHouseholdId) { _, _ in
+            Task {
+                await backendChildrenContext.refreshForActiveHousehold()
+                await scheduleDataSource.refresh()
+                await runDataSource.refresh()
+            }
+        }
+        .sheet(isPresented: $isShowingCreator, onDismiss: {
+            Task { await scheduleDataSource.refresh() }
+        }) {
+            NavigationStack {
+                ScheduleCreatorView()
+                    .environmentObject(backendProfileContext)
+                    .environmentObject(backendHouseholdContext)
+                    .environmentObject(backendChildrenContext)
+                    .environmentObject(backendSchedulesContext)
+                    .environmentObject(backendHouseholdPeopleContext)
+            }
         }
         .sheet(isPresented: $isShowingEditor, onDismiss: {
             Task { await scheduleDataSource.refresh() }
@@ -130,15 +172,56 @@ struct SchedulesListView: View {
         }
     }
 
+    private var hasHouseholdScope: Bool {
+        if !authSession.isAuthenticated {
+            return true
+        }
+        return backendHouseholdContext.hasActiveMembership && activeHouseholdStore.activeHouseholdId != nil
+    }
+
+    private var emptyHouseholdState: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "person.3.sequence")
+                .font(.system(size: 34, weight: .semibold))
+                .foregroundStyle(CalendarUITheme.indigo)
+
+            Text("No active tribe selected")
+                .font(.system(size: 20, weight: .bold))
+                .foregroundStyle(CalendarUITheme.textPrimary)
+
+            Text("Join or create a tribe to see schedules.")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(CalendarUITheme.textSecondary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
     private var editorMode: ScheduleEditorView.Mode {
         guard let editingTemplate else { return .create }
         return .edit(editingTemplate.asCalendarSchedule)
     }
 
+    private var scopedTemplates: [SystemDomain.ScheduleTemplate] {
+        let validChildIds = Set(backendChildrenContext.children.map(\.id))
+        return scheduleDataSource.templates.filter { template in
+            if authSession.isAuthenticated, let activeHouseholdId = activeHouseholdStore.activeHouseholdId {
+                guard template.householdId == activeHouseholdId else { return false }
+            }
+            return validChildIds.contains(template.childId)
+        }
+    }
+
+    @ViewBuilder
     private func scheduleCard(_ template: SystemDomain.ScheduleTemplate) -> some View {
+        let assignment = driverAssignment(for: template)
         CalendarCard {
             VStack(alignment: .leading, spacing: 12) {
                 Button {
+                    guard backendHouseholdContext.canManageSchedules else {
+                        generationMessage = "Only organisers can manage schedules."
+                        return
+                    }
                     editingTemplate = template
                     isShowingEditor = true
                 } label: {
@@ -155,6 +238,32 @@ struct SchedulesListView: View {
                             .font(.system(size: 13, weight: .medium))
                             .foregroundStyle(CalendarUITheme.textSecondary)
 
+                        HStack(spacing: 8) {
+                            Image(systemName: assignment.isAssigned ? "steeringwheel" : "person.crop.circle.badge.exclamationmark")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(assignment.isAssigned ? CalendarUITheme.indigo : Color.orange)
+                            Text(assignment.label)
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(assignment.isAssigned ? CalendarUITheme.textPrimary : Color.orange)
+                                .lineLimit(1)
+                        }
+
+                        if !assignment.isAssigned {
+                            if backendHouseholdContext.canManageSchedules {
+                                Button("Assign Driver") {
+                                    editingTemplate = template
+                                    isShowingEditor = true
+                                }
+                                .font(.system(size: 13, weight: .semibold))
+                                .buttonStyle(.borderedProminent)
+                                .tint(CalendarUITheme.indigo)
+                            } else {
+                                Text("Driver assignment is managed by organisers.")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(CalendarUITheme.textSecondary)
+                            }
+                        }
+
                         AppBadge(
                             text: template.isActive ? "ENABLED" : "DISABLED",
                             style: template.isActive ? .success : .neutral
@@ -167,11 +276,16 @@ struct SchedulesListView: View {
                 Toggle("Enabled", isOn: Binding(
                     get: { template.isActive },
                     set: { newValue in
+                        guard backendHouseholdContext.canManageSchedules else {
+                            generationMessage = "Only organisers can manage schedules."
+                            return
+                        }
                         Task { await scheduleDataSource.toggleEnabled(id: template.id, enabled: newValue) }
                     }
                 ))
                 .font(.system(size: 15, weight: .semibold))
                 .tint(CalendarUITheme.indigo)
+                .disabled(!backendHouseholdContext.canManageSchedules)
             }
         }
     }
@@ -207,8 +321,7 @@ struct SchedulesListView: View {
                 .multilineTextAlignment(.center)
 
             Button("Create Schedule") {
-                editingTemplate = nil
-                isShowingEditor = true
+                isShowingCreator = true
             }
             .font(.system(size: 16, weight: .semibold))
             .foregroundStyle(.white)
@@ -216,20 +329,6 @@ struct SchedulesListView: View {
             .frame(height: 44)
             .background(CalendarUITheme.indigo)
             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-
-#if DEBUG
-            if AppConfig.isDemoFlowEnabled {
-                Button("Seed Demo Schedules") {
-                    Task { await scheduleDataSource.seedDemoIfNeeded() }
-                }
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(CalendarUITheme.textPrimary)
-                .frame(maxWidth: .infinity)
-                .frame(height: 44)
-                .background(Color.white)
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-            }
-#endif
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -252,6 +351,20 @@ struct SchedulesListView: View {
         let formatter = DateFormatter()
         formatter.dateFormat = "h:mm a"
         return formatter.string(from: date)
+    }
+
+    private func driverAssignment(for template: SystemDomain.ScheduleTemplate) -> (label: String, isAssigned: Bool) {
+        guard let driverId = template.driverId else {
+            return ("No driver assigned", false)
+        }
+        if let profile = backendHouseholdContext.activeHouseholdProfilesByUserId[driverId] {
+            let name = AuthBackedMemberDisplayResolver.resolveName(profile: profile, relationshipLabel: nil)
+            return ("Driver: \(name)", true)
+        }
+        if let person = backendHouseholdPeopleContext.people.first(where: { $0.id == driverId }) {
+            return ("Driver: \(person.name)", true)
+        }
+        return ("Driver assigned", true)
     }
 }
 

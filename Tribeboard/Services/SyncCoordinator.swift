@@ -10,48 +10,69 @@ struct SyncDiagnosticsSnapshot {
 
 @MainActor
 final class SyncCoordinator: ObservableObject {
+    private enum CoordinatorError: LocalizedError {
+        case dependencyNotReady(String)
+    }
     @Published private(set) var status: SyncStatusSnapshot
     @Published private(set) var recentSyncWarning: String?
+    @Published private(set) var isSyncing: Bool = false
+    @Published private(set) var lastError: String?
+    @Published private(set) var pendingCount: Int = 0
+    @Published private(set) var lastProcessedOperationType: String?
+    @Published private(set) var lastSkippedDuplicateOperation: String?
 
     private let queueRepository: SyncQueueRepository
+    private let queueStore: SyncQueueStore
     private let auditRepository: SyncAuditRepository
     private let processedChangeRepository: ProcessedChangeRepository
     private let remoteDriver: RemoteSyncDriver?
+    private let scheduleBackendService: ScheduleBackendService
+    private let runBackendService: RunBackendService
     private let runRepository: (any RunRepository)?
     private let scheduleRepository: (any ScheduleRepository)?
     private let driverRepository: (any DriverRepository)?
     private let householdRepository: (any HouseholdRepository)?
     private let mergeService = SyncMergeService()
     private var isProcessing = false
+    private var hasQueuedSyncRequest = false
 
     init(
         queueRepository: SyncQueueRepository,
-        auditRepository: SyncAuditRepository = LocalSyncAuditRepository(),
-        processedChangeRepository: ProcessedChangeRepository = LocalProcessedChangeRepository(),
+        queueStore: SyncQueueStore? = nil,
+        auditRepository: SyncAuditRepository? = nil,
+        processedChangeRepository: ProcessedChangeRepository? = nil,
         remoteDriver: RemoteSyncDriver? = nil,
+        scheduleBackendService: ScheduleBackendService? = nil,
+        runBackendService: RunBackendService? = nil,
         runRepository: (any RunRepository)? = nil,
         scheduleRepository: (any ScheduleRepository)? = nil,
         driverRepository: (any DriverRepository)? = nil,
         householdRepository: (any HouseholdRepository)? = nil
     ) {
         self.queueRepository = queueRepository
-        self.auditRepository = auditRepository
-        self.processedChangeRepository = processedChangeRepository
+        self.queueStore = queueStore ?? SyncQueueStore()
+        self.auditRepository = auditRepository ?? LocalSyncAuditRepository()
+        self.processedChangeRepository = processedChangeRepository ?? LocalProcessedChangeRepository()
         self.remoteDriver = remoteDriver
+        self.scheduleBackendService = scheduleBackendService ?? SupabaseScheduleBackendService()
+        self.runBackendService = runBackendService ?? SupabaseRunBackendService()
         self.runRepository = runRepository
         self.scheduleRepository = scheduleRepository
         self.driverRepository = driverRepository
         self.householdRepository = householdRepository
         self.status = SyncStatusSnapshot(state: .idle, pendingCount: 0, lastSyncAt: nil, lastError: nil)
+        self.lastError = nil
+        self.pendingCount = self.queueStore.pendingOperations().count
     }
 
     func refreshStatus() async {
         do {
             let changes = try await queueRepository.loadChanges()
-            status.pendingCount = changes.count
+            let operationCount = queueStore.pendingOperations().count
+            status.pendingCount = changes.count + operationCount
             if isProcessing {
                 status.state = .syncing
-            } else if changes.isEmpty {
+            } else if changes.isEmpty && operationCount == 0 {
                 if status.state != .failed {
                     status.state = status.lastSyncAt == nil ? .idle : .succeeded
                 }
@@ -65,6 +86,7 @@ final class SyncCoordinator: ObservableObject {
             status.state = .failed
             status.lastError = "Unable to read sync queue."
         }
+        syncPublishedStatus()
     }
 
     func enqueue(_ change: SyncChange) async {
@@ -80,24 +102,57 @@ final class SyncCoordinator: ObservableObject {
             status.pendingCount = queue.count
             status.state = queue.isEmpty ? .idle : .pending
             status.lastError = nil
+            syncPublishedStatus()
         } catch {
             status.state = .failed
             status.lastError = "Unable to enqueue sync change."
+            syncPublishedStatus()
         }
+    }
+    
+    func enqueue(operation: SyncOperation) async {
+        queueStore.enqueue(operation: operation)
+        pendingCount = queueStore.pendingOperations().count
+        status.pendingCount = pendingCount
+        if pendingCount > 0, status.state == .idle || status.state == .succeeded {
+            status.state = .pending
+        }
+    }
+    
+    func startSync() async {
+        if isProcessing {
+            hasQueuedSyncRequest = true
+            return
+        }
+        await processQueue()
+    }
+    
+    func retryFailedOperations() async {
+        await processQueue()
     }
 
     func processQueue() async {
         guard !isProcessing else { return }
         isProcessing = true
-        defer { isProcessing = false }
+        defer {
+            isProcessing = false
+            if hasQueuedSyncRequest {
+                hasQueuedSyncRequest = false
+                Task { await self.processQueue() }
+            }
+        }
+        isSyncing = true
+        defer { isSyncing = false }
 
         do {
+            try await processOperationQueue()
             let queue = try await queueRepository.loadChanges()
             guard !queue.isEmpty else {
                 status.state = .idle
                 status.pendingCount = 0
                 status.lastError = nil
                 recentSyncWarning = nil
+                syncPublishedStatus()
                 return
             }
 
@@ -144,6 +199,7 @@ final class SyncCoordinator: ObservableObject {
             status.lastSyncAt = Date()
             status.lastError = nil
             recentSyncWarning = nil
+            syncPublishedStatus()
         } catch {
             status.state = .failed
             status.lastError = "Unable to process sync queue."
@@ -162,6 +218,7 @@ final class SyncCoordinator: ObservableObject {
                 )
             )
             await refreshStatus()
+            syncPublishedStatus()
         }
     }
 
@@ -221,6 +278,7 @@ final class SyncCoordinator: ObservableObject {
                 recentSyncWarning = nil
             }
             await refreshStatus()
+            syncPublishedStatus()
         } catch {
             status.state = .failed
             status.lastError = "Unable to pull remote changes."
@@ -238,18 +296,22 @@ final class SyncCoordinator: ObservableObject {
                     createdAt: Date()
                 )
             )
+            syncPublishedStatus()
         }
     }
 
     func clearQueue() async {
         do {
             try await queueRepository.saveChanges([])
+            queueStore.clearCompleted()
             status.pendingCount = 0
             status.state = .idle
             status.lastError = nil
+            syncPublishedStatus()
         } catch {
             status.state = .failed
             status.lastError = "Unable to clear sync queue."
+            syncPublishedStatus()
         }
     }
 
@@ -290,6 +352,38 @@ final class SyncCoordinator: ObservableObject {
             status.state = .failed
             status.lastError = "Unable to clear processed change log."
         }
+    }
+    
+    func clearSyncErrorState() {
+        status.lastError = nil
+        lastError = nil
+    }
+    
+    func pendingOperationGroups() -> [SyncEntityType: Int] {
+        queueStore.groupedPendingCounts()
+    }
+    
+    func oldestPendingOperation() -> SyncOperation? {
+        queueStore.oldestPendingOperation()
+    }
+    
+    func pendingOperations(for householdId: UUID, entityType: SyncEntityType? = nil) -> [SyncOperation] {
+        queueStore.pendingOperations(for: householdId, entityType: entityType)
+    }
+    
+    func resetUserScopedState(clearPendingOperations: Bool = true) async {
+        status = SyncStatusSnapshot(state: .idle, pendingCount: 0, lastSyncAt: nil, lastError: nil)
+        recentSyncWarning = nil
+        isSyncing = false
+        lastError = nil
+        lastProcessedOperationType = nil
+        lastSkippedDuplicateOperation = nil
+        hasQueuedSyncRequest = false
+        if clearPendingOperations {
+            queueStore.clearCompleted()
+            try? await queueRepository.saveChanges([])
+        }
+        syncPublishedStatus()
     }
 
     func remoteMirrorCounts() async -> RemoteMirrorCounts? {
@@ -378,6 +472,214 @@ final class SyncCoordinator: ObservableObject {
         }
     }
 
+    private func processOperationQueue() async throws {
+        var operations = queueStore.pendingOperations()
+        guard !operations.isEmpty else {
+            pendingCount = 0
+            return
+        }
+        pendingCount = operations.count
+        status.pendingCount = operations.count
+        status.state = .syncing
+        
+        var processedIds: Set<UUID> = []
+        for operation in operations {
+            do {
+                guard shouldProcess(operation: operation, queue: operations, alreadyProcessed: processedIds) else {
+                    continue
+                }
+                try await dispatch(operation: operation)
+                processedIds.insert(operation.id)
+                lastProcessedOperationType = "\(operation.entityType.rawValue).\(operation.operationType.rawValue)"
+            } catch let error as CoordinatorError {
+                // Dependency order safety: keep queued until prerequisite is available.
+                if case .dependencyNotReady(let message) = error {
+                    status.lastError = message
+                }
+            } catch {
+                // Keep failed operations queued; sync should never block the UI.
+                lastError = error.localizedDescription
+                status.lastError = error.localizedDescription
+            }
+        }
+        
+        if !processedIds.isEmpty {
+            operations.removeAll { processedIds.contains($0.id) }
+            queueStore.clearCompleted()
+            for remaining in operations {
+                queueStore.enqueue(operation: remaining)
+            }
+        }
+        
+        pendingCount = operations.count
+        status.pendingCount = operations.count
+        if operations.isEmpty {
+            if status.state != .failed {
+                status.state = .succeeded
+            }
+        } else {
+            status.state = .pending
+        }
+        syncPublishedStatus()
+    }
+    
+    private func shouldProcess(
+        operation: SyncOperation,
+        queue: [SyncOperation],
+        alreadyProcessed: Set<UUID>
+    ) -> Bool {
+        switch operation.entityType {
+        case .schedule:
+            return true
+        case .run:
+            let earlierScheduleCreates = queue.contains { queued in
+                queued.id != operation.id
+                    && !alreadyProcessed.contains(queued.id)
+                    && queued.householdId == operation.householdId
+                    && queued.entityType == .schedule
+                    && queued.operationType == .create
+                    && queued.createdAt <= operation.createdAt
+            }
+            if earlierScheduleCreates {
+                return false
+            }
+            return true
+        case .runAssignment:
+            let earlierRunCreates = queue.contains { queued in
+                queued.id != operation.id
+                    && !alreadyProcessed.contains(queued.id)
+                    && queued.householdId == operation.householdId
+                    && queued.entityType == .run
+                    && queued.operationType == .create
+                    && queued.createdAt <= operation.createdAt
+            }
+            if earlierRunCreates {
+                return false
+            }
+            return true
+        case .driver, .household:
+            return true
+        }
+    }
+    
+    private func dispatch(operation: SyncOperation) async throws {
+        switch operation.entityType {
+        case .schedule:
+            try await dispatchScheduleOperation(operation)
+        case .run:
+            try await dispatchRunOperation(operation)
+        case .runAssignment:
+            // Legacy queue entries: driver assignment is persisted on runs.driver_id.
+            try await dispatchRunOperation(
+                SyncOperation(
+                    id: operation.id,
+                    entityType: .run,
+                    operationType: .update,
+                    entityId: operation.entityId,
+                    householdId: operation.householdId,
+                    createdAt: operation.createdAt
+                )
+            )
+        case .driver, .household:
+            // Not part of Sprint 44 offline scope.
+            return
+        }
+    }
+    
+    private func dispatchScheduleOperation(_ operation: SyncOperation) async throws {
+        guard let scheduleRepository else { return }
+        let localTemplates = try await scheduleRepository.loadTemplates(for: operation.householdId)
+        let localTemplate = localTemplates.first(where: { $0.id == operation.entityId })
+        
+        switch operation.operationType {
+        case .create:
+            let remote = try await scheduleBackendService.fetchSchedules(householdId: operation.householdId)
+            if remote.contains(where: { $0.id == operation.entityId }) {
+                lastSkippedDuplicateOperation = "schedule.create \(operation.entityId.uuidString)"
+                return
+            }
+            guard let localTemplate else {
+                throw CoordinatorError.dependencyNotReady("Schedule create dependency not ready.")
+            }
+            _ = try await scheduleBackendService.createSchedule(mapScheduleToBackend(localTemplate))
+        case .update:
+            guard let localTemplate else {
+                throw CoordinatorError.dependencyNotReady("Schedule update dependency not ready.")
+            }
+            _ = try await scheduleBackendService.updateSchedule(mapScheduleToBackend(localTemplate))
+        case .delete:
+            try await scheduleBackendService.deleteSchedule(id: operation.entityId)
+        }
+    }
+    
+    private func dispatchRunOperation(_ operation: SyncOperation) async throws {
+        guard let runRepository else { return }
+        let localRuns = try await runRepository.loadRuns(for: operation.householdId)
+        let localRun = localRuns.first(where: { $0.id == operation.entityId })
+        
+        switch operation.operationType {
+        case .create:
+            let remote = try await runBackendService.fetchRuns(householdId: operation.householdId)
+            if remote.contains(where: { $0.id == operation.entityId }) {
+                lastSkippedDuplicateOperation = "run.create \(operation.entityId.uuidString)"
+                return
+            }
+            guard let localRun else {
+                throw CoordinatorError.dependencyNotReady("Run create dependency not ready.")
+            }
+            let remoteTemplates = try await scheduleBackendService.fetchSchedules(householdId: operation.householdId)
+            let templateExists = remoteTemplates.contains(where: { $0.id == localRun.templateId })
+#if DEBUG
+            print(
+                "[SyncCoordinator] run.create: schedule_id=\(localRun.templateId.uuidString), " +
+                "household_id=\(operation.householdId.uuidString), template_exists_in_loaded_templates=\(templateExists)"
+            )
+#endif
+            guard templateExists else {
+                throw CoordinatorError.dependencyNotReady("Run create blocked: schedule template missing in backend.")
+            }
+            _ = try await runBackendService.createRun(mapRunToBackend(localRun))
+        case .update:
+            guard let localRun else {
+                throw CoordinatorError.dependencyNotReady("Run update dependency not ready.")
+            }
+            _ = try await runBackendService.updateRun(mapRunToBackend(localRun))
+        case .delete:
+            try await runBackendService.deleteRun(id: operation.entityId)
+        }
+    }
+    
+    private func mapRunToBackend(_ run: SystemDomain.RunInstance) -> BackendRun {
+        RunPersistenceMapper.package(from: run).run
+    }
+    
+    private func mapScheduleToBackend(_ template: SystemDomain.ScheduleTemplate) -> BackendScheduleTemplate {
+        let departureTime = String(format: "%02d:%02d:00", template.hour, template.minute)
+        let weekday = weekdayName(for: template.weekdays.sorted().first ?? 2)
+        return BackendScheduleTemplate(
+            id: template.id,
+            householdId: template.householdId,
+            childId: template.childId,
+            title: template.name,
+            weekday: weekday,
+            departureTime: departureTime,
+            createdAt: nil
+        )
+    }
+
+    private func weekdayName(for value: Int) -> String {
+        switch value {
+        case 1: return "sunday"
+        case 2: return "monday"
+        case 3: return "tuesday"
+        case 4: return "wednesday"
+        case 5: return "thursday"
+        case 6: return "friday"
+        case 7: return "saturday"
+        default: return "monday"
+        }
+    }
+    
     private func resolveQueuedChanges(_ changes: [SyncChange]) async throws -> [ResolvedSyncChange] {
         guard
             let runRepository,
@@ -399,6 +701,14 @@ final class SyncCoordinator: ObservableObject {
         for change in changes {
             switch change.entityType {
             case .run:
+                if runsByHousehold[change.householdId] == nil {
+                    runsByHousehold[change.householdId] = try await runRepository.loadRuns(for: change.householdId)
+                }
+                let run = runsByHousehold[change.householdId]?.first(where: { $0.id == change.entityId })
+                resolved.append(
+                    ResolvedSyncChange(change: change, run: run, schedule: nil, driver: nil, household: nil)
+                )
+            case .runAssignment:
                 if runsByHousehold[change.householdId] == nil {
                     runsByHousehold[change.householdId] = try await runRepository.loadRuns(for: change.householdId)
                 }
@@ -450,6 +760,14 @@ final class SyncCoordinator: ObservableObject {
         let fileURL = directory.appendingPathComponent(fileName, isDirectory: false)
         let garbage = Data("THIS_IS_CORRUPTED_JSON".utf8)
         try garbage.write(to: fileURL, options: .atomic)
+    }
+    
+    private func syncPublishedStatus() {
+        isSyncing = status.state == .syncing
+        if let statusError = status.lastError, !statusError.isEmpty {
+            lastError = statusError
+        }
+        pendingCount = max(status.pendingCount, queueStore.pendingOperations().count)
     }
 }
 

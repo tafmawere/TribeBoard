@@ -47,7 +47,7 @@ struct LoadingSkeletonView: View {
     }
 }
 
-private struct ShimmerEffect: ViewModifier {
+struct ShimmerEffect: ViewModifier {
     let isAnimating: Bool
     @State private var phase: CGFloat = -0.8
 

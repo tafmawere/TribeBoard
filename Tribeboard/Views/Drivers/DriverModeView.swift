@@ -300,7 +300,7 @@ struct DriverModeView: View {
 
     private func statusText(_ status: SystemDomain.RunStatus) -> String {
         switch status {
-        case .scheduled:
+        case .scheduled, .assigned:
             return "Scheduled"
         case .inProgress:
             return "In Progress"
@@ -313,7 +313,7 @@ struct DriverModeView: View {
 
     private func badgeStyle(for status: SystemDomain.RunStatus) -> BadgeStyle {
         switch status {
-        case .scheduled:
+        case .scheduled, .assigned:
             return .scheduled
         case .inProgress:
             return .enRoute

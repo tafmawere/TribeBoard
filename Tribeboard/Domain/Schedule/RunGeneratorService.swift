@@ -44,11 +44,13 @@ final class RunGeneratorService {
                         templateId: template.id,
                         title: template.name,
                         date: runDate,
-                        status: .scheduled,
+                        departureTime: RunScheduleSnapshot.departureTime(from: template),
+                        status: template.driverId == nil ? .scheduled : .assigned,
                         stops: template.stops.sorted { $0.order < $1.order }.map {
                             SystemDomain.RunStopProgress(stopId: $0.id, status: .pending, arrivedAt: nil, departedAt: nil)
                         },
                         stopSnapshots: template.stops,
+                        assignedDriverId: template.driverId,
                         driverId: template.driverId,
                         childId: template.childId,
                         createdAt: Date()

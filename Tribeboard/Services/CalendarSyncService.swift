@@ -60,13 +60,18 @@ final class CalendarSyncService {
 
     func requestCalendarAccess() async -> Bool {
         if #available(iOS 17.0, *) {
-            return await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
-                eventStore.requestFullAccessToEvents { accessGranted, _ in
-                    continuation.resume(returning: accessGranted)
-                }
+            do {
+                return try await eventStore.requestFullAccessToEvents()
+            } catch {
+                return false
             }
         }
-        return await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
+        return await requestCalendarAccessLegacy()
+    }
+
+    @available(iOS, introduced: 13.0, deprecated: 17.0)
+    private func requestCalendarAccessLegacy() async -> Bool {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
             eventStore.requestAccess(to: .event) { accessGranted, _ in
                 continuation.resume(returning: accessGranted)
             }

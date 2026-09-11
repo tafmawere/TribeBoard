@@ -1,31 +1,39 @@
+import Combine
 import CoreLocation
 import Foundation
-import MapKit
-import Combine
+import GooglePlaces
 
 final class HomeLocationViewModel: NSObject, ObservableObject {
     @Published var addressQuery: String = ""
-    @Published var suggestions: [MKLocalSearchCompletion] = []
+    @Published var suggestions: [LocationSearchResult] = []
     @Published var selectedTitle: String = ""
     @Published var selectedSubtitle: String = ""
     @Published var selectedLatitude: Double?
     @Published var selectedLongitude: Double?
-    @Published var mapRegion: MKCoordinateRegion
+    @Published var mapRegion: CoordinateRegionDegrees
     @Published var isResolvingCurrentLocation = false
 
-    private let completer = MKLocalSearchCompleter()
+    private var fetcher: GMSAutocompleteFetcher?
     private let locationManager = CLLocationManager()
     private let geocoder = CLGeocoder()
 
     override init() {
-        self.mapRegion = MKCoordinateRegion(
+        self.mapRegion = CoordinateRegionDegrees(
             center: CLLocationCoordinate2D(latitude: -17.8252, longitude: 31.0335),
-            span: MKCoordinateSpan(latitudeDelta: 0.03, longitudeDelta: 0.03)
+            latitudeDelta: 0.03,
+            longitudeDelta: 0.03
         )
         super.init()
-        completer.delegate = self
-        completer.resultTypes = [.address]
+        rebuildFetcher()
         locationManager.delegate = self
+    }
+
+    private func rebuildFetcher() {
+        let filter = GMSAutocompleteFilter()
+        filter.types = ["address"]
+        let newFetcher = GMSAutocompleteFetcher(filter: filter)
+        newFetcher.delegate = self
+        fetcher = newFetcher
     }
 
     func setInitialAddress(_ value: String) {
@@ -36,35 +44,35 @@ final class HomeLocationViewModel: NSObject, ObservableObject {
 
     func updateQuery(_ query: String) {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        addressQuery = query
         if trimmed.count < 2 {
             suggestions = []
+            fetcher?.sourceTextHasChanged("")
             return
         }
-        completer.queryFragment = trimmed
+        fetcher?.sourceTextHasChanged(trimmed)
     }
 
-    func selectSuggestion(_ completion: MKLocalSearchCompletion) {
-        let request = MKLocalSearch.Request(completion: completion)
-        let search = MKLocalSearch(request: request)
-        search.start { [weak self] response, _ in
-            guard let self else { return }
-            guard let mapItem = response?.mapItems.first else { return }
-
-            let coordinate = mapItem.placemark.coordinate
-            let title = mapItem.name ?? completion.title
-            let subtitle = completion.subtitle
-            let fullAddress = subtitle.isEmpty ? title : "\(title), \(subtitle)"
+    func selectSuggestion(_ result: LocationSearchResult) {
+        guard let placeId = result.placeId else { return }
+        GMSPlacesClient.shared().fetchPlace(fromPlaceID: placeId, placeFields: [.name, .formattedAddress, .coordinate], sessionToken: nil) { [weak self] place, _ in
+            guard let self, let place else { return }
+            let coordinate = place.coordinate
+            let title = (place.name ?? result.title).trimmingCharacters(in: .whitespacesAndNewlines)
+            let subtitle = result.subtitle
+            let fullAddress = (place.formattedAddress ?? result.fullAddress).trimmingCharacters(in: .whitespacesAndNewlines)
 
             DispatchQueue.main.async {
                 self.selectedTitle = title
                 self.selectedSubtitle = subtitle
                 self.selectedLatitude = coordinate.latitude
                 self.selectedLongitude = coordinate.longitude
-                self.addressQuery = fullAddress
+                self.addressQuery = fullAddress.isEmpty ? "\(title), \(subtitle)" : fullAddress
                 self.suggestions = []
-                self.mapRegion = MKCoordinateRegion(
+                self.mapRegion = CoordinateRegionDegrees(
                     center: coordinate,
-                    span: MKCoordinateSpan(latitudeDelta: 0.012, longitudeDelta: 0.012)
+                    latitudeDelta: 0.012,
+                    longitudeDelta: 0.012
                 )
             }
         }
@@ -101,9 +109,10 @@ final class HomeLocationViewModel: NSObject, ObservableObject {
                 self.selectedLongitude = location.coordinate.longitude
                 self.addressQuery = fullAddress
                 self.suggestions = []
-                self.mapRegion = MKCoordinateRegion(
+                self.mapRegion = CoordinateRegionDegrees(
                     center: location.coordinate,
-                    span: MKCoordinateSpan(latitudeDelta: 0.012, longitudeDelta: 0.012)
+                    latitudeDelta: 0.012,
+                    longitudeDelta: 0.012
                 )
             }
         }
@@ -121,14 +130,24 @@ final class HomeLocationViewModel: NSObject, ObservableObject {
     }
 }
 
-extension HomeLocationViewModel: MKLocalSearchCompleterDelegate {
-    func completerDidUpdateResults(_ completer: MKLocalSearchCompleter) {
+extension HomeLocationViewModel: GMSAutocompleteFetcherDelegate {
+    func didAutocomplete(with predictions: [GMSAutocompletePrediction]) {
         DispatchQueue.main.async {
-            self.suggestions = Array(completer.results.prefix(6))
+            self.suggestions = predictions.prefix(6).map { prediction in
+                let title = prediction.attributedPrimaryText.string.trimmingCharacters(in: .whitespacesAndNewlines)
+                let subtitle = prediction.attributedSecondaryText?.string.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                let fullAddress = subtitle.isEmpty ? title : "\(title), \(subtitle)"
+                return LocationSearchResult(
+                    title: title,
+                    subtitle: subtitle,
+                    fullAddress: fullAddress,
+                    placeId: prediction.placeID
+                )
+            }
         }
     }
 
-    func completer(_ completer: MKLocalSearchCompleter, didFailWithError error: any Error) {
+    func didFailAutocompleteWithError(_ error: Error) {
         DispatchQueue.main.async {
             self.suggestions = []
         }
@@ -156,7 +175,7 @@ extension HomeLocationViewModel: CLLocationManagerDelegate {
         applyCurrentLocation(location)
     }
 
-    func locationManager(_ manager: CLLocationManager, didFailWithError error: any Error) {
+    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
         DispatchQueue.main.async {
             self.isResolvingCurrentLocation = false
         }

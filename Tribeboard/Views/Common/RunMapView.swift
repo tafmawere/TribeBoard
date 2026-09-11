@@ -1,10 +1,9 @@
+import GoogleMaps
 import SwiftUI
-import MapKit
+import UIKit
 
 struct RunMapView: View, Equatable {
     let model: RunMapModel
-
-    @State private var cameraPosition: MapCameraPosition = .automatic
 
     static func == (lhs: RunMapView, rhs: RunMapView) -> Bool {
         lhs.model == rhs.model
@@ -13,30 +12,18 @@ struct RunMapView: View, Equatable {
     var body: some View {
         Group {
             if let region = model.region {
-                Map(position: $cameraPosition) {
-                    ForEach(model.points) { point in
-                        Annotation(point.name, coordinate: point.coordinate) {
-                            Image(systemName: symbol(for: point.kind))
-                                .font(.system(size: 12, weight: .bold))
-                                .foregroundStyle(.white)
-                                .padding(8)
-                                .background(color(for: point.kind))
-                                .clipShape(Circle())
-                                .overlay {
-                                    Circle().stroke(Color.white.opacity(0.9), lineWidth: 1.5)
-                                }
-                        }
-                    }
-                }
-                .mapStyle(.standard(elevation: .flat))
-                .onAppear {
-                    cameraPosition = .region(region)
-                }
-                .onChange(of: model) { _, newValue in
-                    if let newRegion = newValue.region {
-                        updateCameraIfSignificant(to: newRegion)
-                    }
-                }
+                TribeGoogleMapView(
+                    markers: model.points.map(Self.googleMarker(from:)),
+                    polylineCoordinates: [],
+                    strokeUIColor: .clear,
+                    lineWidth: 0,
+                    cameraHint: region,
+                    externalCamera: nil,
+                    showsUserLocation: false,
+                    padding: .init(top: 28, left: 24, bottom: 28, right: 24),
+                    onMarkerIdTap: nil
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             } else {
                 mapUnavailablePlaceholder
             }
@@ -57,49 +44,28 @@ struct RunMapView: View, Equatable {
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
-    private func symbol(for kind: RunMapPointKind) -> String {
-        switch kind {
+    private static func googleMarker(from point: RunMapPoint) -> GoogleMapMarkerModel {
+        let kind: GoogleMapMarkerModel.Kind
+        switch point.kind {
         case .driver:
-            return "car.fill"
+            kind = .driver
         case .stopActive:
-            return "mappin.and.ellipse"
+            kind = .stopActive
         case .stopPending:
-            return "circle.fill"
+            kind = .stopPending
         case .stopCompleted:
-            return "checkmark"
+            kind = .stopCompleted
         case .stopSkipped:
-            return "forward.fill"
+            kind = .stopSkipped
         }
-    }
-
-    private func color(for kind: RunMapPointKind) -> Color {
-        switch kind {
-        case .driver:
-            return Color.blue
-        case .stopActive:
-            return Color.orange
-        case .stopPending:
-            return Color.gray
-        case .stopCompleted:
-            return Color.green
-        case .stopSkipped:
-            return Color.gray.opacity(0.65)
-        }
-    }
-
-    private func updateCameraIfSignificant(to region: MKCoordinateRegion) {
-        if let current = cameraPosition.region {
-            let from = CLLocation(latitude: current.center.latitude, longitude: current.center.longitude)
-            let to = CLLocation(latitude: region.center.latitude, longitude: region.center.longitude)
-            let centerDelta = to.distance(from: from)
-            let spanDelta = abs(current.span.latitudeDelta - region.span.latitudeDelta)
-                + abs(current.span.longitudeDelta - region.span.longitudeDelta)
-            if centerDelta >= 15 || spanDelta >= 0.001 {
-                cameraPosition = .region(region)
-            }
-        } else {
-            cameraPosition = .region(region)
-        }
+        return GoogleMapMarkerModel(
+            id: point.id,
+            title: point.name,
+            coordinate: point.coordinate,
+            kind: kind,
+            orderLabel: nil,
+            isSelected: false
+        )
     }
 }
 

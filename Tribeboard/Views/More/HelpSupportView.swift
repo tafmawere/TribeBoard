@@ -134,26 +134,13 @@ struct HelpSupportView: View {
     private var privacyAndSafetyCard: some View {
         supportCard(title: "Privacy & Safety", icon: "lock.shield.fill") {
             VStack(spacing: 8) {
-                Button {
-                    guard let url = URL(string: ExternalLinks.privacyPolicy) else { return }
-                    openURL(url)
+                NavigationLink {
+                    LegalSafetyView()
                 } label: {
                     actionRow(
-                        title: "Privacy Policy",
-                        subtitle: "How we handle your data",
-                        icon: "hand.raised.fill"
-                    )
-                }
-                .buttonStyle(.plain)
-
-                Button {
-                    guard let url = URL(string: ExternalLinks.termsOfService) else { return }
-                    openURL(url)
-                } label: {
-                    actionRow(
-                        title: "Terms of Service",
-                        subtitle: "Usage terms and responsibilities",
-                        icon: "doc.text.fill"
+                        title: "Legal & Safety",
+                        subtitle: "Policies, safety reporting, and account requests",
+                        icon: "doc.text.magnifyingglass"
                     )
                 }
                 .buttonStyle(.plain)

@@ -16,14 +16,14 @@ final class DriverDataSource: ObservableObject {
     private let repositoryTypeName: String
 
     init(
-        repository: any DriverRepository = LocalDriverRepository(),
+        repository: (any DriverRepository)? = nil,
         householdContext: ActiveHouseholdContext? = nil,
         syncCoordinator: SyncCoordinator? = nil
     ) {
-        self.repository = repository
+        self.repository = repository ?? LocalDriverRepository()
         self.householdContext = householdContext ?? ActiveHouseholdContext()
         self.syncCoordinator = syncCoordinator
-        self.repositoryTypeName = String(describing: type(of: repository))
+        self.repositoryTypeName = String(describing: type(of: self.repository))
     }
 
     func refresh() async {
@@ -48,11 +48,6 @@ final class DriverDataSource: ObservableObject {
     }
 
     func bootstrapIfNeeded() async {
-#if DEBUG
-        if AppConfig.isDemoFlowEnabled {
-            await seedDemoDrivers()
-        }
-#endif
         await refresh()
     }
 

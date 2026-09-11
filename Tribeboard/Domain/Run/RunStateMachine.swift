@@ -3,11 +3,13 @@ import Foundation
 struct RunStateMachine {
     func start(_ run: SystemDomain.RunInstance, now: Date) throws -> SystemDomain.RunInstance {
         try throwIfTerminal(run)
-        guard run.status == .scheduled else { throw RunTransitionError.invalidTransition }
+        guard run.status == .scheduled || run.status == .assigned else {
+            throw RunTransitionError.invalidTransition
+        }
 
         var updated = run
         updated.status = .inProgress
-        updated.startedAt = updated.startedAt ?? now
+        updated.startedAt = now
 
         if updated.stops.isEmpty {
             updated.activeStopIndex = nil
@@ -32,9 +34,7 @@ struct RunStateMachine {
 
         var updated = run
         updated.stops[stopIndex].status = .arrived
-        if updated.stops[stopIndex].arrivedAt == nil {
-            updated.stops[stopIndex].arrivedAt = now
-        }
+        updated.stops[stopIndex].arrivedAt = now
         return updated
     }
 
@@ -50,10 +50,19 @@ struct RunStateMachine {
         guard run.stops[stopIndex].status == .arrived else {
             throw RunTransitionError.invalidTransition
         }
+        guard run.stops[stopIndex].arrivedAt != nil else {
+            throw RunTransitionError.invalidTransition
+        }
 
         var updated = run
         updated.stops[stopIndex].status = .completed
         updated.stops[stopIndex].departedAt = now
+        guard RunStopLifecycle.canMarkCompleted(
+            arrivedAt: updated.stops[stopIndex].arrivedAt,
+            departedAt: updated.stops[stopIndex].departedAt
+        ) else {
+            throw RunTransitionError.invalidTransition
+        }
         advanceActiveStop(on: &updated)
         return updated
     }
@@ -92,7 +101,7 @@ struct RunStateMachine {
 
     func cancel(_ run: SystemDomain.RunInstance, now: Date) throws -> SystemDomain.RunInstance {
         try throwIfTerminal(run)
-        guard run.status == .scheduled || run.status == .inProgress else {
+        guard run.status == .scheduled || run.status == .assigned || run.status == .inProgress else {
             throw RunTransitionError.invalidTransition
         }
 

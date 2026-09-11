@@ -23,9 +23,116 @@ struct ChildConfigurationSummary {
     }
 }
 
+struct FamilySummary: Equatable {
+    var totalMembers: Int
+    var totalChildren: Int
+    var totalDrivers: Int
+    var totalObservers: Int
+
+    static let empty = FamilySummary(
+        totalMembers: 0,
+        totalChildren: 0,
+        totalDrivers: 0,
+        totalObservers: 0
+    )
+
+    static func calculate(
+        activeMemberships: [BackendHouseholdMembership],
+        householdPeople: [BackendHouseholdPerson],
+        children: [BackendChild]
+    ) -> FamilySummary {
+        var driverIds = Set<UUID>()
+        var observerIds = Set<UUID>()
+
+        for membership in activeMemberships {
+            if membershipCountsAsDriver(membership) {
+                driverIds.insert(membership.id)
+            }
+            if membership.normalizedAccessRole == .observer {
+                observerIds.insert(membership.id)
+            }
+        }
+
+        for person in householdPeople {
+            if personCountsAsDriver(person) {
+                driverIds.insert(person.id)
+            }
+            if personCountsAsObserver(person) {
+                observerIds.insert(person.id)
+            }
+        }
+
+        return FamilySummary(
+            totalMembers: activeMemberships.count + householdPeople.count,
+            totalChildren: children.count,
+            totalDrivers: driverIds.count,
+            totalObservers: observerIds.count
+        )
+    }
+
+    private static func membershipCountsAsDriver(_ membership: BackendHouseholdMembership) -> Bool {
+        if membership.normalizedAccessRole == .driver { return true }
+        return [
+            membership.role,
+            membership.accessRole,
+            membership.familyRole,
+            membership.relationshipLabel
+        ]
+        .compactMap { $0?.lowercased() }
+        .contains { $0.contains("driver") }
+    }
+
+    private static func personCountsAsDriver(_ person: BackendHouseholdPerson) -> Bool {
+        if person.isDriver { return true }
+        return [
+            person.role,
+            person.relationship,
+            person.name
+        ]
+        .compactMap { $0?.lowercased() }
+        .contains { $0.contains("driver") }
+    }
+
+    private static func personCountsAsObserver(_ person: BackendHouseholdPerson) -> Bool {
+        let values = [
+            person.role,
+            person.relationship
+        ]
+        .compactMap { $0?.lowercased() }
+        return values.contains { value in
+            value.contains("observer") ||
+            value.contains("helper") ||
+            value.contains("relative") ||
+            value.contains("support")
+        }
+    }
+}
+
+@MainActor
+final class FamilyStore: ObservableObject {
+    @Published private(set) var summary: FamilySummary = .empty
+
+    func updateSummary(
+        activeMemberships: [BackendHouseholdMembership],
+        householdPeople: [BackendHouseholdPerson],
+        children: [BackendChild]
+    ) {
+        summary = FamilySummary.calculate(
+            activeMemberships: activeMemberships,
+            householdPeople: householdPeople,
+            children: children
+        )
+    }
+
+    func clearSummary() {
+        summary = .empty
+    }
+}
+
 @MainActor
 final class TribeStore: ObservableObject {
     nonisolated let objectWillChange = ObservableObjectPublisher()
+    let familyStore = FamilyStore()
 
     var tribe: Tribe? {
         willSet { objectWillChange.send() }
@@ -59,6 +166,10 @@ final class TribeStore: ObservableObject {
         willSet { objectWillChange.send() }
     }
 
+    var familySummary: FamilySummary {
+        familyStore.summary
+    }
+
     private var snoozedSuggestionUntil: [UUID: Date] = [:]
     private var dismissedSuggestionIDs: Set<UUID> = []
 
@@ -81,6 +192,15 @@ final class TribeStore: ObservableObject {
         syncTribeMemberIds()
     }
 
+    func upsertMember(_ member: TribeMember) {
+        if let index = members.firstIndex(where: { $0.id == member.id }) {
+            members[index] = member
+        } else {
+            members.append(member)
+        }
+        syncTribeMemberIds()
+    }
+
     func updateMember(_ member: TribeMember) {
         guard let index = members.firstIndex(where: { $0.id == member.id }) else { return }
         members[index] = member
@@ -92,6 +212,56 @@ final class TribeStore: ObservableObject {
         syncTribeMemberIds()
     }
 
+    func updateFamilySummary(
+        activeMemberships: [BackendHouseholdMembership],
+        householdPeople: [BackendHouseholdPerson],
+        children: [BackendChild]
+    ) {
+        objectWillChange.send()
+        familyStore.updateSummary(
+            activeMemberships: activeMemberships,
+            householdPeople: householdPeople,
+            children: children
+        )
+    }
+
+    func clearFamilySummary() {
+        objectWillChange.send()
+        familyStore.clearSummary()
+    }
+
+    func upsertChildrenFromBackend(_ backendChildren: [TribeMember]) {
+        let normalized = backendChildren.filter { $0.memberType == .child }
+        guard !normalized.isEmpty else { return }
+        for child in normalized {
+            if let index = members.firstIndex(where: { $0.id == child.id }) {
+                members[index] = child
+            } else {
+                members.append(child)
+            }
+        }
+        syncTribeMemberIds()
+    }
+
+    func replaceChildActivities(childId: UUID, activities: [ChildActivity]) {
+        guard let index = members.firstIndex(where: { $0.id == childId && $0.memberType == .child }) else { return }
+        members[index].activities = activities
+    }
+
+    func upsertChildActivity(childId: UUID, activity: ChildActivity) {
+        guard let index = members.firstIndex(where: { $0.id == childId && $0.memberType == .child }) else { return }
+        if let existing = members[index].activities.firstIndex(where: { $0.id == activity.id }) {
+            members[index].activities[existing] = activity
+        } else {
+            members[index].activities.append(activity)
+        }
+    }
+
+    func removeChildActivity(childId: UUID, activityId: UUID) {
+        guard let index = members.firstIndex(where: { $0.id == childId && $0.memberType == .child }) else { return }
+        members[index].activities.removeAll { $0.id == activityId }
+    }
+
     @discardableResult
     func createChildWithSchoolAndDefaultSchedules(
         childName: String,
@@ -99,32 +269,57 @@ final class TribeStore: ObservableObject {
         avatarSymbol: AvatarSymbol? = nil,
         avatarURL: String? = nil,
         avatarSeed: String? = nil,
-        schoolName: String,
-        schoolAddress: String,
+        displayName: String? = nil,
+        dateOfBirth: Date? = nil,
+        schoolName: String? = nil,
+        schoolAddress: String? = nil,
+        gradeOrClass: String? = nil,
+        schoolLatitude: Double? = nil,
+        schoolLongitude: Double? = nil,
+        schoolStartTime: DateComponents? = nil,
+        schoolEndTime: DateComponents? = nil,
+        schoolDays: Set<Weekday>? = nil,
         dropoffTime: DateComponents,
         pickupTime: DateComponents,
         weekdays: Set<Int>,
         allowedDriverIds: [UUID],
-        trackerMemberIds: [UUID]
-    ) -> ChildProfile {
+        trackerMemberIds: [UUID],
+        childId: UUID? = nil
+    ) -> ChildProfile? {
         let newChild = TribeMember(
+            id: childId ?? UUID(),
             fullName: childName.trimmingCharacters(in: .whitespacesAndNewlines),
             avatarURL: avatarURL,
             avatarSeed: avatarSeed,
             avatarImageName: avatarImageName,
             avatarSymbol: avatarSymbol ?? AvatarSymbol.fromLegacyImageName(avatarImageName),
             memberType: .child,
+            dateOfBirth: dateOfBirth,
+            displayName: displayName,
+            schoolName: schoolName,
+            schoolAddress: schoolAddress,
+            gradeOrClass: gradeOrClass,
+            schoolStartTime: schoolStartTime,
+            schoolEndTime: schoolEndTime,
+            schoolDays: schoolDays,
             roles: [.child, .passenger]
         )
         addMember(newChild)
 
+        let normalizedSchoolName = schoolName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let normalizedSchoolAddress = schoolAddress?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard !normalizedSchoolName.isEmpty, !normalizedSchoolAddress.isEmpty else {
+            return nil
+        }
+
         let school = TribeLocation(
-            name: schoolName.trimmingCharacters(in: .whitespacesAndNewlines),
-            address: schoolAddress.trimmingCharacters(in: .whitespacesAndNewlines),
+            name: normalizedSchoolName,
+            address: normalizedSchoolAddress,
             type: .school,
             tribeId: tribe?.id,
             childId: newChild.id,
-            linkedChildIds: [newChild.id]
+            linkedChildIds: [newChild.id],
+            notes: schoolCoordinateNote(latitude: schoolLatitude, longitude: schoolLongitude)
         )
         addOrUpdateLocation(school)
 
@@ -286,6 +481,42 @@ final class TribeStore: ObservableObject {
         return templateVenueIDs.count
     }
 
+    func schoolName(for childId: UUID) -> String? {
+        if let child = members.first(where: { $0.id == childId }),
+           let direct = child.schoolName?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !direct.isEmpty {
+            return direct
+        }
+
+        if let profile = childProfiles.first(where: { $0.memberId == childId }),
+           let location = locations.first(where: { $0.id == profile.primarySchoolLocationId }) {
+            let trimmed = location.name.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.isEmpty ? nil : trimmed
+        }
+
+        if let linked = locations.first(where: {
+            $0.type == .school && ($0.childId == childId || $0.linkedChildIds.contains(childId))
+        }) {
+            let trimmed = linked.name.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.isEmpty ? nil : trimmed
+        }
+        return nil
+    }
+
+    func childrenMissingSchoolCount() -> Int {
+        members
+            .filter { $0.memberType == .child }
+            .filter { schoolName(for: $0.id) == nil }
+            .count
+    }
+
+    func childrenMissingSchoolRoutineCount() -> Int {
+        members
+            .filter { $0.memberType == .child }
+            .filter { $0.hasSchoolConfigured && !$0.hasSchoolRoutineConfigured }
+            .count
+    }
+
     func ruleCount(for childId: UUID) -> Int {
         let templates = childTemplates(for: childId)
         let ruleIDs = Set(templates.compactMap(\.venueRuleId))
@@ -378,6 +609,7 @@ final class TribeStore: ObservableObject {
         return members
             .filter { member in
                 member.fullName.lowercased().contains(query) ||
+                member.preferredDisplayName.lowercased().contains(query) ||
                 member.roles.contains(where: { $0.rawValue.lowercased().contains(query) })
             }
             .sorted { $0.fullName < $1.fullName }
@@ -413,6 +645,7 @@ final class TribeStore: ObservableObject {
                 fullName: "TJ",
                 memberType: .child,
                 dateOfBirth: Calendar.current.date(byAdding: .year, value: -10, to: Date()),
+                schoolName: "Lincoln Elementary",
                 roles: [.child, .passenger, .observer],
                 isLocationSharingEnabled: true,
                 isOnline: false
@@ -421,6 +654,7 @@ final class TribeStore: ObservableObject {
                 fullName: "Tawana",
                 memberType: .child,
                 dateOfBirth: Calendar.current.date(byAdding: .year, value: -8, to: Date()),
+                schoolName: "Lincoln Elementary",
                 roles: [.child, .passenger, .observer],
                 isLocationSharingEnabled: true,
                 isOnline: false
@@ -549,5 +783,10 @@ final class TribeStore: ObservableObject {
             return candidate
         }
         return nil
+    }
+
+    private func schoolCoordinateNote(latitude: Double?, longitude: Double?) -> String? {
+        guard let latitude, let longitude else { return nil }
+        return "lat=\(latitude),lon=\(longitude)"
     }
 }

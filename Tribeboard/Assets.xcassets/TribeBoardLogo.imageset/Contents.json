@@ -1,19 +1,8 @@
 {
   "images" : [
     {
-      "filename" : "TribeBoard copy 2.png",
-      "idiom" : "universal",
-      "scale" : "1x"
-    },
-    {
-      "filename" : "TribeBoard copy.png",
-      "idiom" : "universal",
-      "scale" : "2x"
-    },
-    {
-      "filename" : "TribeBoard copy 1.png",
-      "idiom" : "universal",
-      "scale" : "3x"
+      "filename" : "tribeboard-color-1024.png",
+      "idiom" : "universal"
     }
   ],
   "info" : {

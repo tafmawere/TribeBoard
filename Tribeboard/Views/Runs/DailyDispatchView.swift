@@ -7,6 +7,7 @@ struct DailyDispatchView: View {
 
     @EnvironmentObject private var runDataSource: RunDataSource
     @EnvironmentObject private var driverDataSource: DriverDataSource
+    @EnvironmentObject private var backendHouseholdContext: BackendHouseholdContext
     @EnvironmentObject private var locationService: LocationReadinessService
     @EnvironmentObject private var notificationService: NotificationService
     @StateObject private var etaSmoothingService = ETASmoothingService()
@@ -15,6 +16,18 @@ struct DailyDispatchView: View {
     @State private var selectedRunForDriverPicker: SelectedRun?
 
     let onOpenRunDetails: (UIRun) -> Void
+    let onCreateRun: (() -> Void)?
+    let onOpenCalendar: (() -> Void)?
+
+    init(
+        onOpenRunDetails: @escaping (UIRun) -> Void,
+        onCreateRun: (() -> Void)? = nil,
+        onOpenCalendar: (() -> Void)? = nil
+    ) {
+        self.onOpenRunDetails = onOpenRunDetails
+        self.onCreateRun = onCreateRun
+        self.onOpenCalendar = onOpenCalendar
+    }
 
     private var buckets: DispatchBuckets {
         runDataSource.dispatchBuckets(for: selectedDate)
@@ -50,26 +63,49 @@ struct DailyDispatchView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                header
-                notificationHint
+            VStack(alignment: .leading, spacing: 16) {
+                dispatchBoardIntro
+                compactNotificationBanner
                 attentionStrip
-                sectionHeader("Summary Metrics")
-                summaryStrip
+                dispatchMetricsRow
+
+                if backendHouseholdContext.hasActiveMembership, !backendHouseholdContext.canManageMembers {
+                    UICard {
+                        Text(
+                            backendHouseholdContext.isCurrentUserDriver
+                                ? "Drivers can start runs but cannot manage members."
+                                : "Observers have view-only access."
+                        )
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(UIRunDesignSystem.textSecondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
 
                 if summary.total == 0 {
-                    emptyState
+                    dispatchEmptyState
                 } else {
-                    section(title: "Unassigned Runs", runs: buckets.unassigned)
-                    section(title: "Assigned Runs", runs: buckets.assigned)
-                    section(title: "In Progress", runs: buckets.inProgress)
+                    section(title: "Unassigned runs", runs: buckets.unassigned)
+                    section(title: "Assigned runs", runs: buckets.assigned)
+                    section(title: "In progress", runs: buckets.inProgress)
                     section(title: "Completed", runs: buckets.completed)
                     section(title: "Cancelled", runs: buckets.cancelled)
                 }
             }
-            .padding(16)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
         }
-        .background(UIRunDesignSystem.background.ignoresSafeArea())
+        .background(
+            LinearGradient(
+                colors: [
+                    UIRunDesignSystem.background,
+                    UIRunDesignSystem.background.opacity(0.92)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+        )
         .task {
             await runDataSource.refresh()
             await driverDataSource.bootstrapIfNeeded()
@@ -77,53 +113,100 @@ struct DailyDispatchView: View {
         }
         .sheet(item: $selectedRunForDriverPicker) { runId in
             NavigationStack {
-                DriverPickerView(runId: runId.id)
+                DriverPickerView(
+                    runId: runId.id,
+                    runHouseholdId: runDataSource.run(withId: runId.id.uuidString)?.householdId
+                )
             }
         }
     }
 
-    private var header: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("Dispatch")
-                .font(.system(size: 28, weight: .bold))
+    private var dispatchBoardIntro: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(formattedBoardDate(selectedDate))
+                .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(UIRunDesignSystem.textPrimary)
-            Text(formattedDate(selectedDate))
-                .font(.system(size: 14, weight: .medium))
+            Text("Assign drivers and monitor today’s runs.")
+                .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(UIRunDesignSystem.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
-    }
-
-    private var summaryStrip: some View {
-        HStack(spacing: 8) {
-            summaryPill(title: "Total", value: summary.total, style: .neutral)
-            summaryPill(title: "Unassigned", value: summary.unassigned, style: .warning)
-            summaryPill(title: "In Progress", value: summary.inProgress, style: .enRoute)
-            summaryPill(title: "Completed", value: summary.completed, style: .completed)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color(uiColor: .secondarySystemGroupedBackground))
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(UIRunDesignSystem.primary.opacity(0.12), lineWidth: 1)
         }
     }
 
     @ViewBuilder
-    private var notificationHint: some View {
+    private var compactNotificationBanner: some View {
         if showNotificationHint {
-            UICard {
-                HStack(spacing: 8) {
-                    Text("Enable notifications for run reminders")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(UIRunDesignSystem.textSecondary)
-                    Spacer()
-                    Button("Enable") {
-                        Task {
-                            let granted = await notificationService.requestAuthorization()
-                            if granted {
-                                await runDataSource.reconcileNotifications(notificationService: notificationService)
-                            }
+            HStack(spacing: 10) {
+                Image(systemName: "bell.badge")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(UIRunDesignSystem.primary)
+                Text("Enable run reminders")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(UIRunDesignSystem.textPrimary)
+                    .lineLimit(1)
+                Spacer(minLength: 8)
+                Button("Enable") {
+                    Task {
+                        let granted = await notificationService.requestAuthorization()
+                        if granted {
+                            await runDataSource.reconcileNotifications(notificationService: notificationService)
                         }
                     }
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(UIRunDesignSystem.primary)
-                    .buttonStyle(.plain)
                 }
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(UIRunDesignSystem.primary)
+                .buttonStyle(.plain)
             }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(UIRunDesignSystem.primary.opacity(0.08))
+            )
+        }
+    }
+
+    private var dispatchMetricsRow: some View {
+        HStack(spacing: 8) {
+            metricStatusCard(title: "Total", value: summary.total, accent: Color.indigo)
+            metricStatusCard(title: "Unassigned", value: summary.unassigned, accent: Color.orange)
+            metricStatusCard(title: "In progress", value: summary.inProgress, accent: Color.blue)
+            metricStatusCard(title: "Completed", value: summary.completed, accent: Color.green)
+        }
+    }
+
+    private func metricStatusCard(title: String, value: Int, accent: Color) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("\(value)")
+                .font(.system(size: 20, weight: .bold, design: .rounded))
+                .foregroundStyle(UIRunDesignSystem.textPrimary)
+            Text(title)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(UIRunDesignSystem.textSecondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 11)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color(uiColor: .secondarySystemBackground))
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(accent.opacity(0.28), lineWidth: 1)
         }
     }
 
@@ -135,8 +218,8 @@ struct DailyDispatchView: View {
             UICard {
                 VStack(alignment: .leading, spacing: 10) {
                     HStack {
-                        Text("Attention")
-                            .font(.system(size: 16, weight: .bold))
+                        Text("Needs attention")
+                            .font(.system(size: 15, weight: .bold))
                             .foregroundStyle(UIRunDesignSystem.textPrimary)
                         Spacer()
                         let summary = runDataSource.attentionSummary(for: selectedDate)
@@ -179,37 +262,53 @@ struct DailyDispatchView: View {
         }
     }
 
-    private func summaryPill(title: String, value: Int, style: BadgeStyle) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("\(value)")
+    private var dispatchEmptyState: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("No runs scheduled today")
                 .font(.system(size: 18, weight: .bold))
                 .foregroundStyle(UIRunDesignSystem.textPrimary)
-            Text(title)
-                .font(.system(size: 12, weight: .semibold))
+            Text("Create a run or generate today’s runs from schedules.")
+                .font(.system(size: 14, weight: .medium))
                 .foregroundStyle(UIRunDesignSystem.textSecondary)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(10)
-        .background(Color.white)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(borderColor(for: style), lineWidth: 1)
-        }
-    }
+                .fixedSize(horizontal: false, vertical: true)
 
-    private var emptyState: some View {
-        UICard {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("No runs for this day")
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundStyle(UIRunDesignSystem.textPrimary)
-                Text("Generate runs from schedules or choose another date.")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(UIRunDesignSystem.textSecondary)
+            VStack(spacing: 10) {
+                if let onCreateRun {
+                    Button(action: onCreateRun) {
+                        Text("Create Run")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(UIRunDesignSystem.primary)
+                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                if let onOpenCalendar {
+                    Button(action: onOpenCalendar) {
+                        Text("Open Calendar")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(UIRunDesignSystem.textPrimary)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(Color(uiColor: .tertiarySystemBackground))
+                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.vertical, 8)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(Color(uiColor: .secondarySystemGroupedBackground))
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(Color.primary.opacity(0.06), lineWidth: 1)
         }
     }
 
@@ -218,7 +317,7 @@ struct DailyDispatchView: View {
         VStack(alignment: .leading, spacing: 10) {
             sectionHeader(title)
             if runs.isEmpty {
-                Text("No runs")
+                Text("No runs in this section.")
                     .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(UIRunDesignSystem.textSecondary)
             } else {
@@ -268,7 +367,7 @@ struct DailyDispatchView: View {
                 if run.status == .inProgress {
                     VStack(alignment: .leading, spacing: 4) {
                         if locationService.currentLocation != nil {
-                            Text("Driver Location")
+                            Text("Driver location")
                                 .font(.system(size: 12, weight: .semibold))
                                 .foregroundStyle(UIRunDesignSystem.textSecondary)
                             Text("• Tracking active")
@@ -281,7 +380,7 @@ struct DailyDispatchView: View {
                         }
 
                         if let proximity {
-                            Text("Next Stop")
+                            Text("Next stop")
                                 .font(.system(size: 12, weight: .semibold))
                                 .foregroundStyle(UIRunDesignSystem.textSecondary)
                             Text("\(proximity.stopName)")
@@ -291,7 +390,7 @@ struct DailyDispatchView: View {
                                 .font(.system(size: 12, weight: .medium))
                                 .foregroundStyle(UIRunDesignSystem.textPrimary)
                             if proximity.withinArrivalRadius {
-                                AppBadge(text: "Near Stop", style: .success)
+                                AppBadge(text: "Near stop", style: .success)
                             }
                         }
 
@@ -311,26 +410,27 @@ struct DailyDispatchView: View {
                         }
                     }
                     .padding(8)
-                    .background(Color.black.opacity(0.03))
+                    .background(Color(uiColor: .tertiarySystemBackground))
                     .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 }
 
                 HStack(spacing: 8) {
                     if !isTerminal {
-                        Button(run.assignedDriverId == nil ? "Assign Driver" : "Change Driver") {
+                        Button(run.assignedDriverId == nil ? "Assign driver" : "Change driver") {
                             selectedRunForDriverPicker = SelectedRun(id: run.id)
                         }
                         .buttonStyle(.borderedProminent)
                         .tint(UIRunDesignSystem.primary)
+                        .disabled(!backendHouseholdContext.isCurrentUserOrganiser)
                     }
 
-                    Button("Open Run") {
+                    Button("Open run") {
                         onOpenRunDetails(RunUIAdapter.mapToUIRun(run))
                     }
                     .buttonStyle(.bordered)
 
                     if run.status == .inProgress {
-                        Button("View Live") {
+                        Button("View live") {
                             onOpenRunDetails(RunUIAdapter.mapToUIRun(run))
                         }
                         .buttonStyle(.borderedProminent)
@@ -344,7 +444,7 @@ struct DailyDispatchView: View {
 
     private func runTitle(_ run: SystemDomain.RunInstance) -> String {
         let trimmed = run.title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        return trimmed.isEmpty ? "Scheduled Run" : trimmed
+        return trimmed.isEmpty ? "Scheduled run" : trimmed
     }
 
     private func driverName(for run: SystemDomain.RunInstance) -> String {
@@ -373,8 +473,8 @@ struct DailyDispatchView: View {
 
     private func statusText(_ status: SystemDomain.RunStatus) -> String {
         switch status {
-        case .scheduled: return "Scheduled"
-        case .inProgress: return "In Progress"
+        case .scheduled, .assigned: return "Scheduled"
+        case .inProgress: return "In progress"
         case .completed: return "Completed"
         case .cancelled: return "Cancelled"
         }
@@ -382,14 +482,14 @@ struct DailyDispatchView: View {
 
     private func badgeStyle(for status: SystemDomain.RunStatus) -> BadgeStyle {
         switch status {
-        case .scheduled: return .scheduled
+        case .scheduled, .assigned: return .scheduled
         case .inProgress: return .enRoute
         case .completed: return .completed
         case .cancelled: return .cancelled
         }
     }
 
-    private func formattedDate(_ date: Date) -> String {
+    private func formattedBoardDate(_ date: Date) -> String {
         let formatter = DateFormatter()
         formatter.dateFormat = "EEEE, d MMM yyyy"
         return formatter.string(from: date)
@@ -399,33 +499,6 @@ struct DailyDispatchView: View {
         let formatter = DateFormatter()
         formatter.dateFormat = "h:mm a"
         return formatter.string(from: date)
-    }
-
-    private func borderColor(for style: BadgeStyle) -> Color {
-        switch style {
-        case .scheduled:
-            return Color.purple.opacity(0.24)
-        case .pending:
-            return Color.gray.opacity(0.24)
-        case .enRoute:
-            return Color.blue.opacity(0.24)
-        case .completed:
-            return Color.green.opacity(0.24)
-        case .cancelled:
-            return Color.gray.opacity(0.22)
-        case .overdue:
-            return Color.red.opacity(0.24)
-        case .info:
-            return Color.indigo.opacity(0.2)
-        case .success:
-            return Color.green.opacity(0.2)
-        case .warning:
-            return Color.orange.opacity(0.2)
-        case .neutral:
-            return Color.gray.opacity(0.2)
-        case .live:
-            return Color.red.opacity(0.2)
-        }
     }
 
     private func icon(for severity: AttentionSeverity) -> String {
@@ -460,7 +533,7 @@ struct DailyDispatchView: View {
             flags.append(("Overdue", .overdue))
         }
         if runAttention.contains(where: { $0.type == .driverMissing }) {
-            flags.append(("Driver Required", .warning))
+            flags.append(("Driver required", .warning))
         }
         if hasConflict || runAttention.contains(where: { $0.type == .driverConflict }) {
             flags.append(("Conflict", .warning))
@@ -473,7 +546,7 @@ struct DailyDispatchView: View {
 
     private func sectionHeader(_ text: String) -> some View {
         Text(text)
-            .font(.system(size: 20, weight: .bold))
+            .font(.system(size: 17, weight: .bold))
             .foregroundStyle(UIRunDesignSystem.textPrimary)
     }
 
@@ -521,10 +594,35 @@ struct DailyDispatchView: View {
 }
 
 #Preview {
-    NavigationStack {
-        DailyDispatchView { _ in }
+    let householdContext = ActiveHouseholdContext()
+    let activeStore = ActiveHouseholdStore()
+    let householdRepo = LocalHouseholdRepository()
+    let sync = SyncCoordinator(
+        queueRepository: LocalSyncQueueRepository(),
+        auditRepository: LocalSyncAuditRepository(),
+        processedChangeRepository: LocalProcessedChangeRepository(),
+        remoteDriver: MockRemoteSyncDriver(),
+        runRepository: LocalRunRepository(),
+        scheduleRepository: LocalScheduleRepository(),
+        driverRepository: LocalDriverRepository(),
+        householdRepository: householdRepo
+    )
+    let householdDataSource = HouseholdDataSource(
+        repository: householdRepo,
+        activeContext: householdContext,
+        syncCoordinator: sync
+    )
+    let backendHousehold = BackendHouseholdContext(
+        localHouseholdContext: householdContext,
+        localHouseholdDataSource: householdDataSource,
+        activeHouseholdStore: activeStore
+    )
+    return NavigationStack {
+        DailyDispatchView(onOpenRunDetails: { _ in })
             .environmentObject(RunDataSource())
             .environmentObject(DriverDataSource())
+            .environmentObject(backendHousehold)
+            .environmentObject(LocationReadinessService())
             .environmentObject(NotificationService())
     }
 }

@@ -1,6 +1,5 @@
 import SwiftUI
 import PhotosUI
-import MapKit
 import UIKit
 
 struct OnboardingFlowView: View {
@@ -20,7 +19,14 @@ struct OnboardingFlowView: View {
     @StateObject private var state = OnboardingState()
     @State private var pendingChildID = UUID()
     @State private var pendingChildName = ""
+    @State private var pendingChildDisplayName = ""
     @State private var pendingChildDateOfBirth: Date?
+    @State private var pendingChildSchoolName = ""
+    @State private var pendingChildSchoolAddress = ""
+    @State private var pendingChildGradeOrClass = ""
+    @State private var pendingChildSchoolDays: Set<Weekday> = [.monday, .tuesday, .wednesday, .thursday, .friday]
+    @State private var pendingChildSchoolStartTime: DateComponents?
+    @State private var pendingChildSchoolEndTime: DateComponents?
     @State private var pendingChildPhotoURL: String?
     @State private var pendingChildAvatarSymbol: AvatarSymbol?
     @State private var showingAddChildSheet = false
@@ -38,7 +44,8 @@ struct OnboardingFlowView: View {
     @State private var selectedPendingChildPhotoItem: PhotosPickerItem?
     @State private var showingAvatarPickerSheet = false
     @State private var avatarEditTarget: AvatarEditTarget?
-    @StateObject private var schoolAddressVM = HomeLocationViewModel()
+    @StateObject private var venueSearchModel = LocationSearchModel()
+    @StateObject private var pendingChildSchoolSearchModel = LocationSearchModel()
     @State private var venueTypeSelection: VenueType = .school
     @State private var venueLabel: String = ""
     @State private var venueWeekdays: Set<OnboardingWeekday> = [.monday, .tuesday, .wednesday, .thursday, .friday]
@@ -52,6 +59,19 @@ struct OnboardingFlowView: View {
     private let adaptiveFieldBackground = Color(uiColor: .tertiarySystemBackground)
     private let adaptiveChipBackground = Color(uiColor: .tertiarySystemBackground)
     private let adaptiveBorder = Color(uiColor: .separator).opacity(0.35)
+    @FocusState private var focusedField: Field?
+
+    private enum Field: Hashable {
+        case primaryAdultName
+        case otherAdultName(Int)
+        case venueLabel
+        case venueSearch
+        case childName
+        case childDisplayName
+        case childGrade
+        case childSchoolName
+        case childSchoolAddress
+    }
 
     var body: some View {
         ZStack {
@@ -142,12 +162,13 @@ struct OnboardingFlowView: View {
                 onboardingChoiceCard(
                     icon: "person.3.fill",
                     title: "Join Tribe",
-                    subtitle: "Enter an invite code to join an existing tribe."
+                    subtitle: "Enter a family code to join an existing tribe."
                 ) {
                     state.goToJoinTribe()
                 }
             }
         }
+        .scrollDismissesKeyboard(.interactively)
     }
 
     private var createTribeScreen: some View {
@@ -185,11 +206,13 @@ struct OnboardingFlowView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("Adults")
                         .font(.system(size: 24, weight: .bold))
-                    Text("Add adults and assign access and driving permissions.")
+                    Text("Add adults and assign access and driving permissions. Next, add your children.")
                         .font(.system(size: 14))
                         .foregroundStyle(.secondary)
                 }
             }
+
+            ProductEducationCard(item: ProductEducationProvider.item(for: .childFirstSetup))
 
             if !state.hasDriver {
                 HStack(alignment: .top, spacing: 10) {
@@ -228,8 +251,7 @@ struct OnboardingFlowView: View {
 
                         HStack(spacing: 12) {
                             editableAdultAvatar(for: primaryBinding, fallbackName: "You", size: .medium)
-                            TextField("Primary adult name", text: primaryBinding.name)
-                                .textFieldStyle(.roundedBorder)
+                            onboardingInputField("Primary adult name", text: primaryBinding.name, field: .primaryAdultName)
                         }
 
                         relationshipSection(for: primaryBinding)
@@ -259,8 +281,7 @@ struct OnboardingFlowView: View {
                     VStack(alignment: .leading, spacing: 10) {
                         HStack(spacing: 10) {
                             editableAdultAvatar(for: adultBinding, fallbackName: "Adult", size: .small)
-                            TextField("Adult name", text: adultBinding.name)
-                                .textFieldStyle(.roundedBorder)
+                            onboardingInputField("Adult name", text: adultBinding.name, field: .otherAdultName(index))
                         }
                         relationshipSection(for: adultBinding)
                         accessSection(for: adultBinding, isPrimaryAdmin: false)
@@ -291,12 +312,42 @@ struct OnboardingFlowView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("Children Setup Dashboard")
                         .font(.system(size: 24, weight: .bold))
-                    Text("Add children, then configure school and routine for each.")
+                    Text("Add your children first, then configure school and routine for each.")
                         .font(.system(size: 14))
                         .foregroundStyle(.secondary)
                     Text("\(state.readyChildrenCount) of \(state.children.count) children ready")
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(Color(red: 0.388, green: 0.400, blue: 0.945))
+                    Text("Schedules and runs are created around your child's routine.")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.secondary)
+                    Text("Activities help Tribeboard understand where your child needs to be beyond school.")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.secondary)
+                    if state.children.contains(where: { !$0.hasSchoolConfigured }) {
+                        Text("Adding your child's school helps Tribeboard plan runs and schedules.")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+
+            ProductEducationCard(item: ProductEducationProvider.item(for: .schoolAndActivities))
+
+            onboardingCard {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Household Members")
+                        .font(.system(size: 16, weight: .bold))
+                    ForEach(state.adults.filter { !$0.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) { adult in
+                        HStack {
+                            Text(adult.name)
+                                .font(.system(size: 14, weight: .semibold))
+                            Spacer()
+                            Text(adult.canDrive ? "Driver" : "Helper")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                 }
             }
 
@@ -319,14 +370,20 @@ struct OnboardingFlowView: View {
                                 }
                             )
                             VStack(alignment: .leading, spacing: 4) {
-                                Text(child.name.isEmpty ? "Unnamed child" : child.name)
+                                Text(child.displayName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty ?? (child.name.isEmpty ? "Unnamed child" : child.name))
                                     .font(.system(size: 16, weight: .semibold))
                                     .foregroundStyle(.primary)
                                 if let age = child.age {
-                                    Text("Age \(age)")
+                                    Text("\(age) years old")
                                         .font(.system(size: 13))
                                         .foregroundStyle(.secondary)
                                 }
+                                Text(child.schoolRoutineSummary)
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundStyle(.secondary)
+                                Text(child.activityCountText)
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(.secondary)
                             }
                             Spacer()
                             if child.isSetupComplete {
@@ -340,9 +397,28 @@ struct OnboardingFlowView: View {
                 .buttonStyle(.plain)
             }
 
+            if state.children.isEmpty {
+                onboardingCard {
+                    Text("Start by adding your children.")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                }
+            }
+
             onboardingCard {
                 Button {
                     pendingChildID = UUID()
+                    pendingChildName = ""
+                    pendingChildDisplayName = ""
+                    pendingChildDateOfBirth = nil
+                    pendingChildSchoolName = ""
+                    pendingChildSchoolAddress = ""
+                    pendingChildGradeOrClass = ""
+                    pendingChildSchoolDays = [.monday, .tuesday, .wednesday, .thursday, .friday]
+                    pendingChildSchoolStartTime = nil
+                    pendingChildSchoolEndTime = nil
+                    pendingChildPhotoURL = nil
+                    pendingChildAvatarSymbol = nil
                     showingAddChildSheet = true
                 } label: {
                     HStack(spacing: 8) {
@@ -518,47 +594,14 @@ struct OnboardingFlowView: View {
                             .buttonStyle(.plain)
                         }
                     }
-                    TextField("Label (e.g., School, Soccer)", text: $venueLabel)
-                        .textFieldStyle(.roundedBorder)
-                    TextField("Search venue", text: $schoolAddressVM.addressQuery)
-                        .textFieldStyle(.roundedBorder)
-                        .onChange(of: schoolAddressVM.addressQuery) { _, newValue in
-                            schoolAddressVM.updateQuery(newValue)
-                        }
-                    if !schoolAddressVM.suggestions.isEmpty {
-                        ScrollView {
-                            VStack(spacing: 0) {
-                                ForEach(Array(schoolAddressVM.suggestions.enumerated()), id: \.offset) { _, completion in
-                                    Button {
-                                        schoolAddressVM.selectSuggestion(completion)
-                                    } label: {
-                                        VStack(alignment: .leading, spacing: 3) {
-                                            Text(completion.title)
-                                                .font(.system(size: 14, weight: .semibold))
-                                                .foregroundStyle(.primary)
-                                            if !completion.subtitle.isEmpty {
-                                                Text(completion.subtitle)
-                                                    .font(.system(size: 12))
-                                                    .foregroundStyle(.secondary)
-                                            }
-                                        }
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                        .padding(.horizontal, 12)
-                                        .padding(.vertical, 10)
-                                    }
-                                    .buttonStyle(.plain)
-                                    Divider()
-                                }
-                            }
-                        }
-                        .frame(maxHeight: 160)
-                        .background(adaptiveFieldBackground)
-                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .stroke(adaptiveBorder, lineWidth: 1)
-                        }
-                    }
+                    onboardingInputField("Label (e.g., School, Soccer)", text: $venueLabel, field: .venueLabel)
+                    LocationSearchField(
+                        title: "Venue Search",
+                        placeholder: "Search venue",
+                        model: venueSearchModel,
+                        onSelected: { _ in },
+                        onCleared: { }
+                    )
                 }
             }
 
@@ -581,7 +624,7 @@ struct OnboardingFlowView: View {
         }
         .onAppear {
             venueSetupRoute = .addVenue
-            schoolAddressVM.addressQuery = ""
+            venueSearchModel.clearSelection()
             venueTypeSelection = .school
             venueLabel = ""
         }
@@ -802,27 +845,38 @@ struct OnboardingFlowView: View {
                     Text("\(state.scheduleTemplatesToCreate) schedules will generate runs when you tap Create Run.")
                         .font(.system(size: 20, weight: .bold))
                         .foregroundStyle(state.scheduleTemplatesToCreate > 0 ? Color.primary : Color.orange)
+                    Text("Children come first. Drivers support the routine you set.")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.secondary)
                     Text("Home: \(state.homeAddress)")
                         .font(.system(size: 14))
-                    Text("Adults: \(state.adults.filter { !$0.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }.map(\.name).joined(separator: ", "))")
-                        .font(.system(size: 14))
-                        .foregroundStyle(.secondary)
                     Divider()
                     ForEach(state.children) { child in
                         VStack(alignment: .leading, spacing: 4) {
-                            Text(child.name)
+                            Text(child.displayName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty ?? child.name)
                                 .font(.system(size: 15, weight: .semibold))
+                            if let age = child.age {
+                                Text("\(age) years old")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(.secondary)
+                            }
+                            Text(child.schoolRoutineSummary)
+                                .font(.system(size: 12))
+                                .foregroundStyle(.secondary)
                             Text("Venues: \(child.venues.isEmpty ? "Not set" : "\(child.venues.count)")")
                                 .font(.system(size: 13))
                                 .foregroundStyle(.secondary)
                             Text("Rules: \(child.venueRules.count)")
                                 .font(.system(size: 13))
                                 .foregroundStyle(.secondary)
-                            Text("\(child.name): \(child.isSetupComplete ? "\(scheduleCount(for: child)) schedules ready" : "Setup Required")")
+                            Text("\(child.preferredDisplayName): \(child.isSetupComplete ? "\(scheduleCount(for: child)) schedules ready" : "Setup Required")")
                                 .font(.system(size: 12, weight: .semibold))
                                 .foregroundStyle(child.isSetupComplete ? Color.green.opacity(0.9) : .orange)
                         }
                     }
+                    Text("Adults: \(state.adults.filter { !$0.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }.map(\.name).joined(separator: ", "))")
+                        .font(.system(size: 14))
+                        .foregroundStyle(.secondary)
                 }
             }
 
@@ -1173,11 +1227,11 @@ struct OnboardingFlowView: View {
     }
 
     private var selectedVenuePlace: Place? {
-        guard !schoolAddressVM.selectedTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
-        guard let latitude = schoolAddressVM.selectedLatitude, let longitude = schoolAddressVM.selectedLongitude else { return nil }
+        guard let selected = venueSearchModel.selectedResult else { return nil }
+        guard let latitude = selected.latitude, let longitude = selected.longitude else { return nil }
         return Place(
-            name: schoolAddressVM.selectedTitle,
-            formattedAddress: schoolAddressVM.selectedSubtitle.isEmpty ? schoolAddressVM.selectedTitle : "\(schoolAddressVM.selectedTitle), \(schoolAddressVM.selectedSubtitle)",
+            name: selected.title,
+            formattedAddress: selected.fullAddress,
             latitude: latitude,
             longitude: longitude,
             placeId: nil
@@ -1298,6 +1352,48 @@ struct OnboardingFlowView: View {
             }
     }
 
+    private var pendingChildSchoolStartBinding: Binding<Date> {
+        Binding(
+            get: {
+                let fallback = DateComponents(hour: 7, minute: 45)
+                return Calendar.current.date(from: pendingChildSchoolStartTime ?? fallback) ?? Date()
+            },
+            set: { pendingChildSchoolStartTime = Calendar.current.dateComponents([.hour, .minute], from: $0) }
+        )
+    }
+
+    private var pendingChildSchoolEndBinding: Binding<Date> {
+        Binding(
+            get: {
+                let fallback = DateComponents(hour: 13, minute: 45)
+                return Calendar.current.date(from: pendingChildSchoolEndTime ?? fallback) ?? Date()
+            },
+            set: { pendingChildSchoolEndTime = Calendar.current.dateComponents([.hour, .minute], from: $0) }
+        )
+    }
+
+    private var pendingChildSchoolDaysPicker: some View {
+        HStack(spacing: 8) {
+            ForEach(Weekday.allCases, id: \.self) { day in
+                let selected = pendingChildSchoolDays.contains(day)
+                Button(day.shortLabel) {
+                    if selected {
+                        pendingChildSchoolDays.remove(day)
+                    } else {
+                        pendingChildSchoolDays.insert(day)
+                    }
+                }
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(selected ? .white : .secondary)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 6)
+                .background(selected ? Color(red: 0.388, green: 0.400, blue: 0.945) : Color(uiColor: .tertiarySystemBackground))
+                .clipShape(Capsule())
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
     private func hasDuplicateRule(for child: OnboardingChildDraft, venueId: UUID, editingRuleId: UUID?) -> Bool {
         let existingRules = rulesForVenue(child: child, venueId: venueId).filter { $0.id != editingRuleId }
         return existingRules.contains { existing in
@@ -1335,7 +1431,8 @@ struct OnboardingFlowView: View {
 
     private var addChildSheet: some View {
         NavigationStack {
-            VStack(alignment: .leading, spacing: 14) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
                 Text("Add Child")
                     .font(.system(size: 24, weight: .bold))
                 Button {
@@ -1362,45 +1459,94 @@ struct OnboardingFlowView: View {
                 }
                 .buttonStyle(.plain)
 
-                TextField("Name", text: $pendingChildName)
-                    .textFieldStyle(.roundedBorder)
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Date of Birth")
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Basic Info")
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(.secondary)
+                    onboardingInputField("Child name", text: $pendingChildName, field: .childName)
+                    onboardingInputField("Preferred display name (optional)", text: $pendingChildDisplayName, field: .childDisplayName)
+                    onboardingInputField("Grade/Class (optional)", text: $pendingChildGradeOrClass, field: .childGrade)
                     DatePicker(
-                        "",
+                        "Date of birth (optional)",
                         selection: pendingChildDateOfBirthBinding,
                         in: ...Date(),
                         displayedComponents: .date
                     )
                     .datePickerStyle(.compact)
-                    .labelsHidden()
 
                     if let pendingChildDateOfBirth {
-                        Text("Age: \(age(from: pendingChildDateOfBirth)) years")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(.secondary)
-                    } else {
-                        Text("Select date")
+                        Text("\(age(from: pendingChildDateOfBirth)) years old")
                             .font(.system(size: 12, weight: .medium))
                             .foregroundStyle(.secondary)
                     }
+                }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("School Info")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                    onboardingInputField("School name (optional)", text: $pendingChildSchoolName, field: .childSchoolName)
+                    LocationSearchField(
+                        title: "School Search",
+                        placeholder: "Search school",
+                        model: pendingChildSchoolSearchModel,
+                        onSelected: { result in
+                            if pendingChildSchoolName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                                pendingChildSchoolName = result.title
+                            }
+                            pendingChildSchoolAddress = result.fullAddress
+                        },
+                        onCleared: { }
+                    )
+                    onboardingInputField("School address (optional)", text: $pendingChildSchoolAddress, field: .childSchoolAddress)
+                    Text("School routine (optional)")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                    pendingChildSchoolDaysPicker
+                    DatePicker(
+                        "School start time",
+                        selection: pendingChildSchoolStartBinding,
+                        displayedComponents: .hourAndMinute
+                    )
+                    .datePickerStyle(.compact)
+                    DatePicker(
+                        "School end time",
+                        selection: pendingChildSchoolEndBinding,
+                        displayedComponents: .hourAndMinute
+                    )
+                    .datePickerStyle(.compact)
+                    Text("Adding your child's school helps Tribeboard plan runs and schedules.")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.secondary)
                 }
 
                 Button("Save Child") {
                     state.addChild(
                         id: pendingChildID,
                         name: pendingChildName,
+                        displayName: pendingChildDisplayName.nilIfEmpty,
                         dateOfBirth: pendingChildDateOfBirth,
+                        schoolName: pendingChildSchoolName.nilIfEmpty,
+                        schoolAddress: pendingChildSchoolAddress.nilIfEmpty,
+                        gradeOrClass: pendingChildGradeOrClass.nilIfEmpty,
+                        schoolStartTime: pendingChildSchoolStartTime,
+                        schoolEndTime: pendingChildSchoolEndTime,
+                        schoolDays: pendingChildSchoolDays.isEmpty ? nil : pendingChildSchoolDays,
                         avatarImageName: pendingChildAvatarSymbol?.rawValue ?? "",
                         avatarURL: pendingChildPhotoURL,
                         avatarId: pendingChildAvatarSymbol?.rawValue,
                         avatarSymbol: pendingChildAvatarSymbol
                     )
                     pendingChildName = ""
+                    pendingChildDisplayName = ""
                     pendingChildID = UUID()
                     pendingChildDateOfBirth = nil
+                    pendingChildSchoolName = ""
+                    pendingChildSchoolAddress = ""
+                    pendingChildGradeOrClass = ""
+                    pendingChildSchoolDays = [.monday, .tuesday, .wednesday, .thursday, .friday]
+                    pendingChildSchoolStartTime = nil
+                    pendingChildSchoolEndTime = nil
                     pendingChildPhotoURL = nil
                     pendingChildAvatarSymbol = nil
                     showingAddChildSheet = false
@@ -1414,10 +1560,30 @@ struct OnboardingFlowView: View {
                 .disabled(pendingChildName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 .opacity(pendingChildName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.6 : 1)
 
-                Spacer()
+                Spacer(minLength: 0)
             }
             .padding(20)
+            }
+            .scrollDismissesKeyboard(.interactively)
         }
+    }
+
+    private func onboardingInputField(_ title: String, text: Binding<String>, field: Field) -> some View {
+        TextField(title, text: text)
+            .focused($focusedField, equals: field)
+            .foregroundStyle(.primary)
+            .tint(Color(red: 0.388, green: 0.400, blue: 0.945))
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(adaptiveFieldBackground)
+            .overlay {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .stroke(
+                        focusedField == field ? Color(red: 0.388, green: 0.400, blue: 0.945).opacity(0.7) : adaptiveBorder,
+                        lineWidth: focusedField == field ? 1.5 : 1
+                    )
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 }
 

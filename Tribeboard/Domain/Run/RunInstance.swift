@@ -9,6 +9,8 @@ extension SystemDomain {
         var templateId: UUID
         var title: String?
         var date: Date
+        /// SQL `time` snapshot (`HH:mm:ss`) copied at creation — never derived from schedule templates later.
+        var departureTime: String
         var status: RunStatus
         var stops: [RunStopProgress]
         var stopSnapshots: [Stop]
@@ -28,6 +30,7 @@ extension SystemDomain {
             case templateId
             case title
             case date
+            case departureTime
             case status
             case stops
             case stopSnapshots
@@ -48,6 +51,7 @@ extension SystemDomain {
             templateId: UUID,
             title: String?,
             date: Date,
+            departureTime: String,
             status: RunStatus,
             stops: [RunStopProgress],
             stopSnapshots: [Stop],
@@ -66,6 +70,7 @@ extension SystemDomain {
             self.templateId = templateId
             self.title = title
             self.date = date
+            self.departureTime = departureTime
             self.status = status
             self.stops = stops
             self.stopSnapshots = stopSnapshots
@@ -95,6 +100,13 @@ extension SystemDomain {
             templateId = try container.decode(UUID.self, forKey: .templateId)
             title = try container.decodeIfPresent(String.self, forKey: .title)
             date = try container.decode(Date.self, forKey: .date)
+            if let decodedDeparture = try container.decodeIfPresent(String.self, forKey: .departureTime)?
+                .trimmingCharacters(in: .whitespacesAndNewlines),
+               !decodedDeparture.isEmpty {
+                departureTime = decodedDeparture
+            } else {
+                departureTime = RunScheduledTime.from(date: date)
+            }
             status = try container.decodeIfPresent(RunStatus.self, forKey: .status) ?? .scheduled
             stopSnapshots = try container.decodeIfPresent([Stop].self, forKey: .stopSnapshots) ?? []
 

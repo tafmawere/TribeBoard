@@ -1,12 +1,14 @@
-import SwiftUI
-import MapKit
-import CoreLocation
 import Combine
+import CoreLocation
+import GoogleMaps
+import SwiftUI
+import UIKit
 
 struct LiveTrackingView: View {
+    @EnvironmentObject private var authSession: AuthSessionContext
     let run: UIRun
 
-    @State private var mapPosition: MapCameraPosition
+    @State private var mapCamera: GoogleMapCameraState
     @State private var driverCoordinate: CLLocationCoordinate2D
     @State private var routeStepIndex: Int = 1
     @State private var isSheetExpanded = false
@@ -30,12 +32,7 @@ struct LiveTrackingView: View {
         self.routeCoordinates = mockedRoute
         let initial = mockedRoute[1]
         _driverCoordinate = State(initialValue: initial)
-        _mapPosition = State(initialValue: .region(
-            MKCoordinateRegion(
-                center: initial,
-                span: MKCoordinateSpan(latitudeDelta: 0.018, longitudeDelta: 0.018)
-            )
-        ))
+        _mapCamera = State(initialValue: GoogleMapCameraState(target: initial, zoom: 15))
     }
 
     private var destinationCoordinate: CLLocationCoordinate2D {
@@ -64,26 +61,43 @@ struct LiveTrackingView: View {
         isSheetExpanded ? 360 : 122
     }
 
+    private static let liveDriverMarkerID = UUID(uuidString: "00000000-0000-0000-0000-0000000000C1")!
+    private static let liveDestinationMarkerID = UUID(uuidString: "00000000-0000-0000-0000-0000000000C2")!
+
+    private var liveTrackingMarkers: [GoogleMapMarkerModel] {
+        [
+            GoogleMapMarkerModel(
+                id: Self.liveDriverMarkerID,
+                title: "Driver",
+                coordinate: driverCoordinate,
+                kind: .driver,
+                orderLabel: nil,
+                isSelected: false
+            ),
+            GoogleMapMarkerModel(
+                id: Self.liveDestinationMarkerID,
+                title: "Destination",
+                coordinate: destinationCoordinate,
+                kind: .destination,
+                orderLabel: nil,
+                isSelected: false
+            )
+        ]
+    }
+
     var body: some View {
         ZStack(alignment: .bottom) {
-            Map(position: $mapPosition, interactionModes: .all) {
-                Annotation("Driver", coordinate: driverCoordinate) {
-                    ZStack {
-                        Circle()
-                            .fill(UIRunDesignSystem.primary)
-                            .frame(width: 18, height: 18)
-                        Circle()
-                            .stroke(Color.white, lineWidth: 2.2)
-                            .frame(width: 18, height: 18)
-                    }
-                }
-
-                Marker("Destination", coordinate: destinationCoordinate)
-                    .tint(.red)
-
-                MapPolyline(coordinates: routeCoordinates)
-                    .stroke(UIRunDesignSystem.primary.opacity(0.85), lineWidth: 5)
-            }
+            TribeGoogleMapView(
+                markers: liveTrackingMarkers,
+                polylineCoordinates: routeCoordinates,
+                strokeUIColor: UIColor(UIRunDesignSystem.primary).withAlphaComponent(0.85),
+                lineWidth: 5,
+                cameraHint: nil,
+                externalCamera: mapCamera,
+                showsUserLocation: false,
+                padding: .init(top: 44, left: 12, bottom: 160, right: 12),
+                onMarkerIdTap: nil
+            )
             .ignoresSafeArea()
 
             floatingActionButtons
@@ -165,14 +179,11 @@ struct LiveTrackingView: View {
 
     private var collapsedHeader: some View {
         HStack(spacing: 10) {
-            Circle()
-                .fill(UIRunDesignSystem.primary.opacity(0.16))
-                .frame(width: 36, height: 36)
-                .overlay {
-                    Text(initials(for: run.driverName))
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(UIRunDesignSystem.primary)
-                }
+            TribeAvatarView(
+                identity: TribeAvatarIdentity(displayName: run.driverName),
+                size: TribeAvatarSize.closest(to: 36),
+                accessToken: authSession.currentAccessToken
+            )
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(statusText)
@@ -207,14 +218,11 @@ struct LiveTrackingView: View {
                 HStack(spacing: 8) {
                     ForEach(run.passengers) { passenger in
                         HStack(spacing: 6) {
-                            Circle()
-                                .fill(UIRunDesignSystem.primary.opacity(0.14))
-                                .frame(width: 24, height: 24)
-                                .overlay {
-                                    Text(initials(for: passenger.name))
-                                        .font(.system(size: 10, weight: .bold))
-                                        .foregroundStyle(UIRunDesignSystem.primary)
-                                }
+                            TribeAvatarView(
+                                identity: TribeAvatarIdentity(displayName: passenger.name),
+                                size: TribeAvatarSize.closest(to: 24),
+                                accessToken: authSession.currentAccessToken
+                            )
                             Text(passenger.name)
                                 .font(.system(size: 12, weight: .semibold))
                                 .foregroundStyle(UIRunDesignSystem.textSecondary)
@@ -289,12 +297,7 @@ struct LiveTrackingView: View {
 
         withAnimation(.easeInOut(duration: 0.9)) {
             driverCoordinate = routeCoordinates[nextIndex]
-            mapPosition = .region(
-                MKCoordinateRegion(
-                    center: driverCoordinate,
-                    span: MKCoordinateSpan(latitudeDelta: 0.016, longitudeDelta: 0.016)
-                )
-            )
+            mapCamera = GoogleMapCameraState(target: driverCoordinate, zoom: 15)
         }
 
         if routeStepIndex == routeCoordinates.count - 1 {
@@ -314,10 +317,6 @@ struct LiveTrackingView: View {
             meters += start.distance(from: end)
         }
         return meters / 1609.34
-    }
-
-    private func initials(for name: String) -> String {
-        name.split(separator: " ").prefix(2).compactMap(\.first).map(String.init).joined().uppercased()
     }
 
     private func fabButton(icon: String, tint: Color, action: @escaping () -> Void) -> some View {

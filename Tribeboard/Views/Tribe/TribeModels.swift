@@ -30,11 +30,41 @@ enum AvatarSymbol: String, CaseIterable, Hashable, Codable {
 }
 
 struct MemberAvatarData: Hashable {
+    var avatarType: AvatarType?
+    var avatarKey: String?
     var photoURL: String?
     var imageReference: String?
     var symbol: AvatarSymbol?
     var seed: String
     var name: String
+
+    var identity: TribeAvatarIdentity {
+        if let avatarType {
+            return TribeAvatarIdentity(
+                avatarType: avatarType,
+                avatarKey: avatarKey,
+                avatarURL: photoURL,
+                displayName: name
+            )
+        }
+        if let photoURL {
+            return TribeAvatarIdentity(
+                avatarType: .uploaded,
+                avatarKey: nil,
+                avatarURL: photoURL,
+                displayName: name
+            )
+        }
+        if let presetKey = avatarKey ?? imageReference {
+            return TribeAvatarIdentity(
+                avatarType: .preset,
+                avatarKey: presetKey,
+                avatarURL: nil,
+                displayName: name
+            )
+        }
+        return TribeAvatarIdentity(displayName: name)
+    }
 
     var initials: String {
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -100,6 +130,103 @@ enum MemberType: String, CaseIterable, Identifiable, Hashable {
     var id: String { rawValue }
 }
 
+enum Weekday: Int, Codable, CaseIterable, Hashable {
+    case monday = 1
+    case tuesday = 2
+    case wednesday = 3
+    case thursday = 4
+    case friday = 5
+    case saturday = 6
+    case sunday = 7
+
+    var shortLabel: String {
+        switch self {
+        case .monday: return "Mon"
+        case .tuesday: return "Tue"
+        case .wednesday: return "Wed"
+        case .thursday: return "Thu"
+        case .friday: return "Fri"
+        case .saturday: return "Sat"
+        case .sunday: return "Sun"
+        }
+    }
+}
+
+enum ChildActivityType: String, Codable, CaseIterable, Equatable, Hashable {
+    case schoolBased
+    case external
+}
+
+struct ChildActivity: Identifiable, Codable, Equatable, Hashable {
+    let id: UUID
+    var name: String
+    var type: ChildActivityType
+    var locationName: String?
+    var locationAddress: String?
+    var days: Set<Weekday>
+    var startTime: DateComponents?
+    var endTime: DateComponents?
+    var notes: String?
+
+    init(
+        id: UUID = UUID(),
+        name: String,
+        type: ChildActivityType,
+        locationName: String? = nil,
+        locationAddress: String? = nil,
+        days: Set<Weekday> = [],
+        startTime: DateComponents? = nil,
+        endTime: DateComponents? = nil,
+        notes: String? = nil
+    ) {
+        self.id = id
+        self.name = name
+        self.type = type
+        self.locationName = locationName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        self.locationAddress = locationAddress?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        self.days = days
+        self.startTime = startTime
+        self.endTime = endTime
+        self.notes = notes?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+    }
+
+    var activityDaysSummary: String {
+        let ordered = Weekday.allCases.filter { days.contains($0) }
+        guard !ordered.isEmpty else { return "" }
+        let weekdaysOnly: [Weekday] = [.monday, .tuesday, .wednesday, .thursday, .friday]
+        if ordered == weekdaysOnly { return "Mon–Fri" }
+        return ordered.map(\.shortLabel).joined(separator: "/")
+    }
+
+    var activityTimeSummary: String? {
+        guard let startTime, let endTime else { return nil }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm"
+        let calendar = Calendar.current
+        let startText = calendar.date(from: startTime).map { formatter.string(from: $0) } ?? "--:--"
+        let endText = calendar.date(from: endTime).map { formatter.string(from: $0) } ?? "--:--"
+        return "\(startText)-\(endText)"
+    }
+
+    var activityLocationSummary: String? {
+        if type == .schoolBased { return "At school" }
+        return locationName ?? locationAddress
+    }
+
+    var activitySummaryLine: String {
+        var parts: [String] = [name]
+        if !activityDaysSummary.isEmpty {
+            parts.append(activityDaysSummary)
+        }
+        if let time = activityTimeSummary {
+            parts.append(time)
+        } else if type == .schoolBased {
+            parts.append("School-based")
+        }
+        return parts.joined(separator: " • ")
+    }
+}
+
 enum Role: String, CaseIterable, Identifiable, Hashable {
     case admin = "Admin"
     case driver = "Driver"
@@ -125,7 +252,10 @@ enum Role: String, CaseIterable, Identifiable, Hashable {
 struct TribeMember: Identifiable, Hashable {
     let id: UUID
     var fullName: String
+    var displayName: String?
     var profileImageURL: URL?
+    var avatarType: AvatarType?
+    var avatarKey: String?
     var avatarURL: String?
     var avatarSeed: String
     var avatarImageName: String?
@@ -135,6 +265,13 @@ struct TribeMember: Identifiable, Hashable {
     var memberType: MemberType
     var relationship: String?
     var dateOfBirth: Date?
+    var schoolName: String?
+    var schoolAddress: String?
+    var gradeOrClass: String?
+    var schoolStartTime: DateComponents?
+    var schoolEndTime: DateComponents?
+    var schoolDays: Set<Weekday>?
+    var activities: [ChildActivity]
     var phone: String?
     var roles: Set<Role>
     var isLocationSharingEnabled: Bool
@@ -144,6 +281,8 @@ struct TribeMember: Identifiable, Hashable {
         id: UUID = UUID(),
         fullName: String,
         profileImageURL: URL? = nil,
+        avatarType: AvatarType? = nil,
+        avatarKey: String? = nil,
         avatarURL: String? = nil,
         avatarSeed: String? = nil,
         avatarImageName: String? = nil,
@@ -153,6 +292,14 @@ struct TribeMember: Identifiable, Hashable {
         memberType: MemberType,
         relationship: String? = nil,
         dateOfBirth: Date? = nil,
+        displayName: String? = nil,
+        schoolName: String? = nil,
+        schoolAddress: String? = nil,
+        gradeOrClass: String? = nil,
+        schoolStartTime: DateComponents? = nil,
+        schoolEndTime: DateComponents? = nil,
+        schoolDays: Set<Weekday>? = nil,
+        activities: [ChildActivity] = [],
         phone: String? = nil,
         roles: Set<Role> = [],
         isLocationSharingEnabled: Bool = true,
@@ -160,6 +307,8 @@ struct TribeMember: Identifiable, Hashable {
     ) {
         self.id = id
         self.fullName = fullName
+        self.avatarType = avatarType
+        self.avatarKey = avatarKey
         self.avatarURL = avatarURL
         self.avatarSeed = avatarSeed ?? id.uuidString
         if let profileImageURL {
@@ -176,6 +325,18 @@ struct TribeMember: Identifiable, Hashable {
         self.memberType = memberType
         self.relationship = relationship
         self.dateOfBirth = dateOfBirth
+        self.displayName = displayName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        self.schoolName = schoolName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        self.schoolAddress = schoolAddress?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        self.gradeOrClass = gradeOrClass?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        self.schoolStartTime = schoolStartTime
+        self.schoolEndTime = schoolEndTime
+        if let schoolDays, !schoolDays.isEmpty {
+            self.schoolDays = schoolDays
+        } else {
+            self.schoolDays = nil
+        }
+        self.activities = activities
         self.phone = phone
         self.roles = roles
         self.isLocationSharingEnabled = isLocationSharingEnabled
@@ -184,6 +345,8 @@ struct TribeMember: Identifiable, Hashable {
 
     var avatar: MemberAvatarData {
         MemberAvatarData(
+            avatarType: avatarType,
+            avatarKey: avatarKey,
             photoURL: avatarURL,
             imageReference: avatarImageName,
             symbol: avatarSymbol ?? AvatarSymbol.fromLegacyImageName(avatarImageName),
@@ -210,15 +373,98 @@ struct TribeMember: Identifiable, Hashable {
         if memberType == .adult {
             return relationship ?? "Adult"
         }
-        if let age {
-            return "Age \(age)"
+        if let ageText {
+            return ageText
         }
         return "Child"
+    }
+
+    var preferredDisplayName: String {
+        let preferred = displayName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !preferred.isEmpty {
+            return preferred
+        }
+        return fullName
     }
 
     var age: Int? {
         guard let dateOfBirth else { return nil }
         return Calendar.current.dateComponents([.year], from: dateOfBirth, to: Date()).year
+    }
+
+    var ageText: String? {
+        guard let age else { return nil }
+        let suffix = age == 1 ? "year" : "years"
+        return "\(age) \(suffix) old"
+    }
+
+    var schoolSummaryText: String? {
+        let school = schoolName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return school.isEmpty ? nil : school
+    }
+
+    var hasSchoolConfigured: Bool {
+        schoolSummaryText != nil
+    }
+
+    var hasSchoolRoutineConfigured: Bool {
+        guard hasSchoolConfigured else { return false }
+        guard schoolStartTime != nil, schoolEndTime != nil else { return false }
+        guard let schoolDays, !schoolDays.isEmpty else { return false }
+        return true
+    }
+
+    var schoolRoutineSummary: String {
+        guard let school = schoolSummaryText else {
+            return "No school configured"
+        }
+        guard let schoolDays,
+              !schoolDays.isEmpty,
+              let schoolStartTime,
+              let schoolEndTime else {
+            return school
+        }
+        return "\(school) • \(formattedSchoolDays(schoolDays)) • \(formattedTimeRange(start: schoolStartTime, end: schoolEndTime))"
+    }
+
+    var activityCountText: String {
+        let count = activities.count
+        let noun = count == 1 ? "activity" : "activities"
+        return "\(count) \(noun)"
+    }
+
+    var activitiesMissingTiming: [ChildActivity] {
+        activities.filter { $0.startTime == nil || $0.endTime == nil }
+    }
+
+    var externalActivitiesMissingLocation: [ChildActivity] {
+        activities.filter { activity in
+            guard activity.type == .external else { return false }
+            return activity.locationName == nil && activity.locationAddress == nil
+        }
+    }
+
+    private func formattedSchoolDays(_ days: Set<Weekday>) -> String {
+        let ordered = Weekday.allCases.filter { days.contains($0) }
+        let weekdaysOnly: [Weekday] = [.monday, .tuesday, .wednesday, .thursday, .friday]
+        if ordered == weekdaysOnly {
+            return "Mon–Fri"
+        }
+        if ordered.count == 1, let only = ordered.first {
+            return only.shortLabel
+        }
+        return ordered.map(\.shortLabel).joined(separator: ", ")
+    }
+
+    private func formattedTimeRange(start: DateComponents, end: DateComponents) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm"
+        let calendar = Calendar.current
+        let startDate = calendar.date(from: start)
+        let endDate = calendar.date(from: end)
+        let startText = startDate.map { formatter.string(from: $0) } ?? "--:--"
+        let endText = endDate.map { formatter.string(from: $0) } ?? "--:--"
+        return "\(startText)-\(endText)"
     }
 
     var isDriver: Bool {
@@ -241,6 +487,13 @@ struct TribeMember: Identifiable, Hashable {
         }
 
         return permissions.sorted()
+    }
+}
+
+private extension String {
+    var nilIfEmpty: String? {
+        let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
     }
 }
 

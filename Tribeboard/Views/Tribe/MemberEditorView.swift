@@ -15,27 +15,49 @@ struct AddPersonView: View {
 
     let existingMember: TribeMember?
     let defaultType: MemberType
-    let onSave: (TribeMember) -> Void
+    let onSave: (TribeMember) async -> Bool
+    let saveErrorProvider: (() -> String?)?
 
     @State private var fullName: String
     @State private var relationship: String
     @State private var phone: String
     @State private var memberType: MemberType
-    @State private var nickname: String
+    @State private var displayName: String
     @State private var dateOfBirth: Date?
+    @State private var schoolName: String
+    @State private var schoolAddress: String
+    @State private var gradeOrClass: String
+    @State private var schoolDays: Set<Weekday>
+    @State private var schoolStartTime: DateComponents?
+    @State private var schoolEndTime: DateComponents?
     @State private var selectedAdultRoles: Set<AdultAccessRole>
     @State private var showMoreRoles = false
+    @State private var isSaving = false
+    @State private var saveErrorMessage: String?
+    @FocusState private var focusedField: Field?
+    @StateObject private var schoolSearchModel = LocationSearchModel()
+
+    private enum Field: Hashable {
+        case fullName
+        case phone
+        case displayName
+        case gradeOrClass
+        case schoolName
+        case schoolAddress
+    }
 
     private let relationshipOptions = ["Mom", "Dad", "Guardian", "Helper", "Other"]
 
     init(
         existingMember: TribeMember? = nil,
         defaultType: MemberType = .adult,
-        onSave: @escaping (TribeMember) -> Void
+        onSave: @escaping (TribeMember) async -> Bool,
+        saveErrorProvider: (() -> String?)? = nil
     ) {
         self.existingMember = existingMember
         self.defaultType = defaultType
         self.onSave = onSave
+        self.saveErrorProvider = saveErrorProvider
 
         let initialType = existingMember?.memberType ?? defaultType
         let initialRoles = Self.adultAccessRoles(from: existingMember?.roles ?? [])
@@ -44,12 +66,18 @@ struct AddPersonView: View {
         _relationship = State(initialValue: existingMember?.relationship ?? "Guardian")
         _phone = State(initialValue: existingMember?.phone ?? "")
         _memberType = State(initialValue: initialType)
-        _nickname = State(initialValue: "")
+        _displayName = State(initialValue: existingMember?.displayName ?? "")
+        _schoolName = State(initialValue: existingMember?.schoolName ?? "")
+        _schoolAddress = State(initialValue: existingMember?.schoolAddress ?? "")
+        _gradeOrClass = State(initialValue: existingMember?.gradeOrClass ?? "")
+        _schoolDays = State(initialValue: existingMember?.schoolDays ?? [.monday, .tuesday, .wednesday, .thursday, .friday])
+        _schoolStartTime = State(initialValue: existingMember?.schoolStartTime)
+        _schoolEndTime = State(initialValue: existingMember?.schoolEndTime)
         if let existingAge = existingMember?.age,
            let estimatedDob = Calendar.current.date(byAdding: .year, value: -existingAge, to: Date()) {
             _dateOfBirth = State(initialValue: estimatedDob)
         } else {
-            _dateOfBirth = State(initialValue: nil)
+            _dateOfBirth = State(initialValue: existingMember?.dateOfBirth)
         }
         _selectedAdultRoles = State(initialValue: initialType == .adult ? (initialRoles.isEmpty ? [.parentGuardian] : initialRoles) : [])
     }
@@ -67,6 +95,7 @@ struct AddPersonView: View {
                     .padding(20)
                     .padding(.bottom, 90)
                 }
+                .scrollDismissesKeyboard(.interactively)
             }
             .navigationTitle("Add member")
             .navigationBarTitleDisplayMode(.inline)
@@ -78,9 +107,11 @@ struct AddPersonView: View {
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Save") {
-                        savePerson()
+                        Task {
+                            await savePerson()
+                        }
                     }
-                    .disabled(!isSaveEnabled)
+                    .disabled(!isSaveEnabled || isSaving)
                 }
             }
             .safeAreaInset(edge: .bottom) {
@@ -104,6 +135,18 @@ struct AddPersonView: View {
                     selectedAdultRoles.insert(.parentGuardian)
                 }
             }
+            .alert("Unable to Save", isPresented: Binding(
+                get: { saveErrorMessage != nil },
+                set: { newValue in
+                    if !newValue { saveErrorMessage = nil }
+                }
+            )) {
+                Button("OK", role: .cancel) {
+                    saveErrorMessage = nil
+                }
+            } message: {
+                Text(saveErrorMessage ?? "Save failed.")
+            }
         }
     }
 
@@ -116,14 +159,10 @@ struct AddPersonView: View {
 
                 TextField("Full name", text: $fullName)
                     .textInputAutocapitalization(.words)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 12)
-                    .background(Color.white)
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .stroke(Color.black.opacity(0.08), lineWidth: 1)
-                    }
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .focused($focusedField, equals: .fullName)
+                    .tint(TribeTheme.primary)
+                    .foregroundStyle(.primary)
+                    .modifier(FieldStyle(isFocused: focusedField == .fullName))
 
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Relationship")
@@ -147,14 +186,10 @@ struct AddPersonView: View {
 
                 TextField("Phone (optional)", text: $phone)
                     .keyboardType(.phonePad)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 12)
-                    .background(Color.white)
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .stroke(Color.black.opacity(0.08), lineWidth: 1)
-                    }
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .focused($focusedField, equals: .phone)
+                    .tint(TribeTheme.primary)
+                    .foregroundStyle(.primary)
+                    .modifier(FieldStyle(isFocused: focusedField == .phone))
             }
         }
     }
@@ -176,25 +211,19 @@ struct AddPersonView: View {
                 }
 
                 if memberType == .child {
-                    TextField("Nickname (optional)", text: $nickname)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 12)
-                        .background(Color.white)
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .stroke(Color.black.opacity(0.08), lineWidth: 1)
-                        }
-                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    Text("Basic Info")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(TribeTheme.textSecondary)
+                    childField("Preferred display name (optional)", text: $displayName, field: .displayName)
+                    childField("Grade/Class (optional)", text: $gradeOrClass, field: .gradeOrClass)
 
                     VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Text("Date of birth")
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundStyle(TribeTheme.textPrimary)
-                            Text("(required)")
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundStyle(.secondary)
-                        }
+                        Text("Date of birth")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(TribeTheme.textSecondary)
+                        Text("Optional, helps with age-aware planning.")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(.secondary)
 
                         DatePicker(
                             "Date of birth",
@@ -207,19 +236,52 @@ struct AddPersonView: View {
                         .padding(.horizontal, 14)
                         .padding(.vertical, 12)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Color.white)
+                        .background(Color(uiColor: .tertiarySystemBackground))
                         .overlay {
                             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .stroke(Color.black.opacity(0.08), lineWidth: 1)
+                                .stroke(Color(uiColor: .separator).opacity(0.35), lineWidth: 1)
                         }
                         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
 
-                        if let age = derivedChildAge {
-                            Text("Age: \(age) years")
+                        if let ageText = derivedChildAgeText {
+                            Text(ageText)
                                 .font(.system(size: 13, weight: .medium))
                                 .foregroundStyle(.secondary)
                         }
                     }
+
+                    Text("School Info")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(TribeTheme.textSecondary)
+                    LocationSearchField(
+                        title: "School Search",
+                        placeholder: "Search school",
+                        model: schoolSearchModel,
+                        onSelected: { result in
+                            if schoolName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                                schoolName = result.title
+                            }
+                            schoolAddress = result.fullAddress
+                        }
+                    )
+                    childField("School name (optional)", text: $schoolName, field: .schoolName)
+                    childField("School address (optional)", text: $schoolAddress, field: .schoolAddress)
+                    Text("School routine (optional)")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                    schoolDaysPicker
+                    DatePicker(
+                        "School start time",
+                        selection: schoolStartTimeBinding,
+                        displayedComponents: .hourAndMinute
+                    )
+                    .datePickerStyle(.compact)
+                    DatePicker(
+                        "School end time",
+                        selection: schoolEndTimeBinding,
+                        displayedComponents: .hourAndMinute
+                    )
+                    .datePickerStyle(.compact)
 
                     if let age = derivedChildAge, age > 18 {
                         HStack(spacing: 8) {
@@ -239,11 +301,15 @@ struct AddPersonView: View {
                         Image(systemName: "info.circle.fill")
                             .font(.system(size: 13, weight: .semibold))
                             .foregroundStyle(TribeTheme.primary)
-                        Text("Child is a Passenger by default.")
+                        Text("School and activities help Tribeboard plan logistics around your child.")
                             .font(.system(size: 13, weight: .medium))
                             .foregroundStyle(.secondary)
                     }
                     .padding(.horizontal, 2)
+
+                    Text("Schedule = repeating plan. Run = actual trip.")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.secondary)
                 } else {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Roles")
@@ -272,21 +338,30 @@ struct AddPersonView: View {
     private var bottomSaveBar: some View {
         VStack(spacing: 4) {
             Button {
-                savePerson()
+                Task {
+                    await savePerson()
+                }
             } label: {
-                Text("Save")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-                    .background(TribeTheme.primary)
-                    .clipShape(Capsule())
+                Group {
+                    if isSaving {
+                        ProgressView()
+                            .tint(.white)
+                    } else {
+                        Text("Save")
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundStyle(.white)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .background(TribeTheme.primary)
+                .clipShape(Capsule())
             }
-            .disabled(!isSaveEnabled)
-            .opacity(isSaveEnabled ? 1 : 0.6)
+            .disabled(!isSaveEnabled || isSaving)
+            .opacity((isSaveEnabled && !isSaving) ? 1 : 0.6)
 
             if !isSaveEnabled {
-                Text(memberType == .child ? "Enter full name and date of birth to continue." : "Enter full name to continue.")
+                Text("Enter full name to continue.")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(.secondary)
             }
@@ -299,9 +374,6 @@ struct AddPersonView: View {
 
     private var isSaveEnabled: Bool {
         let hasName = !fullName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        if memberType == .child {
-            return hasName && dateOfBirth != nil
-        }
         return hasName
     }
 
@@ -371,9 +443,10 @@ struct AddPersonView: View {
         }
     }
 
-    private func savePerson() {
+    private func savePerson() async {
         let trimmedName = fullName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedName.isEmpty else { return }
+        print("[AddPersonView] Save tapped for memberType=\(memberType.rawValue), existingMember=\(existingMember != nil)")
 
         var roles: Set<Role>
         if memberType == .child {
@@ -398,14 +471,35 @@ struct AddPersonView: View {
             memberType: memberType,
             relationship: trimmedRelationship.isEmpty ? nil : trimmedRelationship,
             dateOfBirth: memberType == .child ? dateOfBirth : nil,
+            displayName: memberType == .child ? displayName.nilIfEmpty : nil,
+            schoolName: memberType == .child ? schoolName.nilIfEmpty : nil,
+            schoolAddress: memberType == .child ? schoolAddress.nilIfEmpty : nil,
+            gradeOrClass: memberType == .child ? gradeOrClass.nilIfEmpty : nil,
+            schoolStartTime: memberType == .child ? schoolStartTime : nil,
+            schoolEndTime: memberType == .child ? schoolEndTime : nil,
+            schoolDays: memberType == .child ? (schoolDays.isEmpty ? nil : schoolDays) : nil,
+            activities: existingMember?.activities ?? [],
             phone: trimmedPhone.isEmpty ? nil : trimmedPhone,
             roles: roles,
             isLocationSharingEnabled: existingMember?.isLocationSharingEnabled ?? true,
             isOnline: existingMember?.isOnline ?? false
         )
 
-        onSave(member)
-        dismiss()
+        await MainActor.run {
+            isSaving = true
+            saveErrorMessage = nil
+        }
+        let didSave = await onSave(member)
+        print("[AddPersonView] Save result didSave=\(didSave)")
+        await MainActor.run {
+            isSaving = false
+            if didSave {
+                dismiss()
+            } else {
+                let backendMessage = saveErrorProvider?()?.trimmingCharacters(in: .whitespacesAndNewlines)
+                saveErrorMessage = (backendMessage?.isEmpty == false) ? backendMessage : "Backend save failed. Please try again."
+            }
+        }
     }
 
     private static func adultAccessRoles(from roles: Set<Role>) -> Set<AdultAccessRole> {
@@ -440,8 +534,94 @@ struct AddPersonView: View {
         return age(from: dateOfBirth)
     }
 
+    private var derivedChildAgeText: String? {
+        guard let age = derivedChildAge else { return nil }
+        let suffix = age == 1 ? "year" : "years"
+        return "\(age) \(suffix) old"
+    }
+
     private func age(from dateOfBirth: Date) -> Int {
         Calendar.current.dateComponents([.year], from: dateOfBirth, to: Date()).year ?? 0
+    }
+
+    private func childField(_ title: String, text: Binding<String>, field: Field) -> some View {
+        TextField(title, text: text)
+            .focused($focusedField, equals: field)
+            .tint(TribeTheme.primary)
+            .foregroundStyle(.primary)
+            .modifier(FieldStyle(isFocused: focusedField == field))
+    }
+
+    private var schoolStartTimeBinding: Binding<Date> {
+        Binding(
+            get: {
+                let fallback = DateComponents(hour: 7, minute: 45)
+                return Calendar.current.date(from: schoolStartTime ?? fallback) ?? Date()
+            },
+            set: {
+                schoolStartTime = Calendar.current.dateComponents([.hour, .minute], from: $0)
+            }
+        )
+    }
+
+    private var schoolEndTimeBinding: Binding<Date> {
+        Binding(
+            get: {
+                let fallback = DateComponents(hour: 13, minute: 45)
+                return Calendar.current.date(from: schoolEndTime ?? fallback) ?? Date()
+            },
+            set: {
+                schoolEndTime = Calendar.current.dateComponents([.hour, .minute], from: $0)
+            }
+        )
+    }
+
+    private var schoolDaysPicker: some View {
+        HStack(spacing: 8) {
+            ForEach(Weekday.allCases, id: \.self) { day in
+                let selected = schoolDays.contains(day)
+                Button(day.shortLabel) {
+                    if selected {
+                        schoolDays.remove(day)
+                    } else {
+                        schoolDays.insert(day)
+                    }
+                }
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(selected ? .white : .secondary)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 6)
+                .background(selected ? TribeTheme.primary : Color(uiColor: .tertiarySystemBackground))
+                .clipShape(Capsule())
+                .buttonStyle(.plain)
+            }
+        }
+    }
+}
+
+private struct FieldStyle: ViewModifier {
+    let isFocused: Bool
+
+    func body(content: Content) -> some View {
+        content
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(Color(uiColor: .tertiarySystemBackground))
+            .overlay {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(
+                        isFocused ? TribeTheme.primary.opacity(0.7) : Color(uiColor: .separator).opacity(0.35),
+                        lineWidth: isFocused ? 1.5 : 1
+                    )
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+}
+
+private extension String {
+    var nilIfEmpty: String? {
+        let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
     }
 }
 
@@ -449,23 +629,31 @@ struct AddPersonView: View {
 struct MemberEditorView: View {
     let existingMember: TribeMember?
     let defaultType: MemberType
-    let onSave: (TribeMember) -> Void
+    let onSave: (TribeMember) async -> Bool
+    let saveErrorProvider: (() -> String?)?
 
     init(
         existingMember: TribeMember? = nil,
         defaultType: MemberType = .adult,
-        onSave: @escaping (TribeMember) -> Void
+        onSave: @escaping (TribeMember) async -> Bool,
+        saveErrorProvider: (() -> String?)? = nil
     ) {
         self.existingMember = existingMember
         self.defaultType = defaultType
         self.onSave = onSave
+        self.saveErrorProvider = saveErrorProvider
     }
 
     var body: some View {
-        AddPersonView(existingMember: existingMember, defaultType: defaultType, onSave: onSave)
+        AddPersonView(
+            existingMember: existingMember,
+            defaultType: defaultType,
+            onSave: onSave,
+            saveErrorProvider: saveErrorProvider
+        )
     }
 }
 
 #Preview {
-    AddPersonView { _ in }
+    AddPersonView { _ in true }
 }

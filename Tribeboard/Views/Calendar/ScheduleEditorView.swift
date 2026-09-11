@@ -8,24 +8,39 @@ struct ScheduleEditorView: View {
 
     private struct EditableStop: Identifiable {
         let id: UUID
-        var label: String
-        var latitude: String
-        var longitude: String
+        var locationId: UUID?
     }
 
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var activeHouseholdStore: ActiveHouseholdStore
     @EnvironmentObject private var scheduleDataSource: ScheduleDataSource
+    @EnvironmentObject private var authSession: AuthSessionContext
+    @EnvironmentObject private var backendHouseholdContext: BackendHouseholdContext
+    @EnvironmentObject private var backendChildrenContext: BackendChildrenContext
+    @EnvironmentObject private var backendSchedulesContext: BackendSchedulesContext
+    @EnvironmentObject private var backendHouseholdLocationsContext: BackendHouseholdLocationsContext
+    @EnvironmentObject private var runDataSource: RunDataSource
 
     let mode: Mode
     let isOnboardingContext: Bool
     let onSave: (CalendarMockModel.UISchedule) -> Void
 
     @State private var title: String
-    @State private var time: Date
+    @State private var startTime: Date
+    @State private var endTime: Date
     @State private var weekdays: Set<Int>
     @State private var stops: [EditableStop]
     @State private var isEnabled: Bool
     @State private var showDeleteAlert = false
+    @State private var selectedChildId: UUID?
+    @State private var showValidationAlert = false
+    @State private var validationMessage = ""
+    @State private var isShowingAddLocation = false
+    @FocusState private var focusedField: Field?
+
+    private enum Field: Hashable {
+        case title
+    }
 
     private let weekdayItems: [(Int, String)] = [(2, "Mon"), (3, "Tue"), (4, "Wed"), (5, "Thu"), (6, "Fri"), (7, "Sat"), (1, "Sun")]
     private let templateId: UUID
@@ -45,35 +60,41 @@ struct ScheduleEditorView: View {
         case .create:
             self.templateId = UUID()
             _title = State(initialValue: "")
-            _time = State(initialValue: defaultTime)
-            _weekdays = State(initialValue: [2, 3, 4, 5, 6])
+            _startTime = State(initialValue: defaultTime)
+            _endTime = State(initialValue: Calendar.current.date(byAdding: .minute, value: 45, to: defaultTime) ?? defaultTime)
+            _weekdays = State(initialValue: [])
             _stops = State(initialValue: [
-                EditableStop(id: UUID(), label: "Home", latitude: "-17.8249", longitude: "31.0530"),
-                EditableStop(id: UUID(), label: "Friend", latitude: "-17.8150", longitude: "31.0602"),
-                EditableStop(id: UUID(), label: "School", latitude: "-17.8015", longitude: "31.0476")
+                EditableStop(id: UUID(), locationId: nil),
+                EditableStop(id: UUID(), locationId: nil)
             ])
             _isEnabled = State(initialValue: true)
+            _selectedChildId = State(initialValue: nil)
         case let .edit(schedule):
             self.templateId = schedule.id
             _title = State(initialValue: schedule.title)
-            _time = State(initialValue: Self.timeFromString(schedule.timeString) ?? defaultTime)
+            let parsedStart = Self.timeFromString(schedule.timeString) ?? defaultTime
+            _startTime = State(initialValue: parsedStart)
+            _endTime = State(initialValue: Calendar.current.date(byAdding: .minute, value: 45, to: parsedStart) ?? parsedStart)
             _weekdays = State(initialValue: Self.weekdaysFromRecurrence(schedule.recurrenceLabel))
-            _stops = State(initialValue: schedule.stops.enumerated().map { _, stop in
-                let split = stop.address.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
-                return EditableStop(
-                    id: UUID(),
-                    label: stop.label,
-                    latitude: split.first ?? "",
-                    longitude: split.count > 1 ? split[1] : ""
-                )
+            _stops = State(initialValue: schedule.stops.map { stop in
+                EditableStop(id: UUID(), locationId: nil)
             })
             _isEnabled = State(initialValue: schedule.isEnabled)
+            _selectedChildId = State(initialValue: nil)
         }
     }
 
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
+                if !canEditSchedules {
+                    CalendarCard {
+                        Text("Only organisers can manage schedules.")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(CalendarUITheme.textSecondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
                 detailsCard
                 weekdaysCard
                 stopsCard
@@ -82,10 +103,12 @@ struct ScheduleEditorView: View {
                     deleteCard
                 }
             }
+            .disabled(!canEditSchedules)
             .padding(.horizontal, 16)
             .padding(.top, 16)
             .padding(.bottom, 24)
         }
+        .scrollDismissesKeyboard(.interactively)
         .background(CalendarUITheme.offWhite.ignoresSafeArea())
         .safeAreaInset(edge: .bottom) {
             bottomActionBar
@@ -100,13 +123,18 @@ struct ScheduleEditorView: View {
                 Button("Save") {
                     performSave()
                 }
-                .disabled(scheduleDataSource.isWorking || !canSave)
+                .disabled(scheduleDataSource.isWorking || !canSave || !canEditSchedules)
             }
         }
         .alert("Delete Schedule?", isPresented: $showDeleteAlert) {
             Button("Delete", role: .destructive) {
+                guard canEditSchedules else { return }
                 Task {
+                    await runDataSource.invalidateRuns(templateId: templateId)
                     await scheduleDataSource.delete(id: templateId)
+                    if let householdId = backendHouseholdContext.activeHouseholdId {
+                        await backendSchedulesContext.deleteSchedule(id: templateId, householdId: householdId)
+                    }
                     dismiss()
                 }
             }
@@ -130,6 +158,58 @@ struct ScheduleEditorView: View {
             }
         } message: {
             Text(scheduleDataSource.lastError ?? "Unknown validation error.")
+        }
+        .alert("Schedule Setup Needed", isPresented: $showValidationAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(validationMessage)
+        }
+        .alert("Schedule Sync Issue", isPresented: Binding(
+            get: { backendSchedulesContext.lastError != nil },
+            set: { isPresented in
+                if !isPresented {
+                    backendSchedulesContext.lastError = nil
+                }
+            }
+        )) {
+            Button("OK", role: .cancel) {
+                backendSchedulesContext.lastError = nil
+            }
+        } message: {
+            Text(backendSchedulesContext.lastError ?? "Unable to sync schedule.")
+        }
+        .onAppear {
+            if selectedChildId == nil {
+                if case .edit = mode {
+                    selectedChildId = scheduleDataSource.templates.first(where: { $0.id == templateId })?.childId
+                }
+                if selectedChildId == nil {
+                    selectedChildId = backendChildrenContext.children.first?.id
+                }
+            }
+            hydrateStopsFromTemplateIfNeeded()
+        }
+        .task {
+            await backendHouseholdLocationsContext.refreshForActiveHousehold()
+            hydrateStopsFromTemplateIfNeeded()
+        }
+        .sheet(isPresented: $isShowingAddLocation) {
+            NavigationStack {
+                AddEditHouseholdLocationView()
+            }
+        }
+    }
+
+    private func hydrateStopsFromTemplateIfNeeded() {
+        guard let template = scheduleDataSource.templates.first(where: { $0.id == templateId }) else { return }
+        let templateStops = template.stops.sorted { $0.order < $1.order }
+        guard !templateStops.isEmpty else { return }
+        let alreadyHydrated = stops.contains { $0.locationId != nil }
+        guard !alreadyHydrated else { return }
+        stops = templateStops.map { stop in
+            let resolvedLocationId = stop.locationId
+                ?? backendHouseholdLocationsContext.findLocationByNameOrLabel(stop.name)?.id
+            return EditableStop(id: stop.id, locationId: resolvedLocationId)
         }
     }
 
@@ -164,7 +244,8 @@ struct ScheduleEditorView: View {
             }
             .buttonStyle(.plain)
             .disabled(scheduleDataSource.isWorking || !canSave)
-            .opacity(scheduleDataSource.isWorking || !canSave ? 0.7 : 1.0)
+            .opacity(scheduleDataSource.isWorking || !canSave || !canEditSchedules ? 0.7 : 1.0)
+            .disabled(scheduleDataSource.isWorking || !canSave || !canEditSchedules)
         }
         .padding(.horizontal, 16)
         .padding(.top, 10)
@@ -176,12 +257,31 @@ struct ScheduleEditorView: View {
         CalendarCard {
             VStack(alignment: .leading, spacing: 12) {
                 sectionTitle("Schedule Details")
-                textField("Title", text: $title)
-                DatePicker("Time", selection: $time, displayedComponents: .hourAndMinute)
+                textField("Title", text: $title, field: .title)
+                Picker("Child", selection: Binding<UUID?>(
+                    get: { selectedChildId },
+                    set: { selectedChildId = $0 }
+                )) {
+                    Text("Select child").tag(nil as UUID?)
+                    ForEach(backendChildrenContext.children) { child in
+                        Text(child.displayName?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false ? child.displayName! : child.legalName)
+                            .tag(Optional(child.id))
+                    }
+                }
+                DatePicker("Start Time", selection: $startTime, displayedComponents: .hourAndMinute)
+                    .datePickerStyle(.compact)
+                    .tint(CalendarUITheme.indigo)
+                DatePicker("End Time", selection: $endTime, displayedComponents: .hourAndMinute)
                     .datePickerStyle(.compact)
                     .tint(CalendarUITheme.indigo)
                 if title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     validationText("Title is required.")
+                }
+                if selectedChildId == nil {
+                    validationText("Select a child for this schedule.")
+                }
+                if !hasValidTimeRange {
+                    validationText("End time must be after start time.")
                 }
             }
         }
@@ -211,7 +311,7 @@ struct ScheduleEditorView: View {
                     Spacer()
                     Button("Add Stop") {
                         guard stops.count < 3 else { return }
-                        stops.append(EditableStop(id: UUID(), label: "", latitude: "", longitude: ""))
+                        stops.append(EditableStop(id: UUID(), locationId: nil))
                     }
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(CalendarUITheme.indigo)
@@ -235,11 +335,15 @@ struct ScheduleEditorView: View {
                                 .buttonStyle(.plain)
                             }
                         }
-                        textField("Label", text: $stops[index].label)
-                        HStack(spacing: 8) {
-                            textField("Latitude", text: $stops[index].latitude)
-                            textField("Longitude", text: $stops[index].longitude)
-                        }
+                        HouseholdLocationPickerField(
+                            title: "Location",
+                            placeholder: "Select saved location",
+                            selectedLocationId: Binding(
+                                get: { stops[index].locationId },
+                                set: { stops[index].locationId = $0 }
+                            ),
+                            onAddLocation: { isShowingAddLocation = true }
+                        )
                     }
                     .padding(12)
                     .background(Color(uiColor: .secondarySystemBackground))
@@ -290,7 +394,9 @@ struct ScheduleEditorView: View {
     private var canSave: Bool {
         !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
         !weekdays.isEmpty &&
-        hasValidStops
+        hasValidStops &&
+        selectedChildId != nil &&
+        hasValidTimeRange
     }
 
     private var hasValidStops: Bool {
@@ -302,43 +408,75 @@ struct ScheduleEditorView: View {
             return "Add at least 2 stops."
         }
         for stop in stops {
-            if stop.label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                return "Each stop must have a label."
+            guard let locationId = stop.locationId,
+                  let location = backendHouseholdLocationsContext.location(id: locationId) else {
+                return "Each stop must use a saved family location."
             }
-            guard let lat = Double(stop.latitude), let lon = Double(stop.longitude) else {
-                return "Each stop must have valid latitude and longitude values."
-            }
-            if !(-90.0...90.0).contains(lat) || !(-180.0...180.0).contains(lon) {
-                return "Latitude must be -90...90 and longitude must be -180...180."
+            guard location.readiness == .complete else {
+                return "\(location.displayName) is missing a valid address or map pin."
             }
         }
         return nil
     }
 
     private func saveTemplate() async -> Bool {
+        guard canEditSchedules else {
+            validationMessage = "Only organisers can manage schedules."
+            showValidationAlert = true
+            return false
+        }
+        guard let activeHouseholdId = activeHouseholdStore.activeHouseholdId else {
+            validationMessage = "Select an active household before adding schedules."
+            showValidationAlert = true
+            return false
+        }
+        if weekdays.isEmpty {
+            validationMessage = "Select at least one weekday before saving this schedule."
+            showValidationAlert = true
+            return false
+        }
+        guard let selectedChildId,
+              backendChildrenContext.children.contains(where: { $0.id == selectedChildId }) else {
+            validationMessage = "Select a valid child before saving this schedule."
+            showValidationAlert = true
+            return false
+        }
+        guard hasValidTimeRange else {
+            validationMessage = "End time must be after start time."
+            showValidationAlert = true
+            return false
+        }
+        guard hasValidStops else {
+            validationMessage = stopsValidationMessage ?? "Please fix schedule stops before saving."
+            showValidationAlert = true
+            return false
+        }
+
         let existing = scheduleDataSource.templates.first(where: { $0.id == templateId })
-        let validStops = stops.enumerated().compactMap { index, stop -> SystemDomain.Stop? in
-            guard
-                !stop.label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-                let lat = Double(stop.latitude),
-                let lon = Double(stop.longitude)
-            else { return nil }
+        let validStops: [SystemDomain.Stop] = stops.enumerated().compactMap { index, stop in
+            guard let locationId = stop.locationId,
+                  let location = backendHouseholdLocationsContext.location(id: locationId),
+                  location.readiness == .complete else {
+                return nil
+            }
             let existingStops = existing?.stops.sorted { $0.order < $1.order } ?? []
-            let existingStopId = index < existingStops.count ? existingStops[index].id : nil
+            let existingStopId = index < existingStops.count ? existingStops[index].id : stop.id
             return SystemDomain.Stop(
-                id: existingStopId ?? UUID(),
-                name: stop.label.trimmingCharacters(in: .whitespacesAndNewlines),
-                latitude: lat,
-                longitude: lon,
-                order: index
+                id: existingStopId,
+                name: location.displayName,
+                latitude: location.latitude,
+                longitude: location.longitude,
+                order: index,
+                locationId: location.id
             )
         }
 
-        var components = Calendar.current.dateComponents([.hour, .minute], from: time)
+        let components = Calendar.current.dateComponents([.hour, .minute], from: startTime)
         let template = SystemDomain.ScheduleTemplate(
             id: templateId,
+            householdId: activeHouseholdId,
             name: title.trimmingCharacters(in: .whitespacesAndNewlines),
-            childId: existing?.childId ?? UUID(),
+            childId: selectedChildId,
             driverId: existing?.driverId,
             weekdays: weekdays,
             hour: components.hour ?? 6,
@@ -347,16 +485,35 @@ struct ScheduleEditorView: View {
             isActive: isEnabled,
             createdAt: existing?.createdAt ?? Date()
         )
-
-        await scheduleDataSource.upsert(template)
-        guard scheduleDataSource.lastError == nil else {
-            return false
+        
+#if DEBUG
+        print(
+            "[ScheduleEditorView] save start household_id=\(activeHouseholdId.uuidString), " +
+            "child_id=\(selectedChildId.uuidString), title=\(template.name)"
+        )
+#endif
+        let didSave: Bool
+        switch mode {
+        case .create:
+            didSave = await backendSchedulesContext.createSchedule(from: template)
+        case .edit:
+            didSave = await backendSchedulesContext.updateSchedule(from: template)
         }
+        guard didSave else { return false }
+        await backendSchedulesContext.refreshSchedules(householdId: activeHouseholdId)
+#if DEBUG
+        print("[ScheduleEditorView] save success template_id=\(template.id.uuidString)")
+#endif
         onSave(template.asCalendarSchedule)
         return true
     }
 
     private func performSave() {
+        guard canEditSchedules else {
+            validationMessage = "Only organisers can manage schedules."
+            showValidationAlert = true
+            return
+        }
         guard canSave else { return }
         Task {
             let saved = await saveTemplate()
@@ -366,13 +523,21 @@ struct ScheduleEditorView: View {
         }
     }
 
+    private var canEditSchedules: Bool {
+        backendHouseholdContext.canEditSchedules
+    }
+
+    private var hasValidTimeRange: Bool {
+        endTime > startTime
+    }
+
     private func sectionTitle(_ text: String) -> some View {
         Text(text)
             .font(.system(size: 17, weight: .semibold))
             .foregroundStyle(CalendarUITheme.textPrimary)
     }
 
-    private func textField(_ title: String, text: Binding<String>) -> some View {
+    private func textField(_ title: String, text: Binding<String>, field: Field) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title)
                 .font(.system(size: 13, weight: .semibold))
@@ -380,9 +545,17 @@ struct ScheduleEditorView: View {
             TextField(title, text: text)
                 .foregroundStyle(.primary)
                 .tint(CalendarUITheme.indigo)
+                .focused($focusedField, equals: field)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 10)
                 .background(Color(uiColor: .tertiarySystemBackground))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .stroke(
+                            focusedField == field ? CalendarUITheme.indigo.opacity(0.7) : Color(uiColor: .separator).opacity(0.35),
+                            lineWidth: focusedField == field ? 1.5 : 1
+                        )
+                }
                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
     }

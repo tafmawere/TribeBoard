@@ -30,14 +30,6 @@ final class SystemBootstrap {
         let runStore = RunStore()
         let generator = RunGeneratorService()
 
-        let templatesBefore = scheduleStore.load()
-        let hasDropoff = templatesBefore.contains { $0.name == "School Dropoff" }
-        let hasPickup = templatesBefore.contains { $0.name == "School Pickup" }
-        let seeded = templatesBefore.isEmpty || !hasDropoff || !hasPickup
-        if seeded {
-            scheduleStore.seedDemoIfNeeded()
-        }
-
         let templates = scheduleStore.load()
         let existingRuns = runStore.load()
         let newRuns = generator.generateRuns(
@@ -55,7 +47,7 @@ final class SystemBootstrap {
         print("SystemBootstrap debug -> storage: \(storageURL.path), existing: \(existingRuns.count), generated: \(newRuns.count), savedTotal: \(existingRuns.count + newRuns.count)")
 #endif
 
-        return (seeded: seeded, newRuns: newRuns.count)
+        return (seeded: false, newRuns: newRuns.count)
     }
 
     static func generateAndPersistRuns(daysAhead: Int = 14) async throws -> Int {
@@ -93,7 +85,6 @@ final class SystemBootstrap {
     }
 
     static func seedDemoSchedules() async throws {
-        let scheduleStore = ScheduleStore()
-        scheduleStore.seedDemoIfNeeded()
+        // Sprint 40: explicitly disabled to prevent placeholder schedule sources.
     }
 }

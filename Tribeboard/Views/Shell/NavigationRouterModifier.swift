@@ -33,7 +33,7 @@ struct DestinationNavigationRouter: ViewModifier {
 
                 // Notifications
                 case .notificationsInbox:
-                    NotificationsInboxView()
+                    NotificationsView()
 
                 case .notificationSettings:
                     NotificationSettingsView()
@@ -52,6 +52,9 @@ struct DestinationNavigationRouter: ViewModifier {
                     EmergencyContactsView()
 
                 // General
+                case .profile:
+                    ProfileView()
+
                 case .calendarSync:
                     CalendarSyncView()
 
@@ -60,6 +63,9 @@ struct DestinationNavigationRouter: ViewModifier {
 
                 case .helpSupport:
                     HelpSupportView()
+
+                case .legalSafety:
+                    LegalSafetyView()
 
                 case .about:
                     AboutView()
@@ -93,10 +99,14 @@ private struct RunDetailsRouteView: View {
 
 private struct RunEditRouteView: View {
     let runId: String
+    @EnvironmentObject private var locationService: LocationReadinessService
+    @EnvironmentObject private var familyQuickPlacesStore: FamilyQuickPlacesStore
 
     var body: some View {
-        RunEditRescheduleView(run: RunDetailsData.scheduledRun) { _ in }
+        RunEditRescheduleView(mode: .edit(RunDetailsData.scheduledRun)) { _ in true }
             .navigationTitle("Edit Run")
+            .environmentObject(locationService)
+            .environmentObject(familyQuickPlacesStore)
     }
 }
 
@@ -119,6 +129,11 @@ private struct CancelRunRouteView: View {
 
 private struct ScheduleEditorRouteView: View {
     let scheduleId: String?
+    @EnvironmentObject private var backendProfileContext: BackendProfileContext
+    @EnvironmentObject private var backendHouseholdContext: BackendHouseholdContext
+    @EnvironmentObject private var backendChildrenContext: BackendChildrenContext
+    @EnvironmentObject private var backendSchedulesContext: BackendSchedulesContext
+    @EnvironmentObject private var backendHouseholdPeopleContext: BackendHouseholdPeopleContext
     @EnvironmentObject private var scheduleDataSource: ScheduleDataSource
 
     var body: some View {
@@ -128,8 +143,18 @@ private struct ScheduleEditorRouteView: View {
             let template = scheduleDataSource.templates.first(where: { $0.id == uuid })
         {
             ScheduleEditorView(mode: .edit(template.asCalendarSchedule)) { _ in }
+                .environmentObject(backendProfileContext)
+                .environmentObject(backendHouseholdContext)
+                .environmentObject(backendChildrenContext)
+                .environmentObject(backendSchedulesContext)
+                .environmentObject(backendHouseholdPeopleContext)
         } else {
-            ScheduleEditorView(mode: .create) { _ in }
+            ScheduleCreatorView()
+                .environmentObject(backendProfileContext)
+                .environmentObject(backendHouseholdContext)
+                .environmentObject(backendChildrenContext)
+                .environmentObject(backendSchedulesContext)
+                .environmentObject(backendHouseholdPeopleContext)
         }
     }
 }

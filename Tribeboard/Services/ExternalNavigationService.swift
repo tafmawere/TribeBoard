@@ -1,5 +1,4 @@
 import Foundation
-import MapKit
 import UIKit
 
 enum NavigationApp: String, CaseIterable {
@@ -62,10 +61,9 @@ struct ExternalNavigationService {
         latitude: Double,
         longitude: Double
     ) {
-        let coordinate = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
-        let placemark = MKPlacemark(coordinate: coordinate)
-        let mapItem = MKMapItem(placemark: placemark)
-        mapItem.name = destinationName
-        mapItem.openInMaps(launchOptions: [MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeDriving])
+        let encodedName = destinationName.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? destinationName
+        let urlString = "http://maps.apple.com/?daddr=\(latitude),\(longitude)&dirflg=d"
+        guard let url = URL(string: urlString) else { return }
+        UIApplication.shared.open(url)
     }
 }

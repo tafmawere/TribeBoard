@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct NotificationSettingsView: View {
+    @AppStorage(AppSettings.notificationLeadMinutesKey) private var notificationLeadMinutes = 15
     @State private var muteAll = false
 
     @State private var runStartingOn = true
@@ -73,6 +74,27 @@ struct NotificationSettingsView: View {
                         subtitle: "Always show high-priority safety updates.",
                         isOn: $emergencyAlertsOn
                     )
+                }
+
+                NotificationStitchCard {
+                    VStack(alignment: .leading, spacing: 12) {
+                        NotificationSectionHeading(
+                            title: "Notification lead time",
+                            subtitle: "How many minutes before a run to notify you."
+                        )
+                        HStack {
+                            Text("Lead time")
+                                .font(.system(size: 15, weight: .semibold))
+                            Spacer()
+                            Text("\(notificationLeadMinutes) min")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(NotificationTheme.textSecondary)
+                            Stepper("Lead time", value: $notificationLeadMinutes, in: 1...60)
+                                .labelsHidden()
+                        }
+                    }
+                    .disabled(muteAll)
+                    .opacity(muteAll ? 0.55 : 1)
                 }
 
                 settingsSection(

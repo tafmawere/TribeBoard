@@ -1,5 +1,6 @@
-import MapKit
+import GoogleMaps
 import SwiftUI
+import UIKit
 
 struct SetHomeView: View {
     @Binding var homeLabel: String
@@ -11,8 +12,12 @@ struct SetHomeView: View {
 
     let onContinue: () -> Void
 
-    @StateObject private var vm = HomeLocationViewModel()
-    @State private var cameraPosition: MapCameraPosition = .automatic
+    @StateObject private var searchModel = LocationSearchModel()
+    @State private var mapRegion = CoordinateRegionDegrees(
+        center: CLLocationCoordinate2D(latitude: -17.8252, longitude: 31.0335),
+        latitudeDelta: 0.03,
+        longitudeDelta: 0.03
+    )
 
     var body: some View {
         VStack(spacing: 16) {
@@ -25,36 +30,22 @@ struct SetHomeView: View {
             Spacer()
         }
         .onAppear {
-            vm.setInitialAddress(homeAddress)
+            searchModel.applySelectedAddress(homeAddress)
             if let lat = homeLatitude, let lon = homeLongitude {
-                vm.selectedLatitude = lat
-                vm.selectedLongitude = lon
-                vm.mapRegion = MKCoordinateRegion(
+                mapRegion = CoordinateRegionDegrees(
                     center: CLLocationCoordinate2D(latitude: lat, longitude: lon),
-                    span: MKCoordinateSpan(latitudeDelta: 0.012, longitudeDelta: 0.012)
+                    latitudeDelta: 0.012,
+                    longitudeDelta: 0.012
                 )
             }
-            cameraPosition = .region(vm.mapRegion)
-        }
-        .onChange(of: vm.selectedTitle) { _, newValue in
-            homeAddressTitle = newValue
-        }
-        .onChange(of: vm.selectedSubtitle) { _, newValue in
-            homeAddressSubtitle = newValue
-        }
-        .onChange(of: vm.selectedLatitude) { _, newValue in
-            homeLatitude = newValue
-        }
-        .onChange(of: vm.selectedLongitude) { _, newValue in
-            homeLongitude = newValue
         }
         .onChange(of: mapRegionChangeToken) { _, _ in
-            cameraPosition = .region(vm.mapRegion)
+            // Region updates when the user picks a new resolved address from search.
         }
     }
 
     private var homeCoordinate: CLLocationCoordinate2D? {
-        guard let lat = vm.selectedLatitude, let lon = vm.selectedLongitude else { return nil }
+        guard let lat = homeLatitude, let lon = homeLongitude else { return nil }
         return CLLocationCoordinate2D(latitude: lat, longitude: lon)
     }
 
@@ -71,33 +62,32 @@ struct SetHomeView: View {
                 .foregroundStyle(.primary)
                 .tint(Color(red: 0.388, green: 0.400, blue: 0.945))
 
-            TextField("Home address", text: $vm.addressQuery)
-                .textFieldStyle(.roundedBorder)
-                .foregroundStyle(.primary)
-                .tint(Color(red: 0.388, green: 0.400, blue: 0.945))
-                .onChange(of: vm.addressQuery) { _, newValue in
-                    homeAddress = newValue
-                    vm.updateQuery(newValue)
+            LocationSearchField(
+                title: "Home Address",
+                placeholder: "Search home address",
+                model: searchModel,
+                onSelected: { result in
+                    homeAddress = result.fullAddress
+                    homeAddressTitle = result.title
+                    homeAddressSubtitle = result.subtitle
+                    homeLatitude = result.latitude
+                    homeLongitude = result.longitude
+                    if let lat = result.latitude, let lon = result.longitude {
+                        mapRegion = CoordinateRegionDegrees(
+                            center: CLLocationCoordinate2D(latitude: lat, longitude: lon),
+                            latitudeDelta: 0.012,
+                            longitudeDelta: 0.012
+                        )
+                    }
+                },
+                onCleared: {
+                    homeAddress = ""
+                    homeAddressTitle = ""
+                    homeAddressSubtitle = ""
+                    homeLatitude = nil
+                    homeLongitude = nil
                 }
-
-            suggestionsList
-
-            Button {
-                vm.useCurrentLocation()
-            } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "location.fill")
-                    Text(vm.isResolvingCurrentLocation ? "Locating..." : "Use current location")
-                        .font(.system(size: 14, weight: .semibold))
-                }
-                .foregroundStyle(Color(red: 0.388, green: 0.400, blue: 0.945))
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(Color(red: 0.388, green: 0.400, blue: 0.945).opacity(0.10))
-                .clipShape(Capsule())
-            }
-            .buttonStyle(.plain)
-            .disabled(vm.isResolvingCurrentLocation)
+            )
         }
         .padding(20)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -106,78 +96,46 @@ struct SetHomeView: View {
         .shadow(color: .black.opacity(0.06), radius: 10, x: 0, y: 3)
     }
 
-    @ViewBuilder
-    private var suggestionsList: some View {
-        if !vm.suggestions.isEmpty {
-            ScrollView {
-                VStack(spacing: 0) {
-                    ForEach(Array(vm.suggestions.enumerated()), id: \.offset) { _, completion in
-                        Button {
-                            vm.selectSuggestion(completion)
-                        } label: {
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(completion.title)
-                                    .font(.system(size: 14, weight: .semibold))
-                                    .foregroundStyle(.primary)
-                                if !completion.subtitle.isEmpty {
-                                    Text(completion.subtitle)
-                                        .font(.system(size: 12))
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 10)
-                        }
-                        .buttonStyle(.plain)
-                        Divider()
-                    }
-                }
-            }
-            .frame(maxHeight: 180)
-            .background(Color(uiColor: .tertiarySystemBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .stroke(Color(uiColor: .separator).opacity(0.35), lineWidth: 1)
-            }
-        }
-    }
-
-    private var homePin: HomePin? {
+    private var homePin: GoogleMapMarkerModel? {
         guard let coordinate = homeCoordinate else { return nil }
-        return HomePin(coordinate: coordinate)
+        return GoogleMapMarkerModel(
+            id: UUID(uuidString: "00000000-0000-0000-0000-0000000000AA")!,
+            title: "Home",
+            coordinate: coordinate,
+            kind: .generic,
+            orderLabel: nil,
+            isSelected: false
+        )
     }
 
     private var mapRegionChangeToken: HomeChangeKey {
         HomeChangeKey(
-            lat: vm.mapRegion.center.latitude,
-            lon: vm.mapRegion.center.longitude,
-            spanLat: vm.mapRegion.span.latitudeDelta,
-            spanLon: vm.mapRegion.span.longitudeDelta
+            lat: mapRegion.center.latitude,
+            lon: mapRegion.center.longitude,
+            spanLat: mapRegion.latitudeDelta,
+            spanLon: mapRegion.longitudeDelta
         )
     }
 
-    @MapContentBuilder
-    private var mapContent: some MapContent {
-        if let pin = homePin {
-            Marker("Home", coordinate: pin.coordinate)
-        }
-    }
-
     private var mapView: some View {
-        Map(position: $cameraPosition, interactionModes: .all) {
-            mapContent
-        }
-        .onMapCameraChange { context in
-            vm.mapRegion = context.region
-        }
+        TribeGoogleMapView(
+            markers: homePin.map { [$0] } ?? [],
+            polylineCoordinates: [],
+            strokeUIColor: .clear,
+            lineWidth: 0,
+            cameraHint: mapRegion,
+            externalCamera: nil,
+            showsUserLocation: false,
+            padding: .init(top: 12, left: 12, bottom: 12, right: 12),
+            onMarkerIdTap: nil
+        )
         .frame(height: 180)
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     private var saveHomeButton: some View {
         Button("Save Home") {
+            homeAddress = searchModel.query.trimmingCharacters(in: .whitespacesAndNewlines)
             onContinue()
         }
         .font(.system(size: 17, weight: .semibold))
@@ -187,13 +145,8 @@ struct SetHomeView: View {
         .background(Color(red: 0.388, green: 0.400, blue: 0.945))
         .clipShape(Capsule())
         .shadow(color: Color(red: 0.388, green: 0.400, blue: 0.945).opacity(0.24), radius: 12, x: 0, y: 8)
-        .disabled(homeAddress.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        .disabled(searchModel.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
     }
-}
-
-private struct HomePin: Identifiable {
-    let id: String = "home"
-    let coordinate: CLLocationCoordinate2D
 }
 
 private struct HomeChangeKey: Equatable {

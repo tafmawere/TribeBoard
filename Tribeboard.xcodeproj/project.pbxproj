@@ -6,6 +6,12 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		B005ED002F32553600002CE5 /* GoogleMaps in Frameworks */ = {isa = PBXBuildFile; productRef = B003ED002F32553600002CE3 /* GoogleMaps */; };
+		B006ED002F32553600002CE6 /* GooglePlaces in Frameworks */ = {isa = PBXBuildFile; productRef = B004ED002F32553600002CE4 /* GooglePlaces */; };
+		B008ED002F32553600002CE8 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = B009ED002F32553600002CE9 /* GoogleSignIn */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		A086ED922F32553600002CE4 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -27,6 +33,7 @@
 		A086ED7D2F32553400002CE4 /* Tribeboard.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Tribeboard.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A086ED912F32553600002CE4 /* TribeboardTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TribeboardTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A086ED9B2F32553600002CE4 /* TribeboardUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TribeboardUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		E0F0ED002F32553600002CE0 /* Development.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Development.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -65,6 +72,9 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B005ED002F32553600002CE5 /* GoogleMaps in Frameworks */,
+				B006ED002F32553600002CE6 /* GooglePlaces in Frameworks */,
+				B008ED002F32553600002CE8 /* GoogleSignIn in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -88,6 +98,7 @@
 		A086ED742F32553400002CE4 = {
 			isa = PBXGroup;
 			children = (
+				E0F0ED002F32553600002CE0 /* Development.xcconfig */,
 				A086ED7F2F32553400002CE4 /* Tribeboard */,
 				A086ED942F32553600002CE4 /* TribeboardTests */,
 				A086ED9E2F32553600002CE4 /* TribeboardUITests */,
@@ -125,6 +136,9 @@
 			);
 			name = Tribeboard;
 			packageProductDependencies = (
+				B003ED002F32553600002CE3 /* GoogleMaps */,
+				B004ED002F32553600002CE4 /* GooglePlaces */,
+				B009ED002F32553600002CE9 /* GoogleSignIn */,
 			);
 			productName = Tribeboard;
 			productReference = A086ED7D2F32553400002CE4 /* Tribeboard.app */;
@@ -211,6 +225,11 @@
 			);
 			mainGroup = A086ED742F32553400002CE4;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				B001ED002F32553600002CE1 /* XCRemoteSwiftPackageReference "ios-maps-sdk" */,
+				B002ED002F32553600002CE2 /* XCRemoteSwiftPackageReference "ios-places-sdk" */,
+				B007ED002F32553600002CE7 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = A086ED7E2F32553400002CE4 /* Products */;
 			projectDirPath = "";
@@ -287,10 +306,12 @@
 /* Begin XCBuildConfiguration section */
 		A086EDA52F32553600002CE4 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = E0F0ED002F32553600002CE0 /* Development.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				"ASSETCATALOG_COMPILER_APPICON_NAME[sdk=iphoneos*]" = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
 				CODE_SIGN_ENTITLEMENTS = Tribeboard/Tribeboard.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -299,9 +320,10 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Tribeboard/Info.plist;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.lifestyle";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Tribeboard uses your location to show where you are on the map, estimate arrivals for runs, and improve pickups and drop-offs.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
@@ -328,10 +350,12 @@
 		};
 		A086EDA62F32553600002CE4 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = E0F0ED002F32553600002CE0 /* Development.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				"ASSETCATALOG_COMPILER_APPICON_NAME[sdk=iphoneos*]" = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
 				CODE_SIGN_ENTITLEMENTS = Tribeboard/Tribeboard.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -340,9 +364,10 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Tribeboard/Info.plist;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.lifestyle";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Tribeboard uses your location to show where you are on the map, estimate arrivals for runs, and improve pickups and drop-offs.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
@@ -492,6 +517,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = NDM2BK8S8H;
@@ -500,6 +526,7 @@
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = net.dataenvy.tribeboard.TribeboardTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = NO;
@@ -514,6 +541,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = NDM2BK8S8H;
@@ -522,6 +550,7 @@
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = net.dataenvy.tribeboard.TribeboardTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = NO;
@@ -612,6 +641,51 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		B001ED002F32553600002CE1 /* XCRemoteSwiftPackageReference "ios-maps-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/googlemaps/ios-maps-sdk";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 10.0.0;
+			};
+		};
+		B002ED002F32553600002CE2 /* XCRemoteSwiftPackageReference "ios-places-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/googlemaps/ios-places-sdk";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 10.0.0;
+			};
+		};
+		B007ED002F32553600002CE7 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/google/GoogleSignIn-iOS";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 8.0.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		B003ED002F32553600002CE3 /* GoogleMaps */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B001ED002F32553600002CE1 /* XCRemoteSwiftPackageReference "ios-maps-sdk" */;
+			productName = GoogleMaps;
+		};
+		B004ED002F32553600002CE4 /* GooglePlaces */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B002ED002F32553600002CE2 /* XCRemoteSwiftPackageReference "ios-places-sdk" */;
+			productName = GooglePlaces;
+		};
+		B009ED002F32553600002CE9 /* GoogleSignIn */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B007ED002F32553600002CE7 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignIn;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = A086ED752F32553400002CE4 /* Project object */;
 }

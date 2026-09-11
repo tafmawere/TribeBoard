@@ -1,7 +1,8 @@
-import SwiftUI
-import MapKit
-import CoreLocation
 import Combine
+import CoreLocation
+import GoogleMaps
+import SwiftUI
+import UIKit
 
 struct ReplayRoutePoint: Identifiable {
     let id: UUID
@@ -36,7 +37,7 @@ struct RouteReplayView: View {
     let routePoints: [ReplayRoutePoint]
     let eventMarkers: [ReplayEventMarker]
 
-    @State private var mapPosition: MapCameraPosition
+    @State private var cameraRegion: CoordinateRegionDegrees
     @State private var driverCoordinate: CLLocationCoordinate2D
     @State private var replayDate: Date
     @State private var isPlaying = true
@@ -58,7 +59,12 @@ struct RouteReplayView: View {
 
         _driverCoordinate = State(initialValue: initialCoordinate)
         _replayDate = State(initialValue: initialTime)
-        _mapPosition = State(initialValue: .region(Self.fittedRegion(for: routePoints.map(\.coordinate), fallback: fallback)))
+        _cameraRegion = State(
+            initialValue: CoordinateRegionDegrees.fittingCoordinates(
+                routePoints.map(\.coordinate),
+                fallback: fallback
+            )
+        )
     }
 
     private var startDate: Date {
@@ -75,41 +81,72 @@ struct RouteReplayView: View {
         return max(0, min(1, replayDate.timeIntervalSince(startDate) / total))
     }
 
+    private static let driverReplayMarkerID = UUID(uuidString: "00000000-0000-0000-0000-0000000000D1")!
+
+    private var replayGoogleMarkers: [GoogleMapMarkerModel] {
+        var list: [GoogleMapMarkerModel] = []
+        if let start = routePoints.first {
+            list.append(
+                GoogleMapMarkerModel(
+                    id: start.id,
+                    title: "Start",
+                    coordinate: start.coordinate,
+                    kind: .routeStart,
+                    orderLabel: nil,
+                    isSelected: false
+                )
+            )
+        }
+        if let end = routePoints.last, routePoints.count > 1 {
+            list.append(
+                GoogleMapMarkerModel(
+                    id: end.id,
+                    title: "End",
+                    coordinate: end.coordinate,
+                    kind: .routeEnd,
+                    orderLabel: nil,
+                    isSelected: false
+                )
+            )
+        }
+        for event in eventMarkers {
+            list.append(
+                GoogleMapMarkerModel(
+                    id: event.id,
+                    title: event.title,
+                    coordinate: event.coordinate,
+                    kind: .generic,
+                    orderLabel: nil,
+                    isSelected: false
+                )
+            )
+        }
+        list.append(
+            GoogleMapMarkerModel(
+                id: Self.driverReplayMarkerID,
+                title: "Driver",
+                coordinate: driverCoordinate,
+                kind: .driver,
+                orderLabel: nil,
+                isSelected: false
+            )
+        )
+        return list
+    }
+
     var body: some View {
         ZStack(alignment: .bottom) {
-            Map(position: $mapPosition, interactionModes: .all) {
-                MapPolyline(coordinates: routePoints.map(\.coordinate))
-                    .stroke(UIRunDesignSystem.primary.opacity(0.85), lineWidth: 5)
-
-                if let start = routePoints.first {
-                    Annotation("Start", coordinate: start.coordinate) {
-                        markerIcon(symbol: "play.fill", tint: UIRunDesignSystem.success)
-                    }
-                }
-
-                if let end = routePoints.last {
-                    Annotation("End", coordinate: end.coordinate) {
-                        markerIcon(symbol: "flag.checkered", tint: .red)
-                    }
-                }
-
-                ForEach(eventMarkers) { event in
-                    Annotation(event.title, coordinate: event.coordinate) {
-                        markerIcon(symbol: event.symbol, tint: UIRunDesignSystem.warning)
-                    }
-                }
-
-                Annotation("Driver", coordinate: driverCoordinate) {
-                    ZStack {
-                        Circle()
-                            .fill(UIRunDesignSystem.primary)
-                            .frame(width: 18, height: 18)
-                        Circle()
-                            .stroke(Color.white, lineWidth: 2)
-                            .frame(width: 18, height: 18)
-                    }
-                }
-            }
+            TribeGoogleMapView(
+                markers: replayGoogleMarkers,
+                polylineCoordinates: routePoints.map(\.coordinate),
+                strokeUIColor: UIColor(UIRunDesignSystem.primary).withAlphaComponent(0.85),
+                lineWidth: 5,
+                cameraHint: cameraRegion,
+                externalCamera: nil,
+                showsUserLocation: false,
+                padding: .init(top: 44, left: 20, bottom: 120, right: 20),
+                onMarkerIdTap: nil
+            )
             .ignoresSafeArea()
 
             if let eventBannerText {
@@ -271,48 +308,10 @@ struct RouteReplayView: View {
         }
     }
 
-    private func markerIcon(symbol: String, tint: Color) -> some View {
-        ZStack {
-            Circle()
-                .fill(tint)
-                .frame(width: 24, height: 24)
-            Image(systemName: symbol)
-                .font(.system(size: 11, weight: .bold))
-                .foregroundStyle(.white)
-        }
-    }
-
     private func timestampText(_ date: Date) -> String {
         let formatter = DateFormatter()
         formatter.dateFormat = "h:mm:ss a"
         return formatter.string(from: date)
-    }
-
-    private static func fittedRegion(for coordinates: [CLLocationCoordinate2D], fallback: CLLocationCoordinate2D) -> MKCoordinateRegion {
-        guard !coordinates.isEmpty else {
-            return MKCoordinateRegion(
-                center: fallback,
-                span: MKCoordinateSpan(latitudeDelta: 0.018, longitudeDelta: 0.018)
-            )
-        }
-
-        let lats = coordinates.map(\.latitude)
-        let lons = coordinates.map(\.longitude)
-        guard let minLat = lats.min(),
-              let maxLat = lats.max(),
-              let minLon = lons.min(),
-              let maxLon = lons.max()
-        else {
-            return MKCoordinateRegion(
-                center: fallback,
-                span: MKCoordinateSpan(latitudeDelta: 0.018, longitudeDelta: 0.018)
-            )
-        }
-
-        let center = CLLocationCoordinate2D(latitude: (minLat + maxLat) / 2, longitude: (minLon + maxLon) / 2)
-        let latDelta = max(0.012, (maxLat - minLat) * 1.55)
-        let lonDelta = max(0.012, (maxLon - minLon) * 1.55)
-        return MKCoordinateRegion(center: center, span: MKCoordinateSpan(latitudeDelta: latDelta, longitudeDelta: lonDelta))
     }
 }
 

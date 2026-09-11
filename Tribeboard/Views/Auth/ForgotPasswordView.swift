@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ForgotPasswordView: View {
     @StateObject private var viewModel = AuthViewModel()
+    var initialEmail: String = ""
 
     var body: some View {
         AuthScreenContainer {
@@ -53,6 +54,11 @@ struct ForgotPasswordView: View {
         }
         .navigationTitle("Forgot Password")
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            if viewModel.email.isEmpty {
+                viewModel.email = initialEmail
+            }
+        }
     }
 }
 

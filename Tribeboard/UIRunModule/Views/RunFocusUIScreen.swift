@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct RunFocusUIScreen: View {
+    @EnvironmentObject private var authSession: AuthSessionContext
     let run: UIRun
     let isDriver: Bool
     let onStartRun: () -> Void
@@ -43,14 +44,11 @@ struct RunFocusUIScreen: View {
                     HStack(spacing: 16) {
                         ForEach(run.passengers) { passenger in
                             VStack(spacing: 6) {
-                                Circle()
-                                    .fill(UIRunDesignSystem.primary.opacity(0.14))
-                                    .frame(width: 52, height: 52)
-                                    .overlay {
-                                        Text(initials(passenger.name))
-                                            .font(.system(size: 14, weight: .bold))
-                                            .foregroundStyle(UIRunDesignSystem.primary)
-                                    }
+                                TribeAvatarView(
+                                    identity: TribeAvatarIdentity(displayName: passenger.name),
+                                    size: TribeAvatarSize.closest(to: 52),
+                                    accessToken: authSession.currentAccessToken
+                                )
                                 Text(firstName(passenger.name))
                                     .font(.system(size: 14, weight: .semibold))
                                     .foregroundStyle(UIRunDesignSystem.textPrimary)
@@ -102,10 +100,6 @@ struct RunFocusUIScreen: View {
                     .font(.system(size: 34, weight: .bold))
                     .foregroundStyle(Color.white.opacity(0.7))
             }
-    }
-
-    private func initials(_ fullName: String) -> String {
-        fullName.split(separator: " ").prefix(2).compactMap(\.first).map(String.init).joined().uppercased()
     }
 
     private func firstName(_ fullName: String) -> String {

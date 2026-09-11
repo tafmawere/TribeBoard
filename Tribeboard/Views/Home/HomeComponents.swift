@@ -58,25 +58,20 @@ struct StatusChip: View {
 }
 
 struct PassengerAvatarStack: View {
-    let initials: [String]
+    let identities: [TribeAvatarIdentity]
+    var accessToken: String? = nil
 
     var body: some View {
-        let visible = Array(initials.prefix(3))
-        let overflow = max(0, initials.count - visible.count)
+        let visible = Array(identities.prefix(3))
+        let overflow = max(0, identities.count - visible.count)
 
         return HStack(spacing: -5) {
-            ForEach(Array(visible.enumerated()), id: \.offset) { index, item in
-                Circle()
-                    .fill(index.isMultiple(of: 2) ? HomeTheme.primary.opacity(0.20) : Color.orange.opacity(0.20))
-                    .frame(width: 30, height: 30)
-                    .overlay {
-                        Text(item)
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundStyle(HomeTheme.textPrimary)
-                    }
-                    .overlay {
-                        Circle().stroke(Color.white, lineWidth: 1.5)
-                    }
+            ForEach(Array(visible.enumerated()), id: \.offset) { _, identity in
+                TribeAvatarView(
+                    identity: identity,
+                    size: .compact,
+                    accessToken: accessToken
+                )
             }
 
             if overflow > 0 {
@@ -159,7 +154,9 @@ struct HomeHeroCard: View {
                                 .foregroundStyle(HomeTheme.textSecondary)
                         }
                         Spacer()
-                        PassengerAvatarStack(initials: event.passengerInitials)
+                        PassengerAvatarStack(
+                            identities: event.passengerInitials.map { TribeAvatarIdentity(displayName: $0) }
+                        )
                     }
                 } else {
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
@@ -253,7 +250,9 @@ struct HomeHeroCard: View {
                             .foregroundStyle(HomeTheme.textSecondary)
                     }
                     Spacer()
-                    PassengerAvatarStack(initials: event.passengerInitials)
+                    PassengerAvatarStack(
+                        identities: event.passengerInitials.map { TribeAvatarIdentity(displayName: $0) }
+                    )
                 }
             } else {
                 RoundedRectangle(cornerRadius: 12, style: .continuous)

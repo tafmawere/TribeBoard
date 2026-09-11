@@ -91,7 +91,7 @@ final class RunDetailsViewModel: ObservableObject {
     func primaryAction() {
         guard let run else { return }
         switch run.status {
-        case .scheduled:
+        case .scheduled, .assigned:
             // Scheduled uses explicit Start Run button.
             break
         case .inProgress:

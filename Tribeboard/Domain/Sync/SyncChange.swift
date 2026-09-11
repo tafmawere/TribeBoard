@@ -3,6 +3,7 @@ import Foundation
 enum SyncEntityType: String, Codable, Equatable {
     case run
     case schedule
+    case runAssignment
     case driver
     case household
 }

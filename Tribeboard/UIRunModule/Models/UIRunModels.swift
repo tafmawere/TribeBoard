@@ -13,6 +13,7 @@ enum UIPassengerStatus: String, Hashable {
 
 enum UIRunStatus: String, Hashable {
     case scheduled = "Scheduled"
+    case assigned = "Assigned"
     case active = "Active"
     case completed = "Completed"
 }

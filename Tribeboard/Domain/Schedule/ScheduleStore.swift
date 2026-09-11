@@ -128,59 +128,37 @@ final class ScheduleStore {
     }
 
     func seedDemoIfNeeded() {
-#if DEBUG
-        assert(UUID(uuidString: demoTemplateDropoffIDString) != nil, "Invalid UUID: \(demoTemplateDropoffIDString)")
-        assert(UUID(uuidString: demoTemplatePickupIDString) != nil, "Invalid UUID: \(demoTemplatePickupIDString)")
-        assert(UUID(uuidString: demoChildIDString) != nil, "Invalid UUID: \(demoChildIDString)")
-        assert(UUID(uuidString: dropoffHomeStopIDString) != nil, "Invalid UUID: \(dropoffHomeStopIDString)")
-        assert(UUID(uuidString: dropoffFriendStopIDString) != nil, "Invalid UUID: \(dropoffFriendStopIDString)")
-        assert(UUID(uuidString: dropoffSchoolStopIDString) != nil, "Invalid UUID: \(dropoffSchoolStopIDString)")
-        assert(UUID(uuidString: pickupHomeStopIDString) != nil, "Invalid UUID: \(pickupHomeStopIDString)")
-        assert(UUID(uuidString: pickupFriendStopIDString) != nil, "Invalid UUID: \(pickupFriendStopIDString)")
-        assert(UUID(uuidString: pickupSchoolStopIDString) != nil, "Invalid UUID: \(pickupSchoolStopIDString)")
-#endif
+        // Sprint 40: disabled to avoid placeholder/phantom schedule templates.
+    }
 
+    func upsertScheduleFromBackend(_ backendSchedule: BackendScheduleTemplate) {
         var templates = load()
-        let hasDropoff = templates.contains { $0.name == "School Dropoff" }
-        let hasPickup = templates.contains { $0.name == "School Pickup" }
-        let shouldSeed = templates.isEmpty || !hasDropoff || !hasPickup
-        guard shouldSeed else { return }
-
-        if !hasDropoff {
-            templates.append(
-                DomainScheduleTemplate(
-                    id: demoTemplateDropoffID,
-                    name: "School Dropoff",
-                    childId: demoChildID,
-                    driverId: nil,
-                    weekdays: [2, 3, 4, 5, 6], // Mon-Fri
-                    hour: 6,
-                    minute: 45,
-                    stops: demoStops(prefix: "dropoff"),
-                    isActive: true,
-                    createdAt: Date()
-                )
-            )
+        let existing = templates.first(where: { $0.id == backendSchedule.id })
+        let mapped = Self.mapBackendSchedule(
+            backendSchedule,
+            existingStops: existing?.stops
+        )
+        if let index = templates.firstIndex(where: { $0.id == mapped.id }) {
+            templates[index] = mapped
+        } else {
+            templates.append(mapped)
         }
-
-        if !hasPickup {
-            templates.append(
-                DomainScheduleTemplate(
-                    id: demoTemplatePickupID,
-                    name: "School Pickup",
-                    childId: demoChildID,
-                    driverId: nil,
-                    weekdays: [2, 3, 4, 5, 6], // Mon-Fri
-                    hour: 14,
-                    minute: 30,
-                    stops: demoStops(prefix: "pickup"),
-                    isActive: true,
-                    createdAt: Date()
-                )
-            )
-        }
-
         save(templates)
+    }
+
+    func replaceSchedulesFromBackend(_ backendSchedules: [BackendScheduleTemplate], householdId: UUID) {
+        var templates = load()
+        let existingById = Dictionary(uniqueKeysWithValues: templates.map { ($0.id, $0) })
+        let mapped = backendSchedules.map {
+            Self.mapBackendSchedule($0, existingStops: existingById[$0.id]?.stops)
+        }
+        templates.removeAll { $0.householdId == householdId }
+        templates.append(contentsOf: mapped)
+        save(templates)
+    }
+
+    func removeScheduleFromBackend(id: UUID) {
+        remove(id: id)
     }
 
     private func demoStops(prefix: String) -> [DomainStop] {
@@ -232,6 +210,56 @@ final class ScheduleStore {
                 longitude: 31.0476,
                 order: 2
             )
+        ]
+    }
+
+    private static func mapBackendSchedule(
+        _ schedule: BackendScheduleTemplate,
+        existingStops: [DomainStop]?
+    ) -> DomainScheduleTemplate {
+        let start = parseTime(schedule.departureTime) ?? DateComponents(hour: 6, minute: 45)
+        let weekday = weekdayValue(from: schedule.weekday)
+        let stops = (existingStops?.isEmpty == false) ? (existingStops ?? []) : defaultStops()
+        return DomainScheduleTemplate(
+            id: schedule.id,
+            householdId: schedule.householdId,
+            name: schedule.title.trimmingCharacters(in: .whitespacesAndNewlines),
+            childId: schedule.childId,
+            driverId: nil,
+            weekdays: [weekday],
+            hour: start.hour ?? 6,
+            minute: start.minute ?? 45,
+            stops: stops,
+            isActive: true,
+            createdAt: schedule.createdAtDate ?? Date()
+        )
+    }
+
+    private static func parseTime(_ value: String) -> DateComponents? {
+        let parts = value.split(separator: ":")
+        guard parts.count >= 2, let hour = Int(parts[0]), let minute = Int(parts[1]) else {
+            return nil
+        }
+        return DateComponents(hour: hour, minute: minute)
+    }
+
+    private static func weekdayValue(from name: String) -> Int {
+        switch name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        case "sunday": return 1
+        case "monday": return 2
+        case "tuesday": return 3
+        case "wednesday": return 4
+        case "thursday": return 5
+        case "friday": return 6
+        case "saturday": return 7
+        default: return 2
+        }
+    }
+
+    private static func defaultStops() -> [DomainStop] {
+        [
+            DomainStop(id: UUID(), name: "Start", latitude: 0, longitude: 0, order: 0),
+            DomainStop(id: UUID(), name: "End", latitude: 0, longitude: 0, order: 1)
         ]
     }
 

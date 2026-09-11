@@ -78,6 +78,7 @@ final class MockRemoteSyncDriver: RemoteSyncDriver, RemoteSyncDebuggable {
             templateId: schedule.id,
             title: "Remote Synced Run",
             date: now.addingTimeInterval(3600),
+            departureTime: RunScheduleSnapshot.departureTime(from: schedule),
             status: .scheduled,
             stops: [
                 SystemDomain.RunStopProgress(stopId: stopA.id, status: .pending, arrivedAt: nil, departedAt: nil),
@@ -190,6 +191,8 @@ final class MockRemoteSyncDriver: RemoteSyncDriver, RemoteSyncDebuggable {
     private func apply(_ resolved: ResolvedSyncChange, to snapshot: inout RemoteMirrorStore.Snapshot) {
         switch resolved.change.entityType {
         case .run:
+            applyRun(resolved, to: &snapshot.runs)
+        case .runAssignment:
             applyRun(resolved, to: &snapshot.runs)
         case .schedule:
             applySchedule(resolved, to: &snapshot.schedules)
@@ -324,6 +327,7 @@ final class MockRemoteSyncDriver: RemoteSyncDriver, RemoteSyncDebuggable {
             templateId: UUID(),
             title: "Remote Merge Target",
             date: now.addingTimeInterval(3600),
+            departureTime: RunScheduledTime.from(date: now.addingTimeInterval(3600)),
             status: .scheduled,
             stops: [
                 SystemDomain.RunStopProgress(stopId: stopA.id, status: .pending, arrivedAt: nil, departedAt: nil),

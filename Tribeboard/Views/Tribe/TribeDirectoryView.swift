@@ -3,6 +3,11 @@ import UIKit
 
 struct TribeDirectoryView: View {
     @ObservedObject var store: TribeStore
+    @EnvironmentObject private var activeHouseholdStore: ActiveHouseholdStore
+    @EnvironmentObject private var authSession: AuthSessionContext
+    @EnvironmentObject private var backendHouseholdContext: BackendHouseholdContext
+    @EnvironmentObject private var backendHouseholdPeopleContext: BackendHouseholdPeopleContext
+    @EnvironmentObject private var backendChildrenContext: BackendChildrenContext
 
     @State private var searchText = ""
     @State private var isShowingEditor = false
@@ -14,11 +19,26 @@ struct TribeDirectoryView: View {
     @State private var activeSharePayload: SharePayload?
 
     private var adults: [TribeMember] {
-        store.adults(matching: searchText)
+        if authSession.isAuthenticated, backendHouseholdContext.activeHouseholdId != nil {
+            let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            let mapped = backendHouseholdPeopleContext.people.map(backendHouseholdPeopleContext.mapToTribeMember)
+            if query.isEmpty {
+                return mapped.sorted { $0.fullName < $1.fullName }
+            }
+            return mapped
+                .filter { member in
+                    member.fullName.lowercased().contains(query)
+                    || member.preferredDisplayName.lowercased().contains(query)
+                    || member.roles.contains(where: { $0.rawValue.lowercased().contains(query) })
+                }
+                .sorted { $0.fullName < $1.fullName }
+        }
+        return store.adults(matching: searchText)
     }
 
     private var children: [TribeMember] {
-        store.children(matching: searchText)
+        let backendChildIDs = Set(backendChildrenContext.children.map(\.id))
+        return store.children(matching: searchText).filter { backendChildIDs.contains($0.id) }
     }
 
     var body: some View {
@@ -57,6 +77,8 @@ struct TribeDirectoryView: View {
 
                         configurationHealthSection
 
+                        familyLocationsSection
+
                         if !adults.isEmpty {
                             MemberSectionHeader(title: "Adults", count: adults.count)
                             ForEach(adults) { member in
@@ -72,9 +94,22 @@ struct TribeDirectoryView: View {
                                     configuration: store.childConfigurationSummary(for: member.id),
                                     nextRun: store.nextUpcomingRun(for: member.id),
                                     scheduleCount: store.ruleCount(for: member.id),
+                                    schoolName: member.schoolRoutineSummary,
                                     onRowTap: { selectedMemberID = member.id },
                                     onAvatarTap: { selectedMemberID = member.id }
                                 )
+                            }
+                        } else {
+                            TribeCard {
+                                VStack(alignment: .leading, spacing: 6) {
+                                    Text("No children yet")
+                                        .font(.system(size: 16, weight: .bold))
+                                        .foregroundStyle(TribeTheme.textPrimary)
+                                    Text("Add your first child to begin planning rides.")
+                                        .font(.system(size: 13, weight: .medium))
+                                        .foregroundStyle(TribeTheme.textSecondary)
+                                    ProductEducationCard(item: ProductEducationProvider.item(for: .childFirstSetup))
+                                }
                             }
                         }
                     }
@@ -115,7 +150,11 @@ struct TribeDirectoryView: View {
         }
         .sheet(isPresented: $isShowingEditor) {
             MemberEditorView(defaultType: editorType) { newMember in
-                store.addMember(newMember)
+                if newMember.memberType == .child {
+                    return await backendChildrenContext.createChild(newMember)
+                } else {
+                    return await saveAdultMember(newMember)
+                }
             }
         }
         .sheet(isPresented: $isShowingAddChild) {
@@ -134,6 +173,15 @@ struct TribeDirectoryView: View {
         .sheet(item: selectedMemberBinding) { memberID in
             MemberProfileView(store: store, memberID: memberID.value)
         }
+        .task {
+            await backendHouseholdPeopleContext.refreshForActiveHousehold()
+        }
+        .onChange(of: activeHouseholdStore.activeHouseholdId) { _, _ in
+            Task {
+                await backendHouseholdPeopleContext.refreshForActiveHousehold()
+                await backendChildrenContext.refreshForActiveHousehold()
+            }
+        }
     }
 
     private var adminCount: Int {
@@ -145,7 +193,7 @@ struct TribeDirectoryView: View {
     }
 
     private var childrenCount: Int {
-        store.members.filter { $0.memberType == .child }.count
+        backendChildrenContext.children.count
     }
 
     private var hasHomeSet: Bool {
@@ -155,11 +203,36 @@ struct TribeDirectoryView: View {
         return store.locations.contains(where: { $0.type == .home })
     }
 
-    private var childrenMissingSchedulesCount: Int {
+    private var childNamesMissingSchedules: [String] {
         store.members
             .filter { $0.memberType == .child }
             .filter { store.ruleCount(for: $0.id) == 0 }
-            .count
+            .map(\.preferredDisplayName)
+            .sorted()
+    }
+
+    private var childNamesMissingSchool: [String] {
+        store.members
+            .filter { $0.memberType == .child }
+            .filter { store.schoolName(for: $0.id) == nil }
+            .map(\.preferredDisplayName)
+            .sorted()
+    }
+
+    private var childNamesMissingSchoolRoutine: [String] {
+        store.members
+            .filter { $0.memberType == .child }
+            .filter { $0.hasSchoolConfigured && !$0.hasSchoolRoutineConfigured }
+            .map(\.preferredDisplayName)
+            .sorted()
+    }
+
+    private var childNamesMissingActivities: [String] {
+        store.members
+            .filter { $0.memberType == .child }
+            .filter { $0.activities.isEmpty }
+            .map(\.preferredDisplayName)
+            .sorted()
     }
 
     private var configurationWarnings: [String] {
@@ -167,8 +240,37 @@ struct TribeDirectoryView: View {
         if driverCount == 0 {
             warnings.append("No driver configured")
         }
-        if childrenMissingSchedulesCount > 0 {
-            warnings.append("\(childrenMissingSchedulesCount) child without schedules")
+        let missingDOBNames = children.filter { $0.dateOfBirth == nil }.map(\.preferredDisplayName).sorted()
+        if !missingDOBNames.isEmpty {
+            warnings.append(contentsOf: missingDOBNames.prefix(3).map { "\($0) has no date of birth added" })
+        }
+        if !childNamesMissingSchool.isEmpty {
+            warnings.append(contentsOf: childNamesMissingSchool.prefix(3).map { "\($0) has no school added" })
+        }
+        if !childNamesMissingSchoolRoutine.isEmpty {
+            warnings.append(contentsOf: childNamesMissingSchoolRoutine.prefix(3).map { "\($0) has no school routine set" })
+        }
+        if !childNamesMissingSchedules.isEmpty {
+            warnings.append(contentsOf: childNamesMissingSchedules.prefix(3).map { "\($0) has no schedules yet" })
+        }
+        if !childNamesMissingActivities.isEmpty {
+            warnings.append(contentsOf: childNamesMissingActivities.prefix(3).map { "\($0) has no activities yet" })
+        }
+        let timingWarnings = store.members
+            .filter { $0.memberType == .child }
+            .flatMap { child in
+                child.activitiesMissingTiming.map { "\(child.preferredDisplayName): \($0.name) has no time set" }
+            }
+        if !timingWarnings.isEmpty {
+            warnings.append(contentsOf: timingWarnings.prefix(2))
+        }
+        let locationWarnings = store.members
+            .filter { $0.memberType == .child }
+            .flatMap { child in
+                child.externalActivitiesMissingLocation.map { "\(child.preferredDisplayName): \($0.name) has no location set" }
+            }
+        if !locationWarnings.isEmpty {
+            warnings.append(contentsOf: locationWarnings.prefix(2))
         }
         if !hasHomeSet {
             warnings.append("Home location not set")
@@ -226,7 +328,7 @@ struct TribeDirectoryView: View {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .fill(
                     LinearGradient(
-                        colors: [TribeTheme.primary.opacity(0.14), Color.white],
+                        colors: [TribeTheme.primary.opacity(0.14), Color(uiColor: .systemBackground)],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
@@ -324,6 +426,12 @@ struct TribeDirectoryView: View {
         }
     }
 
+    private var familyLocationsSection: some View {
+        TribeCard {
+            FamilyLocationsSectionView()
+        }
+    }
+
     private func adultCommandRow(member: TribeMember) -> some View {
         HStack(alignment: .top, spacing: 12) {
             MemberAvatarView(member: member, size: 46, showsStatus: true)
@@ -362,9 +470,9 @@ struct TribeDirectoryView: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
-        .background(Color.white)
+        .background(Color(uiColor: .secondarySystemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .shadow(color: Color.black.opacity(0.04), radius: 8, x: 0, y: 4)
+        .shadow(color: Color.black.opacity(0.03), radius: 6, x: 0, y: 3)
         .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .onTapGesture {
             selectedMemberID = member.id
@@ -391,6 +499,21 @@ struct TribeDirectoryView: View {
             set: { value in
                 selectedMemberID = value?.value
             }
+        )
+    }
+
+    private func saveAdultMember(_ member: TribeMember) async -> Bool {
+        guard authSession.isAuthenticated, backendHouseholdContext.activeHouseholdId != nil else {
+            store.addMember(member)
+            return true
+        }
+        let backendRole = backendHouseholdPeopleContext.mapAdultMemberToBackendRole(member)
+        return await backendHouseholdPeopleContext.createPerson(
+            name: member.fullName,
+            relationship: member.relationship,
+            role: backendRole,
+            phone: member.phone,
+            isDriver: member.roles.contains(.driver)
         )
     }
 }
@@ -420,6 +543,7 @@ private struct ChildCommandRow: View {
     let configuration: ChildConfigurationSummary
     let nextRun: RunSuggestion?
     let scheduleCount: Int
+    let schoolName: String?
     var onRowTap: (() -> Void)? = nil
     var onAvatarTap: (() -> Void)? = nil
 
@@ -449,10 +573,24 @@ private struct ChildCommandRow: View {
                     Circle()
                         .fill(statusColor)
                         .frame(width: 10, height: 10)
-                    Text(member.fullName)
+                    Text(member.preferredDisplayName)
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(TribeTheme.textPrimary)
                 }
+
+                if let ageText = member.ageText {
+                    Text(ageText)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(TribeTheme.textSecondary)
+                }
+
+                Text(schoolName ?? "No school added yet")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(TribeTheme.textSecondary)
+
+                Text(member.activityCountText)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(TribeTheme.textSecondary)
 
                 Text(configuration.statusText)
                     .font(.system(size: 13, weight: .semibold))
@@ -489,9 +627,9 @@ private struct ChildCommandRow: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
-        .background(Color.white)
+        .background(Color(uiColor: .secondarySystemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .shadow(color: Color.black.opacity(0.04), radius: 8, x: 0, y: 4)
+        .shadow(color: Color.black.opacity(0.03), radius: 6, x: 0, y: 3)
         .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .onTapGesture {
             onRowTap?()

@@ -1,29 +1,31 @@
-import SwiftUI
-import MapKit
+import Combine
 import CoreLocation
+import GoogleMaps
+import SwiftUI
+import UIKit
 
 struct RunSummaryView: View {
     let run: UIRun
     let routeCoordinates: [CLLocationCoordinate2D]
     let completionDate: Date
 
-    @State private var mapPosition: MapCameraPosition
+    @State private var summaryCameraRegion: CoordinateRegionDegrees
     @State private var isShowingReplay = false
+
+    private static let summaryStartMarkerID = UUID(uuidString: "00000000-0000-0000-0000-0000000000B1")!
+    private static let summaryEndMarkerID = UUID(uuidString: "00000000-0000-0000-0000-0000000000B2")!
 
     init(run: UIRun, routeCoordinates: [CLLocationCoordinate2D], completionDate: Date) {
         self.run = run
         self.routeCoordinates = routeCoordinates
         self.completionDate = completionDate
 
-        let center = routeCoordinates.isEmpty
+        let fallback = routeCoordinates.isEmpty
             ? CLLocationCoordinate2D(latitude: 37.7818, longitude: -122.4154)
             : routeCoordinates[routeCoordinates.count / 2]
-        _mapPosition = State(initialValue: .region(
-            MKCoordinateRegion(
-                center: center,
-                span: MKCoordinateSpan(latitudeDelta: 0.020, longitudeDelta: 0.020)
-            )
-        ))
+        _summaryCameraRegion = State(
+            initialValue: CoordinateRegionDegrees.fittingCoordinates(routeCoordinates, fallback: fallback, minimumDelta: 0.02)
+        )
     }
 
     private var startCoordinate: CLLocationCoordinate2D {
@@ -95,16 +97,34 @@ struct RunSummaryView: View {
                     .font(.system(size: 17, weight: .semibold))
                     .foregroundStyle(UIRunDesignSystem.textPrimary)
 
-                Map(position: $mapPosition, interactionModes: .all) {
-                    Marker("Start", coordinate: startCoordinate)
-                        .tint(UIRunDesignSystem.success)
-
-                    Marker("End", coordinate: endCoordinate)
-                        .tint(.red)
-
-                    MapPolyline(coordinates: routeCoordinates)
-                        .stroke(UIRunDesignSystem.primary.opacity(0.85), lineWidth: 5)
-                }
+                TribeGoogleMapView(
+                    markers: [
+                        GoogleMapMarkerModel(
+                            id: Self.summaryStartMarkerID,
+                            title: "Start",
+                            coordinate: startCoordinate,
+                            kind: .routeStart,
+                            orderLabel: nil,
+                            isSelected: false
+                        ),
+                        GoogleMapMarkerModel(
+                            id: Self.summaryEndMarkerID,
+                            title: "End",
+                            coordinate: endCoordinate,
+                            kind: .routeEnd,
+                            orderLabel: nil,
+                            isSelected: false
+                        )
+                    ],
+                    polylineCoordinates: routeCoordinates,
+                    strokeUIColor: UIColor(UIRunDesignSystem.primary).withAlphaComponent(0.85),
+                    lineWidth: 5,
+                    cameraHint: summaryCameraRegion,
+                    externalCamera: nil,
+                    showsUserLocation: false,
+                    padding: .init(top: 16, left: 12, bottom: 16, right: 12),
+                    onMarkerIdTap: nil
+                )
                 .frame(height: 220)
                 .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
 

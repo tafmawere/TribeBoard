@@ -18,8 +18,12 @@ struct DispatchBucketer {
         let dayRuns = runs.filter { DayKey.key(for: $0.date, calendar: calendar) == day }
 
         return DispatchBuckets(
-            unassigned: dayRuns.filter { $0.status == .scheduled && $0.assignedDriverId == nil },
-            assigned: dayRuns.filter { $0.status == .scheduled && $0.assignedDriverId != nil },
+            unassigned: dayRuns.filter {
+                ($0.status == .scheduled || $0.status == .assigned) && $0.assignedDriverId == nil
+            },
+            assigned: dayRuns.filter {
+                $0.status == .assigned || ($0.status == .scheduled && $0.assignedDriverId != nil)
+            },
             inProgress: dayRuns.filter { $0.status == .inProgress },
             completed: dayRuns.filter { $0.status == .completed },
             cancelled: dayRuns.filter { $0.status == .cancelled }

@@ -7,10 +7,10 @@ final class ActiveHouseholdContext: ObservableObject {
     @Published var householdName: String
 
     init(
-        householdId: UUID = HouseholdDefaults.defaultHouseholdId,
-        householdName: String = HouseholdDefaults.defaultHouseholdName
+        householdId: UUID? = nil,
+        householdName: String? = nil
     ) {
-        self.householdId = householdId
-        self.householdName = householdName
+        self.householdId = householdId ?? HouseholdDefaults.defaultHouseholdId
+        self.householdName = householdName ?? HouseholdDefaults.defaultHouseholdName
     }
 }

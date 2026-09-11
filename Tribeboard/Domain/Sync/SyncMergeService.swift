@@ -84,6 +84,20 @@ struct SyncMergeService {
                     conflicts: &conflicts,
                     auditRecords: &auditRecords
                 )
+            case .runAssignment:
+                // Assignment records reconcile through run payload updates.
+                skippedCount += 1
+                processedToAppend.append(
+                    ProcessedSyncChange(id: UUID(), changeId: resolved.change.id, processedAt: now)
+                )
+                auditRecords.append(
+                    makeAuditRecord(
+                        for: resolved,
+                        result: .skipped,
+                        message: "Run assignment merge handled by run refresh.",
+                        createdAt: now
+                    )
+                )
             case .schedule:
                 if scheduleCacheByHousehold[householdId] == nil {
                     scheduleCacheByHousehold[householdId] = try await scheduleRepository.loadTemplates(for: householdId)

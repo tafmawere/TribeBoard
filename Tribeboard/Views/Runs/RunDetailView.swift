@@ -1,7 +1,8 @@
-import SwiftUI
-import MapKit
-import CoreLocation
 import Combine
+import CoreLocation
+import GoogleMaps
+import SwiftUI
+import UIKit
 
 private enum OperationalRunState: String, CaseIterable {
     case enRouteToPickup = "En Route to Pickup"
@@ -27,9 +28,11 @@ private enum RunViewerRole: String {
 struct RunDetailView: View {
     let run: UIRun
 
+    @EnvironmentObject private var authSession: AuthSessionContext
+
     @AppStorage("profile.activeRole") private var activeRoleRawValue = RunViewerRole.driver.rawValue
 
-    @State private var mapPosition: MapCameraPosition
+    @State private var mapCamera: GoogleMapCameraState
     @State private var driverCoordinate: CLLocationCoordinate2D
     @State private var liveState: OperationalRunState = .enRouteToPickup
     @State private var liveProgress: Double = 0.20
@@ -52,12 +55,12 @@ struct RunDetailView: View {
         self.routeCoordinates = mockedRoute
         let initial = mockedRoute[1]
         _driverCoordinate = State(initialValue: initial)
-        _mapPosition = State(initialValue: .region(
-            MKCoordinateRegion(
-                center: CLLocationCoordinate2D(latitude: 37.7818, longitude: -122.4154),
-                span: MKCoordinateSpan(latitudeDelta: 0.022, longitudeDelta: 0.022)
+        _mapCamera = State(
+            initialValue: GoogleMapCameraState(
+                target: initial,
+                zoom: 14
             )
-        ))
+        )
     }
 
     private var activeRole: RunViewerRole {
@@ -76,6 +79,30 @@ struct RunDetailView: View {
     private var distanceRemainingText: String {
         let remaining = max(0.0, remainingDistanceMiles())
         return String(format: "%.1f mi remaining", remaining)
+    }
+
+    private static let detailDriverMarkerID = UUID(uuidString: "00000000-0000-0000-0000-0000000000D1")!
+    private static let detailDestinationMarkerID = UUID(uuidString: "00000000-0000-0000-0000-0000000000D2")!
+
+    private var detailMapMarkers: [GoogleMapMarkerModel] {
+        [
+            GoogleMapMarkerModel(
+                id: Self.detailDriverMarkerID,
+                title: "Driver",
+                coordinate: driverCoordinate,
+                kind: .driver,
+                orderLabel: nil,
+                isSelected: false
+            ),
+            GoogleMapMarkerModel(
+                id: Self.detailDestinationMarkerID,
+                title: "Destination",
+                coordinate: destinationCoordinate,
+                kind: .destination,
+                orderLabel: nil,
+                isSelected: false
+            )
+        ]
     }
 
     var body: some View {
@@ -107,24 +134,17 @@ struct RunDetailView: View {
                     .font(.system(size: 20, weight: .bold))
                     .foregroundStyle(UIRunDesignSystem.textPrimary)
 
-                Map(position: $mapPosition, interactionModes: .all) {
-                    Annotation("Driver", coordinate: driverCoordinate) {
-                        ZStack {
-                            Circle()
-                                .fill(UIRunDesignSystem.primary)
-                                .frame(width: 16, height: 16)
-                            Circle()
-                                .stroke(Color.white, lineWidth: 2)
-                                .frame(width: 16, height: 16)
-                        }
-                    }
-
-                    Marker("Destination", coordinate: destinationCoordinate)
-                        .tint(.red)
-
-                    MapPolyline(coordinates: routeCoordinates)
-                        .stroke(UIRunDesignSystem.primary.opacity(0.8), lineWidth: 5)
-                }
+                TribeGoogleMapView(
+                    markers: detailMapMarkers,
+                    polylineCoordinates: routeCoordinates,
+                    strokeUIColor: UIColor(UIRunDesignSystem.primary).withAlphaComponent(0.8),
+                    lineWidth: 5,
+                    cameraHint: nil,
+                    externalCamera: mapCamera,
+                    showsUserLocation: false,
+                    padding: .init(top: 12, left: 8, bottom: 12, right: 8),
+                    onMarkerIdTap: nil
+                )
                 .frame(height: 250)
                 .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
 
@@ -182,7 +202,11 @@ struct RunDetailView: View {
                     .foregroundStyle(UIRunDesignSystem.textPrimary)
 
                 HStack(spacing: 10) {
-                    avatar(initials: initials(for: run.driverName), size: 40, fill: UIRunDesignSystem.primary.opacity(0.18), textColor: UIRunDesignSystem.primary)
+                    TribeAvatarView(
+                        identity: TribeAvatarIdentity(displayName: run.driverName),
+                        size: .medium,
+                        accessToken: authSession.currentAccessToken
+                    )
                     Text(run.driverName)
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(UIRunDesignSystem.textPrimary)
@@ -243,6 +267,7 @@ struct RunDetailView: View {
         let nextIndex = min(routeStepIndex + 1, routeCoordinates.count - 1)
         routeStepIndex = nextIndex
         driverCoordinate = routeCoordinates[nextIndex]
+        mapCamera = GoogleMapCameraState(target: driverCoordinate, zoom: 15)
 
         let computedProgress = Double(nextIndex) / Double(max(1, routeCoordinates.count - 1))
         liveProgress = computedProgress
@@ -259,12 +284,7 @@ struct RunDetailView: View {
     }
 
     private func centerOnDriver() {
-        mapPosition = .region(
-            MKCoordinateRegion(
-                center: driverCoordinate,
-                span: MKCoordinateSpan(latitudeDelta: 0.018, longitudeDelta: 0.018)
-            )
-        )
+        mapCamera = GoogleMapCameraState(target: driverCoordinate, zoom: 15)
     }
 
     private func remainingDistanceMiles() -> Double {
@@ -287,30 +307,13 @@ struct RunDetailView: View {
         }
     }
 
-    private func initials(for name: String) -> String {
-        name
-            .split(separator: " ")
-            .prefix(2)
-            .compactMap(\.first)
-            .map(String.init)
-            .joined()
-            .uppercased()
-    }
-
-    private func avatar(initials: String, size: CGFloat, fill: Color, textColor: Color) -> some View {
-        Circle()
-            .fill(fill)
-            .frame(width: size, height: size)
-            .overlay {
-                Text(initials)
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(textColor)
-            }
-    }
-
     private func avatarPill(name: String) -> some View {
         HStack(spacing: 6) {
-            avatar(initials: initials(for: name), size: 26, fill: UIRunDesignSystem.primary.opacity(0.14), textColor: UIRunDesignSystem.primary)
+            TribeAvatarView(
+                identity: TribeAvatarIdentity(displayName: name),
+                size: .small,
+                accessToken: authSession.currentAccessToken
+            )
             Text(name)
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(UIRunDesignSystem.textSecondary)

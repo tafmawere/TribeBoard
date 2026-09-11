@@ -1,6 +1,6 @@
 import Foundation
 
-enum RunTransitionError: Error {
+enum RunTransitionError: Error, Equatable {
     case invalidTransition
     case invalidStopIndex
     case alreadyCompleted

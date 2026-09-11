@@ -109,13 +109,18 @@ struct MemberRow: View {
                 }
 
             VStack(alignment: .leading, spacing: 4) {
-                Text(member.fullName)
+                Text(member.preferredDisplayName)
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(TribeTheme.textPrimary)
-
                 if shouldShowSubtitle {
-                    Text(member.subtitle)
+                    Text(member.ageText ?? member.subtitle)
                         .font(.system(size: 13, weight: .regular))
+                        .foregroundStyle(TribeTheme.textSecondary)
+                    Text(member.schoolRoutineSummary)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(TribeTheme.textSecondary)
+                    Text(member.activityCountText)
+                        .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(TribeTheme.textSecondary)
                 }
 
@@ -153,9 +158,17 @@ struct MemberAvatarView: View {
 
         var dimension: CGFloat {
             switch self {
-            case .small: return 34
-            case .medium: return 46
-            case .large: return 72
+            case .small: return TribeAvatarSize.compact.dimension
+            case .medium: return TribeAvatarSize.small.dimension
+            case .large: return TribeAvatarSize.medium.dimension
+            }
+        }
+
+        var tribeSize: TribeAvatarSize {
+            switch self {
+            case .small: return .compact
+            case .medium: return .small
+            case .large: return .medium
             }
         }
     }
@@ -165,6 +178,7 @@ struct MemberAvatarView: View {
     var showCameraBadge: Bool = false
     var onTap: (() -> Void)? = nil
     var showsStatus: Bool = false
+    var accessToken: String? = nil
     private var isOnline: Bool = false
 
     init(
@@ -172,13 +186,15 @@ struct MemberAvatarView: View {
         size: CGFloat = 46,
         showCameraBadge: Bool = false,
         onTap: (() -> Void)? = nil,
-        showsStatus: Bool = false
+        showsStatus: Bool = false,
+        accessToken: String? = nil
     ) {
         self.member = member.avatar
         self.size = size
         self.showCameraBadge = showCameraBadge
         self.onTap = onTap
         self.showsStatus = showsStatus
+        self.accessToken = accessToken
         self.isOnline = member.isOnline
     }
 
@@ -186,123 +202,40 @@ struct MemberAvatarView: View {
         member: MemberAvatarData,
         size: AvatarSize,
         showCameraBadge: Bool = false,
-        onTap: (() -> Void)? = nil
+        onTap: (() -> Void)? = nil,
+        accessToken: String? = nil
     ) {
         self.member = member
         self.size = size.dimension
         self.showCameraBadge = showCameraBadge
         self.onTap = onTap
+        self.accessToken = accessToken
     }
 
     init(
         member: MemberAvatarData,
         size: CGFloat = 46,
         showCameraBadge: Bool = false,
-        onTap: (() -> Void)? = nil
+        onTap: (() -> Void)? = nil,
+        accessToken: String? = nil
     ) {
         self.member = member
         self.size = size
         self.showCameraBadge = showCameraBadge
         self.onTap = onTap
+        self.accessToken = accessToken
     }
 
     var body: some View {
-        let avatar = baseAvatar
-            .frame(width: size, height: size)
-            .clipShape(Circle())
-            .overlay {
-                Circle().stroke(Color.white, lineWidth: 1.5)
-            }
-            .shadow(color: Color.black.opacity(0.10), radius: 5, x: 0, y: 2)
-            .overlay(alignment: .bottomTrailing) {
-                if showCameraBadge {
-                    cameraBadge
-                }
-            }
-            .overlay(alignment: .bottomTrailing) {
-                if showsStatus {
-                    onlineStatusDot
-                }
-            }
-            .frame(width: size, height: size)
-
-        Group {
-            if let onTap {
-                Button(action: onTap) {
-                    avatar
-                }
-                .buttonStyle(.plain)
-            } else {
-                avatar
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var baseAvatar: some View {
-        // Priority order is photo, then selected symbol, then initials fallback.
-        if let resolvedPhotoURL = AvatarPhotoStore.resolvePhotoURL(from: member.photoURL) {
-            if resolvedPhotoURL.isFileURL, let uiImage = UIImage(contentsOfFile: resolvedPhotoURL.path) {
-                Image(uiImage: uiImage)
-                    .resizable()
-                    .scaledToFill()
-            } else {
-                AsyncImage(url: resolvedPhotoURL) { phase in
-                    switch phase {
-                    case .empty:
-                        fallbackTinted
-                    case .success(let image):
-                        image.resizable().scaledToFill()
-                    case .failure:
-                        fallbackTinted
-                    @unknown default:
-                        fallbackTinted
-                    }
-                }
-            }
-        } else if let symbol = member.symbol ?? AvatarSymbol.fromLegacyImageName(member.imageReference) {
-            ZStack {
-                Circle().fill(Color(red: 0.388, green: 0.400, blue: 0.945).opacity(0.10))
-                Image(systemName: symbol.rawValue)
-                    .font(.system(size: max(12, size * 0.34), weight: .semibold))
-                    .foregroundStyle(Color(red: 0.388, green: 0.400, blue: 0.945))
-            }
-        } else {
-            fallbackTinted
-        }
-    }
-
-    private var fallbackTinted: some View {
-        ZStack {
-            Circle().fill(Color(red: 0.388, green: 0.400, blue: 0.945).opacity(0.12))
-            Text(member.initials)
-                .font(.system(size: max(11, size * 0.30), weight: .bold))
-                .foregroundStyle(Color(red: 0.286, green: 0.357, blue: 0.769))
-        }
-    }
-
-    private var cameraBadge: some View {
-        ZStack {
-            Circle()
-                .fill(Color(red: 0.388, green: 0.400, blue: 0.945).opacity(0.95))
-                .frame(width: max(16, size * 0.28), height: max(16, size * 0.28))
-            Image(systemName: "camera.fill")
-                .font(.system(size: max(7, size * 0.13), weight: .bold))
-                .foregroundStyle(.white)
-        }
-        .overlay {
-            Circle().stroke(Color.white, lineWidth: 1.1)
-        }
-        .offset(x: 1, y: 1)
-    }
-
-    private var onlineStatusDot: some View {
-        Circle()
-            .fill(isOnline ? Color.green : Color.gray.opacity(0.4))
-            .frame(width: 10, height: 10)
-            .overlay {
-                Circle().stroke(Color.white, lineWidth: 1.5)
-            }
+        TribeAvatarView(
+            identity: member.identity,
+            size: TribeAvatarSize.closest(to: size),
+            showCameraBadge: showCameraBadge,
+            showsStatus: showsStatus,
+            isOnline: isOnline,
+            accessToken: accessToken,
+            onTap: onTap
+        )
     }
 }
 
@@ -310,21 +243,27 @@ struct AvatarView: View {
     let name: String
     let identity: String
     var avatarSeed: String? = nil
+    var avatarType: AvatarType? = nil
+    var avatarKey: String? = nil
     var avatarURL: String? = nil
     var imageName: String? = nil
     var remoteImageURL: URL? = nil
+    var accessToken: String? = nil
     var size: CGFloat = 44
 
     var body: some View {
         MemberAvatarView(
             member: MemberAvatarData(
+                avatarType: avatarType,
+                avatarKey: avatarKey ?? imageName,
                 photoURL: remoteImageURL?.absoluteString ?? avatarURL,
                 imageReference: imageName,
                 symbol: AvatarSymbol.fromLegacyImageName(imageName),
                 seed: avatarSeed ?? identity,
                 name: name
             ),
-            size: size
+            size: size,
+            accessToken: accessToken
         )
     }
 }

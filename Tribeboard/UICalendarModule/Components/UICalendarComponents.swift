@@ -138,6 +138,8 @@ struct UIOccurrenceCard: View {
     let onCreateRunNow: () -> Void
     let onViewSchedule: () -> Void
 
+    @EnvironmentObject private var authSession: AuthSessionContext
+
     var body: some View {
         UICalendarCard {
             VStack(alignment: .leading, spacing: 10) {
@@ -161,8 +163,14 @@ struct UIOccurrenceCard: View {
                     Text("\(occurrence.passengers.count) passengers")
                         .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(UICalendarDesignSystem.Colors.textTertiary)
-                    ForEach(occurrence.passengers) { user in
-                        UICalendarChip(text: initials(user.name), isSelected: false, action: nil)
+                    HStack(spacing: -6) {
+                        ForEach(occurrence.passengers) { user in
+                            TribeAvatarView(
+                                identity: TribeAvatarIdentity(displayName: user.name),
+                                size: .compact,
+                                accessToken: authSession.currentAccessToken
+                            )
+                        }
                     }
                 }
 
@@ -185,10 +193,6 @@ struct UIOccurrenceCard: View {
         let formatter = DateFormatter()
         formatter.dateFormat = "h:mm a"
         return formatter.string(from: date)
-    }
-
-    private func initials(_ name: String) -> String {
-        name.split(separator: " ").prefix(2).compactMap(\.first).map(String.init).joined().uppercased()
     }
 }
 
