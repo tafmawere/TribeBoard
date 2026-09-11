@@ -11,6 +11,7 @@ struct LoginSheetView: View {
     @State private var navigationPath = NavigationPath()
     @State private var isCheckingEmail = false
     @State private var localError: String?
+    @State private var emailCheckUnavailable = false
     @FocusState private var isEmailFocused: Bool
 
     private var normalizedEmail: String {
@@ -95,7 +96,10 @@ struct LoginSheetView: View {
             }
             .padding(.bottom, 16)
 
-            if let localError, !localError.isEmpty {
+            if emailCheckUnavailable {
+                emailCheckFallbackBlock
+                    .padding(.bottom, 12)
+            } else if let localError, !localError.isEmpty {
                 AuthInlineErrorView(message: localError)
                     .padding(.bottom, 12)
             } else if let error = authSession.lastError, !error.isEmpty {
@@ -118,6 +122,27 @@ struct LoginSheetView: View {
         }
     }
 
+    private var emailCheckFallbackBlock: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            AuthInlineErrorView(message: EmailExistenceCheckMapper.unavailableUserMessage)
+            HStack(spacing: 10) {
+                Button("Sign in") {
+                    navigationPath.append(LoginRoute.signIn(email: normalizedEmail))
+                }
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(LoginV3Theme.indigo)
+                .buttonStyle(.plain)
+
+                Button("Create account") {
+                    navigationPath.append(LoginRoute.signUp(email: normalizedEmail))
+                }
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(LoginV3Theme.indigo)
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
     private var footerBlock: some View {
         VStack(spacing: 12) {
             LoginV3LegalFooter()
@@ -133,6 +158,7 @@ struct LoginSheetView: View {
 
     private func continueTapped() {
         localError = nil
+        emailCheckUnavailable = false
         authSession.lastError = nil
 
         guard !normalizedEmail.isEmpty else {
@@ -156,6 +182,13 @@ struct LoginSheetView: View {
                     navigationPath.append(LoginRoute.signIn(email: normalizedEmail))
                 } else {
                     navigationPath.append(LoginRoute.signUp(email: normalizedEmail))
+                }
+            } catch let error as SupabaseAuthService.AuthError {
+                switch error {
+                case .emailCheckUnavailable:
+                    emailCheckUnavailable = true
+                default:
+                    localError = error.localizedDescription
                 }
             } catch {
                 localError = error.localizedDescription

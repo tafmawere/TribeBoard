@@ -54,6 +54,8 @@ final class SupabaseAuthService: AuthService {
         case signInWithGoogleFailed
         case networkFailure
         case sessionExpired
+        /// `auth-check` is undeployed or otherwise unreachable. Not a statement about the email.
+        case emailCheckUnavailable
         case unknown(String)
 
         var errorDescription: String? {
@@ -80,6 +82,8 @@ final class SupabaseAuthService: AuthService {
                 return "Could not reach the server. Check your connection and try again."
             case .sessionExpired:
                 return "Your session expired. Please sign in again, then try saving the run."
+            case .emailCheckUnavailable:
+                return EmailExistenceCheckMapper.unavailableUserMessage
             case .unknown(let message):
                 return message
             }
@@ -109,10 +113,6 @@ final class SupabaseAuthService: AuthService {
         let error_code: String?
         let code: Int?
         let error: String?
-    }
-
-    private struct EmailCheckResponse: Decodable {
-        let exists: Bool
     }
 
     private struct VerifyOTPRequestBody: Encodable {
@@ -256,17 +256,34 @@ final class SupabaseAuthService: AuthService {
         request.allHTTPHeaderFields = try SupabaseClientProvider.defaultHeaders()
         request.httpBody = try JSONEncoder().encode(["email": normalizedEmail])
 
-        let (data, response) = try await performAuthRequest(request)
-        guard (200..<300).contains(response.statusCode) else {
-            if let decoded = try? JSONDecoder().decode(AuthErrorResponse.self, from: data),
-               let message = decoded.msg ?? decoded.error_description ?? decoded.message, !message.isEmpty {
+        let data: Data
+        let response: HTTPURLResponse
+        do {
+            (data, response) = try await performAuthRequest(request)
+        } catch {
+            switch EmailExistenceCheckMapper.mapTransportError(error) {
+            case .unavailable:
+                throw AuthError.emailCheckUnavailable
+            case .failed(let message):
                 throw AuthError.unknown(message)
+            case .exists, .doesNotExist:
+                throw AuthError.emailCheckUnavailable
             }
-            throw AuthError.unknown("Could not verify email (\(response.statusCode)).")
         }
 
-        let payload = try JSONDecoder().decode(EmailCheckResponse.self, from: data)
-        return payload.exists
+        switch EmailExistenceCheckMapper.mapHTTP(statusCode: response.statusCode, body: data) {
+        case .exists:
+            return true
+        case .doesNotExist:
+            return false
+        case .unavailable:
+#if DEBUG
+            NSLog("[Auth] auth-check unavailable status=%d", response.statusCode)
+#endif
+            throw AuthError.emailCheckUnavailable
+        case .failed(let message):
+            throw AuthError.unknown(message)
+        }
     }
 
     func signInWithEmailPassword(email: String, password: String) async throws -> AuthUserSession {
