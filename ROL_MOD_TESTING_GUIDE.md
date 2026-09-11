@@ -1,5 +1,9 @@
 # ROL_MOD Testing Guide
 
+> **Historical document (early ROL_MOD).** These scenarios test the original
+> demo-mode Family tab implementation, whose UI structure has since been replaced.
+> For current state see `docs/07_CURRENT_STATE.md`.
+
 ## Prerequisites
 - Build and run the app in Demo Flow mode
 - Ensure `AppConfig.isDemoFlowEnabled` is `true`

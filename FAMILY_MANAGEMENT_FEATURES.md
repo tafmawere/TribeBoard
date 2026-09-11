@@ -1,5 +1,10 @@
 # Family Management Features
 
+> **Historical document (early ROL_MOD, demo-mode era).** Family management has
+> since moved to the Supabase backend (`household_memberships`, `household_people`,
+> FamilyStore/TribeStore). File paths and the "save to Firebase" enhancement note
+> below are outdated. For current models see `docs/02_DOMAIN_MODELS.md`.
+
 ## Overview
 Added comprehensive family management features for parents/admins to manage their family (tribe) in the Family tab.
 

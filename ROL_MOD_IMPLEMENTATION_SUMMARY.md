@@ -1,5 +1,10 @@
 # ROL_MOD Implementation Summary
 
+> **Historical document (early ROL_MOD).** This describes the branch's original
+> demo-mode Family tab scope. File paths below (e.g. `Views/MainNavigationView.swift`,
+> `LaunchRootView.swift`) predate the current project structure and no longer exist.
+> For the current architecture see `docs/01_ARCHITECTURE.md`.
+
 ## Overview
 Successfully implemented Family Members Profiles + Roles UI and Main Menu navigation on the `ROL_MOD` branch.
 
