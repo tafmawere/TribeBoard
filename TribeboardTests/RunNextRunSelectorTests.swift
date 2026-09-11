@@ -83,6 +83,50 @@ final class RunNextRunSelectorTests: XCTestCase {
         XCTAssertEqual(result.run?.title, "Nyerere")
     }
 
+    func testPrefersInProgressOverLaterAssigned() {
+        let reference = calendar.date(from: DateComponents(year: 2026, month: 6, day: 23, hour: 12))!
+        let later = makeRun(
+            title: "Later",
+            date: reference.addingTimeInterval(3600),
+            createdAt: reference,
+            status: .assigned,
+            stopCount: 2
+        )
+        let active = makeRun(
+            title: "Live",
+            date: reference.addingTimeInterval(7200),
+            createdAt: reference.addingTimeInterval(-60),
+            status: .inProgress,
+            stopCount: 2
+        )
+
+        let result = RunNextRunSelector.select(from: [later, active], referenceDate: reference, calendar: calendar)
+        XCTAssertEqual(result.run?.title, "Live")
+        XCTAssertTrue(result.selectionReason.contains("in_progress"))
+    }
+
+    func testReturnsNilWhenOnlyTerminalRunsExist() {
+        let reference = calendar.date(from: DateComponents(year: 2026, month: 6, day: 23, hour: 12))!
+        let completed = makeRun(
+            title: "Done",
+            date: reference,
+            createdAt: reference,
+            status: .completed,
+            stopCount: 2
+        )
+        let cancelled = makeRun(
+            title: "Cancelled",
+            date: reference,
+            createdAt: reference,
+            status: .cancelled,
+            stopCount: 2
+        )
+
+        let result = RunNextRunSelector.select(from: [completed, cancelled], referenceDate: reference, calendar: calendar)
+        XCTAssertNil(result.run)
+        XCTAssertEqual(result.selectionReason, "no_eligible_runs")
+    }
+
     private func makeRun(
         id: UUID = UUID(),
         title: String,
