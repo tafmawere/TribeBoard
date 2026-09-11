@@ -103,7 +103,9 @@ begin
         'household_id', v_inv.household_id,
         'household_name', (select name from public.households where id = v_inv.household_id)
       );
-    elsif lower(coalesce(v_existing.status, '')) = 'pending' then
+    else
+      -- Sentinel defect fix / AC-P0-4.4: pending OR revoked/removed/inactive/declined/etc.
+      -- Reactivate existing row (do NOT fall through to INSERT → unique_violation → already_member).
       update public.household_memberships
       set
         status = 'active',
@@ -153,6 +155,17 @@ begin
     );
   exception
     when unique_violation then
+      -- Race / leftover row: reactivate rather than falsely report already_member
+      update public.household_memberships
+      set
+        status = 'active',
+        access_role = v_access,
+        relationship_label = coalesce(nullif(trim(v_inv.relationship), ''), relationship_label),
+        invited_by_user_id = coalesce(invited_by_user_id, v_inv.invited_by),
+        updated_at = now()
+      where household_id = v_inv.household_id
+        and user_id = v_uid;
+
       update public.household_invites
       set
         status = 'accepted',
@@ -162,7 +175,7 @@ begin
       where id = v_inv.id;
 
       return jsonb_build_object(
-        'outcome', 'already_member',
+        'outcome', 'joined',
         'household_id', v_inv.household_id,
         'household_name', (select name from public.households where id = v_inv.household_id)
       );
@@ -295,7 +308,8 @@ begin
         'household_id', v_inv.household_id,
         'household_name', (select name from public.households where id = v_inv.household_id)
       );
-    elsif lower(coalesce(v_existing.status, '')) = 'pending' then
+    else
+      -- Sentinel defect fix / AC-P0-4.4: reactivate non-active membership (incl. revoked)
       update public.household_memberships
       set
         status = 'active',
@@ -331,6 +345,16 @@ begin
     );
   exception
     when unique_violation then
+      update public.household_memberships
+      set
+        status = 'active',
+        access_role = v_access,
+        relationship_label = coalesce(nullif(trim(v_inv.relationship), ''), relationship_label),
+        invited_by_user_id = coalesce(invited_by_user_id, v_inv.invited_by),
+        updated_at = now()
+      where household_id = v_inv.household_id
+        and user_id = v_uid;
+
       update public.household_invites
       set
         status = 'accepted',
@@ -340,7 +364,7 @@ begin
       where id = v_inv.id;
 
       return jsonb_build_object(
-        'outcome', 'already_member',
+        'outcome', 'joined',
         'household_id', v_inv.household_id,
         'household_name', (select name from public.households where id = v_inv.household_id)
       );

@@ -258,3 +258,14 @@ END $$;
 \echo '=== Gate A catalog checks complete ==='
 -- Behavioral INSERT/accept tests require seeded auth.uid() sessions;
 -- run those via authenticated role SET LOCAL request.jwt.claim.sub in integration harness.
+
+
+-- ---------------------------------------------------------------------------
+-- AC-P0-4.4 rejoin after revoke (manual / integration)
+-- ---------------------------------------------------------------------------
+-- After Gate A apply on non-prod with fixtures:
+-- 1) Create user U, household H, membership for U with status=revoked
+-- 2) Create pending invite for U.email to H
+-- 3) As U, call accept_household_invite(code)
+-- EXPECT: outcome=joined; membership.status=active; access_role from invite
+-- NOT: outcome=already_member while status remains revoked

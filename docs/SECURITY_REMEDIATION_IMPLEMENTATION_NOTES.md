@@ -132,3 +132,9 @@ WS-6 (Gate B): deferred — `auth_check_email`, profiles peer SELECT, `resolve_h
 - Email typo locks invitee until re-invite.
 - Preview still returns non-secret UI fields to any authenticated caller with code/id/token knowledge; secrets stripped and anon EXECUTE revoked (AC-P1-5 satisfied for tokens). Further bind-on-preview is optional hardening.
 - WS-6 P1 items remain open until Gate B.
+
+
+## Residual (documented — not Gate A blockers)
+
+1. **get_invite_by_*** still returns household_id/name/role/status to any authenticated caller who knows a code (tokens NULL). Bind-on-preview remains optional hardening.
+2. **accept rejoin after revoke:** fixed in WS-3 — non-active existing membership rows are UPDATE'd to active + invite access_role (AC-P0-4.4).
